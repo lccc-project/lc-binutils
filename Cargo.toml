@@ -6,4 +6,19 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+x86 = []
+w65c816 = []
+default-archs = ["x86","w65c816"]
+all-archs = ["default-archs"]
+elf = []
+coff = []
+pe = []
+macho = []
+aout = []
+default-formats = ["elf","coff","pe","macho"]
+all-formats = ["default-formats","aout"]
+default = ["default-archs","default-formats"]
+all = ["all-archs","all-formats"]
+
 [dependencies]
