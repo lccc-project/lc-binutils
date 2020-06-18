@@ -1,4 +1,6 @@
 
+#![deny(warnings)]
+
 pub mod binfmt;
 pub mod arch;
 
