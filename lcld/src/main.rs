@@ -3,7 +3,6 @@
 
 use std::io::{Error as IOError, ErrorKind};
 
-pub mod binfmt;
 pub mod arch;
 pub mod driver;
 
