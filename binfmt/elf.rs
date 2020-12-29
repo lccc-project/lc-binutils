@@ -34,7 +34,7 @@ pub trait ElfRelocation: Sealed {
     }
 }
 
-pub trait ElfClass: Sealed {
+pub trait ElfClass: Sealed + Sized {
     type Byte;
     const EI_CLASS: ElfByte<Self>;
     type Half: Numeric;
