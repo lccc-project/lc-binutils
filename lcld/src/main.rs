@@ -1,4 +1,3 @@
-
 #![deny(warnings)]
 
 use std::io::{Error as IOError, ErrorKind};
@@ -6,19 +5,21 @@ use std::io::{Error as IOError, ErrorKind};
 pub mod arch;
 pub mod driver;
 
-pub enum Mode{
+pub enum Mode {
     Unix,
     MacOS,
-    Windows
+    Windows,
 }
 
-fn main(){
+fn main() {
     let exe_name = std::env::current_exe()
-        .and_then(|p|p.file_name()
-            .ok_or_else(||IOError::new(ErrorKind::Other,"No executable path was found"))
-            .map(|s|String::from(s.to_string_lossy()))
-            .map(|s|s.replace(".exe",""))
-        ).unwrap_or_else(|e| {
+        .and_then(|p| {
+            p.file_name()
+                .ok_or_else(|| IOError::new(ErrorKind::Other, "No executable path was found"))
+                .map(|s| String::from(s.to_string_lossy()))
+                .map(|s| s.replace(".exe", ""))
+        })
+        .unwrap_or_else(|e| {
             println!("Error: {}", e);
             std::process::exit(1);
         });

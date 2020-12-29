@@ -1,17 +1,18 @@
+#![deny(warnings)]
 
 pub mod traits;
 
-#[cfg(feature="elf")]
+#[cfg(feature = "elf")]
 pub mod elf;
 
-#[cfg(feature="coff")]
+#[cfg(feature = "coff")]
 pub mod coff;
 
-#[cfg(feature="pe")]
+#[cfg(feature = "pe")]
 pub mod pe;
 
-#[cfg(feature="macho")]
+#[cfg(feature = "macho")]
 pub mod macho;
 
-#[cfg(feature="aout")]
+#[cfg(feature = "aout")]
 pub mod aout;

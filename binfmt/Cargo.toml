@@ -11,3 +11,16 @@ edition = "2018"
 [lib]
 name = "binfmt"
 path = "lib.rs"
+
+[features]
+aout = []
+coff = []
+elf = []
+macho = []
+pe = []
+llir = []
+xir = []
+default-formats = ["coff","elf","macho","pe","llir","xir"]
+default = ["default-formats"]
+all-formats = ["default-formats","aout"]
+all = ["all-formats"]
