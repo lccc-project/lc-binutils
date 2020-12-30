@@ -36,6 +36,18 @@ pub trait ElfRelocation: Sealed {
     }
 }
 
+pub trait ElfProgramHeader: Sealed {
+    type Class: ElfClass;
+    fn pt_type(&self) -> consts::ProgramType;
+    fn offset(&self) -> ElfOffset<Self::Class>;
+    fn vaddr(&self) -> ElfAddr<Self::Class>;
+    fn paddr(&self) -> ElfAddr<Self::Class>;
+    fn memsize(&self) -> ElfSize<Self::Class>;
+    fn filesize(&self) -> ElfSize<Self::Class>;
+    fn align(&self) -> ElfSize<Self::Class>;
+    fn flags(&self) -> ElfWord<Self::Class>;
+}
+
 pub trait ElfClass: Sealed + Sized + Copy {
     type Byte: Numeric;
     const EI_CLASS: ElfByte<Self>;
@@ -52,6 +64,7 @@ pub trait ElfClass: Sealed + Sized + Copy {
     type Symbol: ElfSymbol<Class = Self>;
     type Rel: ElfRelocation<Class = Self>;
     type Rela: ElfRelocation<Class = Self>;
+    type ProgramHeader: ElfProgramHeader<Class = Self>;
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -227,6 +240,8 @@ impl ElfClass for Elf64 {
     type Section = u16;
 
     type Versym = u16;
+
+    type ProgramHeader = Elf64Phdr;
 }
 
 impl ElfRelocationExtractHelpers for Elf64 {
@@ -263,6 +278,7 @@ impl ElfClass for Elf32 {
     type Section = u16;
 
     type Versym = u16;
+    type ProgramHeader = Elf32Phdr;
 }
 
 impl ElfRelocationExtractHelpers for Elf32 {
@@ -284,9 +300,9 @@ pub mod consts {
             #[derive(Copy,Clone,Eq,PartialEq)]
             #[repr(transparent)]
             $vis struct $name($t);
-            impl $name{
-                $(pub const $item: $name = $name($expr);)*
-            }
+
+            $($vis const $item: $name = $name($expr);)*
+
             impl ::std::fmt::Debug for $name{
                 #[allow(unreachable_patterns)]
                 fn fmt(&self,f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result{
@@ -570,6 +586,35 @@ pub mod consts {
     }
 
     static_assertions::const_assert_eq!(core::mem::size_of::<ElfIdent>(), 16);
+
+    fake_enum! {
+        #[repr(u32)] pub enum ProgramType{
+            PT_NULL = 0,
+            PT_LOAD = 2,
+            PT_DYNAMIC = 3,
+            PT_INTERP = 4,
+            PT_NOTE = 5,
+            PT_SHLIB = 6,
+            PT_PHDR = 7,
+        }
+    }
+
+    fake_enum! {
+        #[repr(u32)] pub enum SectionType{
+            SHT_NULL = 0,
+            SHT_PROGBITS = 1,
+            SHT_SYMTAB = 2,
+            SHT_STRTAB = 3,
+            SHT_RELA = 4,
+            SHT_HASH = 5,
+            SHT_DYNAMIC = 6,
+            SHT_NOTE = 7,
+            SHT_NOBITS = 8,
+            SHT_REL = 9,
+            SHT_SHLIB = 10,
+            SHT_DYNSYM = 11,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -589,6 +634,33 @@ pub struct ElfHeader<E: ElfClass> {
     e_shentsize: ElfHalf<E>,
     e_shnum: ElfHalf<E>,
     e_shsnidx: ElfHalf<E>,
+}
+
+impl<E: ElfClass> ElfHeader<E> {
+    pub fn get_program_headers<'a>(
+        &self,
+        bytes: &'a [u8],
+    ) -> Result<&'a [<E as ElfClass>::ProgramHeader], BadElfHeader> {
+        if self.e_phentsize.as_usize() != mem::size_of::<<E as ElfClass>::ProgramHeader>() {
+            return Err(BadElfHeader);
+        }
+        if bytes.len() <= self.e_phoff.as_usize() {
+            return Err(BadElfHeader);
+        }
+        let bytes = &bytes[(self.e_phoff.as_usize())..];
+        if bytes.len() < (self.e_phentsize * self.e_phnum).as_usize() {
+            return Err(BadElfHeader);
+        }
+        // SAFETY:
+        // bytes is valid for 'a
+        // And size is checked above.
+        Ok(unsafe {
+            core::slice::from_raw_parts(
+                bytes.as_ptr() as *const <E as ElfClass>::ProgramHeader,
+                self.e_phnum.as_usize(),
+            )
+        })
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -624,18 +696,18 @@ pub fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, BadElfHeader> {
     }
 
     match hdr.ei_version {
-        consts::EIVersion::EV_CURRENT => {}
+        consts::EV_CURRENT => {}
         _ => return Err(BadElfHeader),
     }
 
     match hdr.ei_data {
-        consts::EIData::ELFDATA2LSB => {}
-        consts::EIData::ELFDATA2MSB => todo!(),
+        consts::ELFDATA2LSB => {}
+        consts::ELFDATA2MSB => todo!(),
         _ => return Err(BadElfHeader),
     }
 
     match hdr.ei_class {
-        consts::EIClass::ELFCLASS32 => {
+        consts::ELFCLASS32 => {
             if bytes.len() < mem::size_of::<ElfHeader<Elf32>>() {
                 return Err(BadElfHeader);
             }
@@ -647,7 +719,7 @@ pub fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, BadElfHeader> {
                 &*(bytes.as_ptr() as *const ElfHeader<Elf32>)
             }))
         }
-        consts::EIClass::ELFCLASS64 => {
+        consts::ELFCLASS64 => {
             if bytes.len() < mem::size_of::<ElfHeader<Elf64>>() {
                 return Err(BadElfHeader);
             }
@@ -660,5 +732,107 @@ pub fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, BadElfHeader> {
             }))
         }
         _ => Err(BadElfHeader),
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct Elf32Phdr {
+    p_type: consts::ProgramType,
+    p_offset: ElfOffset<Elf32>,
+    p_vaddr: PrintHex<ElfAddr<Elf32>>,
+    p_paddr: PrintHex<ElfAddr<Elf32>>,
+    p_filesz: ElfSize<Elf32>,
+    p_memsz: ElfSize<Elf32>,
+    p_flags: ElfWord<Elf32>,
+    p_align: ElfSize<Elf32>,
+}
+
+impl Sealed for Elf32Phdr {}
+
+impl ElfProgramHeader for Elf32Phdr {
+    type Class = Elf32;
+
+    fn pt_type(&self) -> consts::ProgramType {
+        self.p_type
+    }
+
+    fn offset(&self) -> ElfOffset<Self::Class> {
+        self.p_offset
+    }
+
+    fn vaddr(&self) -> ElfAddr<Self::Class> {
+        self.p_vaddr.0
+    }
+
+    fn paddr(&self) -> ElfAddr<Self::Class> {
+        self.p_paddr.0
+    }
+
+    fn memsize(&self) -> ElfSize<Self::Class> {
+        self.p_memsz
+    }
+
+    fn filesize(&self) -> ElfSize<Self::Class> {
+        self.p_filesz
+    }
+
+    fn align(&self) -> ElfSize<Self::Class> {
+        self.p_align
+    }
+
+    fn flags(&self) -> ElfWord<Self::Class> {
+        self.p_flags
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct Elf64Phdr {
+    p_type: consts::ProgramType,
+    p_flags: ElfWord<Elf64>,
+    p_offset: ElfOffset<Elf64>,
+    p_vaddr: PrintHex<ElfAddr<Elf64>>,
+    p_paddr: PrintHex<ElfAddr<Elf64>>,
+    p_filesz: ElfSize<Elf64>,
+    p_memsz: ElfSize<Elf64>,
+    p_align: ElfSize<Elf64>,
+}
+
+impl Sealed for Elf64Phdr {}
+
+impl ElfProgramHeader for Elf64Phdr {
+    type Class = Elf64;
+
+    fn pt_type(&self) -> consts::ProgramType {
+        self.p_type
+    }
+
+    fn offset(&self) -> ElfOffset<Self::Class> {
+        self.p_offset
+    }
+
+    fn vaddr(&self) -> ElfAddr<Self::Class> {
+        self.p_vaddr.0
+    }
+
+    fn paddr(&self) -> ElfAddr<Self::Class> {
+        self.p_paddr.0
+    }
+
+    fn memsize(&self) -> ElfSize<Self::Class> {
+        self.p_memsz
+    }
+
+    fn filesize(&self) -> ElfSize<Self::Class> {
+        self.p_filesz
+    }
+
+    fn align(&self) -> ElfSize<Self::Class> {
+        self.p_align
+    }
+
+    fn flags(&self) -> ElfWord<Self::Class> {
+        self.p_flags
     }
 }

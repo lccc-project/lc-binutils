@@ -1,5 +1,6 @@
 use crate::traits::private::Sealed;
 use std::{
+    convert::TryInto,
     fmt::{Debug, LowerHex},
     ops::*,
 };
@@ -10,26 +11,28 @@ pub(crate) mod private {
 }
 
 pub trait Numeric:
-    Add
-    + Mul
-    + Sub
-    + Div
-    + BitAnd
-    + BitOr
-    + BitXor
-    + Not
+    Add<Output = Self>
+    + Mul<Output = Self>
+    + Sub<Output = Self>
+    + Div<Output = Self>
+    + BitAnd<Output = Self>
+    + BitOr<Output = Self>
+    + BitXor<Output = Self>
+    + Not<Output = Self>
     + Copy
-    + Shl
-    + Shr
+    + Shl<Output = Self>
+    + Shr<Output = Self>
     + Sized
     + Debug
     + LowerHex
+    + TryInto<usize>
     + Sealed
 {
     fn zero() -> Self;
     fn one() -> Self;
     fn min() -> Self;
     fn max() -> Self;
+    fn as_usize(self) -> usize;
 }
 
 #[doc(hide)]
@@ -49,6 +52,9 @@ macro_rules! impl_numeric {
                 }
                 fn max()->Self{
                     $n::MAX
+                }
+                fn as_usize(self) -> usize{
+                    self as usize
                 }
             }
             )*
