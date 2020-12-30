@@ -18,3 +18,6 @@ pub mod macho;
 
 #[cfg(feature = "aout")]
 pub mod aout;
+
+#[cfg(feature = "xir")]
+pub mod xir;
