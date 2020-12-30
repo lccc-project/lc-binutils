@@ -6,5 +6,6 @@ members = [
     "ar",
     "readobj",
     "objdump",
-    "lto"
+    "lto",
+    "binfmt-test"
 ]

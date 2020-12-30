@@ -1,5 +1,5 @@
 use crate::traits::private::Sealed;
-use std::ops::*;
+use std::{fmt::{Debug, LowerHex}, ops::*};
 
 #[doc(hide)]
 pub(crate) mod private {
@@ -7,7 +7,7 @@ pub(crate) mod private {
 }
 
 pub trait Numeric:
-    Add + Mul + Sub + Div + BitAnd + BitOr + BitXor + Not + Copy + Shl + Shr + Sized + Sealed
+    Add + Mul + Sub + Div + BitAnd + BitOr + BitXor + Not + Copy + Shl + Shr + Sized + Debug + LowerHex + Sealed
 {
     fn zero() -> Self;
     fn one() -> Self;

@@ -2,6 +2,8 @@
 
 pub mod traits;
 
+pub mod debug;
+
 #[cfg(feature = "elf")]
 pub mod elf;
 
