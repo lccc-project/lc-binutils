@@ -1,8 +1,7 @@
-
 use std::mem;
 
-use crate::{debug::PrintHex, traits::private::Sealed};
 use crate::traits::Numeric;
+use crate::{debug::PrintHex, traits::private::Sealed};
 
 pub type ElfByte<E> = <E as ElfClass>::Byte;
 pub type ElfHalf<E> = <E as ElfClass>::Half;
@@ -55,11 +54,10 @@ pub trait ElfClass: Sealed + Sized + Copy {
     type Rela: ElfRelocation<Class = Self>;
 }
 
-
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Elf64 {}
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum Elf32 {}
 
 #[repr(C)]
@@ -102,8 +100,7 @@ impl ElfSymbol for Elf32Sym {
 }
 
 #[repr(C)]
-
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct Elf64Sym {
     st_name: ElfWord<Elf64>,
     st_info: ElfByte<Elf64>,
@@ -278,7 +275,7 @@ impl ElfRelocationExtractHelpers for Elf32 {
     }
 }
 
-pub mod consts{
+pub mod consts {
 
     macro_rules! fake_enum{
         {#[repr($t:ty)] $vis:vis enum $name:ident {
@@ -302,7 +299,7 @@ pub mod consts{
         }
     }
 
-    fake_enum!{
+    fake_enum! {
         #[repr(u16)] pub enum ElfType{
             ET_NONE = 0,
             ET_REL = 1,
@@ -312,7 +309,7 @@ pub mod consts{
         }
     }
 
-    fake_enum!{
+    fake_enum! {
         #[repr(u16)] pub enum ElfMachine{
             EM_NONE = 0,           // No machine
             EM_M32 = 1,            // AT&T WE 32100
@@ -506,15 +503,15 @@ pub mod consts{
         }
     }
 
-    fake_enum!{
+    fake_enum! {
         #[repr(u8)] pub enum EIClass{
             ELFCLASSNONE = 0,
             ELFCLASS32 = 1,
-            ELFCLASS64 = 2 
+            ELFCLASS64 = 2
         }
     }
 
-    fake_enum!{
+    fake_enum! {
         #[repr(u8)] pub enum EIData{
             ELFDATANONE = 0,
             ELFDATA2LSB = 1,
@@ -522,14 +519,14 @@ pub mod consts{
         }
     }
 
-    fake_enum!{
+    fake_enum! {
         #[repr(u8)] pub enum EIVersion{
             EV_NONE = 0,
             EV_CURRENT = 1
         }
     }
 
-    fake_enum!{
+    fake_enum! {
         #[repr(u8)] pub enum EIOsAbi{
             ELFOSABI_NONE = 0,           // UNIX System V ABI
             ELFOSABI_HPUX = 1,           // HP-UX operating system
@@ -561,23 +558,23 @@ pub mod consts{
     }
 
     #[repr(C)]
-    #[derive(Copy,Clone,Debug)]
-    pub struct ElfIdent{
-        pub ei_mag: [u8;4],
+    #[derive(Copy, Clone, Debug)]
+    pub struct ElfIdent {
+        pub ei_mag: [u8; 4],
         pub ei_class: EIClass,
         pub ei_data: EIData,
         pub ei_version: EIVersion,
         pub ei_osabi: EIOsAbi,
         pub ei_abiversion: u8,
-        ei_pad: [u8;7]
+        ei_pad: [u8; 7],
     }
 
-    static_assertions::const_assert_eq!(core::mem::size_of::<ElfIdent>(),16);
+    static_assertions::const_assert_eq!(core::mem::size_of::<ElfIdent>(), 16);
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C)]
-pub struct ElfHeader<E: ElfClass>{
+pub struct ElfHeader<E: ElfClass> {
     e_ident: consts::ElfIdent,
     e_type: consts::ElfType,
     e_machine: consts::ElfMachine,
@@ -591,74 +588,77 @@ pub struct ElfHeader<E: ElfClass>{
     e_phnum: ElfHalf<E>,
     e_shentsize: ElfHalf<E>,
     e_shnum: ElfHalf<E>,
-    e_shsnidx: ElfHalf<E>
+    e_shsnidx: ElfHalf<E>,
 }
 
-#[derive(Copy,Clone)]
-pub enum ParsedHeader<'a>{
+#[derive(Copy, Clone)]
+pub enum ParsedHeader<'a> {
     Elf32(&'a ElfHeader<Elf32>),
-    Elf64(&'a ElfHeader<Elf64>)
+    Elf64(&'a ElfHeader<Elf64>),
 }
 
-impl<'a> ::core::fmt::Debug for ParsedHeader<'a>{
+impl<'a> ::core::fmt::Debug for ParsedHeader<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self{
-            Self::Elf32(hdr) => ::core::fmt::Debug::fmt(hdr,f),
-            Self::Elf64(hdr) => ::core::fmt::Debug::fmt(hdr,f)
+        match *self {
+            Self::Elf32(hdr) => ::core::fmt::Debug::fmt(hdr, f),
+            Self::Elf64(hdr) => ::core::fmt::Debug::fmt(hdr, f),
         }
     }
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct BadElfHeader;
 
-pub fn parse_header(bytes: &[u8]) -> Result<ParsedHeader,BadElfHeader>{
-    if bytes.len() < mem::size_of::<ElfIdent>(){
-        return Err(BadElfHeader)
+pub fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, BadElfHeader> {
+    if bytes.len() < mem::size_of::<ElfIdent>() {
+        return Err(BadElfHeader);
     }
     // SAFETY:
     // bytes is valid for 'a
     // bytes as at least a length of ElfIdent
-    let hdr = unsafe{&*(bytes.as_ptr() as *const ElfIdent)};
+    let hdr = unsafe { &*(bytes.as_ptr() as *const ElfIdent) };
 
-    match hdr.ei_mag{
-        [0x7f,b'E',b'L',b'F'] => {},
-        _ => return Err(BadElfHeader)
+    match hdr.ei_mag {
+        [0x7f, b'E', b'L', b'F'] => {}
+        _ => return Err(BadElfHeader),
     }
 
-    match hdr.ei_version{
-        consts::EIVersion::EV_CURRENT => {},
-        _ => return Err(BadElfHeader)
+    match hdr.ei_version {
+        consts::EIVersion::EV_CURRENT => {}
+        _ => return Err(BadElfHeader),
     }
 
-    match hdr.ei_data{
-        consts::EIData::ELFDATA2LSB => {},
+    match hdr.ei_data {
+        consts::EIData::ELFDATA2LSB => {}
         consts::EIData::ELFDATA2MSB => todo!(),
-        _ => return Err(BadElfHeader)
+        _ => return Err(BadElfHeader),
     }
 
-    match hdr.ei_class{
+    match hdr.ei_class {
         consts::EIClass::ELFCLASS32 => {
-            if bytes.len() < mem::size_of::<ElfHeader<Elf32>>(){
-                return Err(BadElfHeader)
+            if bytes.len() < mem::size_of::<ElfHeader<Elf32>>() {
+                return Err(BadElfHeader);
             }
 
             // SAFETY:
             // bytes is valid for 'a
             // length of bytes is verified above
-            Ok(ParsedHeader::Elf32(unsafe{&*(bytes.as_ptr() as *const ElfHeader<Elf32>)}))
-        },
+            Ok(ParsedHeader::Elf32(unsafe {
+                &*(bytes.as_ptr() as *const ElfHeader<Elf32>)
+            }))
+        }
         consts::EIClass::ELFCLASS64 => {
-            if bytes.len() < mem::size_of::<ElfHeader<Elf64>>(){
-                return Err(BadElfHeader)
+            if bytes.len() < mem::size_of::<ElfHeader<Elf64>>() {
+                return Err(BadElfHeader);
             }
 
             // SAFETY:
             // bytes is valid for 'a
             // length of bytes is verified above
-            Ok(ParsedHeader::Elf64(unsafe{&*(bytes.as_ptr() as *const ElfHeader<Elf64>)}))
-        },
-        _ => Err(BadElfHeader)
+            Ok(ParsedHeader::Elf64(unsafe {
+                &*(bytes.as_ptr() as *const ElfHeader<Elf64>)
+            }))
+        }
+        _ => Err(BadElfHeader),
     }
-    
 }
