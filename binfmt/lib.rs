@@ -21,3 +21,5 @@ pub mod aout;
 
 #[cfg(feature = "xir")]
 pub mod xir;
+
+pub mod binary;
