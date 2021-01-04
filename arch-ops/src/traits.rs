@@ -1,0 +1,118 @@
+use std::{
+    convert::TryInto,
+    fmt::{Display, LowerHex},
+    ops::{Add, BitAnd, BitOr, BitXor, Not, RangeBounds, Sub},
+};
+
+pub trait Scalar:
+    Sized
+    + Copy
+    + Clone
+    + Display
+    + LowerHex
+    + Add
+    + Sub
+    + BitAnd
+    + BitOr
+    + BitXor
+    + Not
+    + TryInto<usize>
+    + Send
+    + Sync
+{
+}
+
+impl Scalar for u8 {}
+impl Scalar for u16 {}
+impl Scalar for u32 {}
+impl Scalar for u64 {}
+impl Scalar for u128 {}
+impl Scalar for usize {}
+impl Scalar for i8 {}
+impl Scalar for i16 {}
+impl Scalar for i32 {}
+impl Scalar for i64 {}
+impl Scalar for i128 {}
+impl Scalar for isize {}
+
+pub trait Address: Sized + Display {
+    type Value: Scalar;
+
+    fn is_symbol(&self) -> bool;
+
+    fn to_value(&self) -> Option<Self::Value>;
+
+    fn symbol_name(&self) -> Option<&str>;
+}
+
+pub trait Operand: Sized + Display {
+    type Arch: Architecture;
+
+    fn as_address(&self) -> Option<&<Self::Arch as Architecture>::Address>;
+    fn as_immediate(&self) -> Option<&<Self::Arch as Architecture>::Immediate>;
+    fn as_address_fragment(&self) -> Option<&<Self::Arch as Architecture>::AddressPart>;
+    fn as_register(&self) -> Option<&<Self::Arch as Architecture>::Register>;
+    fn is_implied(&self) -> bool;
+}
+
+pub trait Register: Sized + Display {
+    type Value: Scalar;
+
+    fn known_size(&self) -> Option<u32>;
+    fn size_range(&self) -> (u32, u32);
+}
+
+pub trait AddressPart: Sized {
+    type Value: Scalar;
+    type Address: Address<Value = Self::Value>;
+    type PositionRange: RangeBounds<u32>;
+    fn get_bits(&self) -> Self::PositionRange;
+    fn mask(&self) -> Self::Value;
+    fn get_address(&self) -> &Self::Address;
+}
+
+pub trait Instruction: Sized + Display {
+    type Arch: Architecture;
+    fn name(&self) -> &str;
+    fn operands(&self) -> &[<Self::Arch as Architecture>::Operand];
+}
+
+pub trait Architecture: Sized {
+    type Operand: Operand<Arch = Self>;
+    type Address: Address;
+    type Immediate: Scalar;
+    type AddressPart: AddressPart<Address = Self::Address>;
+    type Register: Register;
+    type Instruction: Instruction<Arch = Self>;
+    type InstructionWriter: InstructionWriter<Arch = Self, Instruction = Self::Instruction>;
+    type InstructionReader: InstructionReader<Arch = Self, Instruction = Self::Instruction>;
+    fn registers(&self) -> &[Self::Register];
+    fn new_writer(&self) -> Self::InstructionWriter;
+    fn new_reader(&self) -> Self::InstructionReader;
+}
+
+pub trait InstructionWriter {
+    type Arch: Architecture;
+    type Instruction: Instruction;
+    type Error: std::error::Error;
+
+    fn get_architecture(&self) -> &Self::Arch;
+
+    fn write_instruction(&mut self, ins: Self::Instruction) -> Result<(), Self::Error>;
+
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error>;
+
+    fn registers(&self) -> &Self;
+}
+
+pub trait InstructionReader {
+    type Arch: Architecture;
+    type Instruction: Instruction;
+    type Error: std::error::Error;
+
+    fn get_architecture(&self) -> &Self::Arch;
+
+    fn read_instruction(&mut self) -> Result<Self::Instruction, Self::Error>;
+
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<(), Self::Error>;
+}
