@@ -63,11 +63,10 @@ pub trait Register: Sized + Display {
 }
 
 pub trait AddressPart: Sized {
-    type Value: Scalar;
-    type Address: Address<Value = Self::Value>;
+    type Address: Address;
     type PositionRange: RangeBounds<u32>;
     fn get_bits(&self) -> Self::PositionRange;
-    fn mask(&self) -> Self::Value;
+    fn mask(&self) -> <Self::Address as Address>::Value;
     fn get_address(&self) -> &Self::Address;
 }
 
