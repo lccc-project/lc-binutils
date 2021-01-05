@@ -1,7 +1,8 @@
 use std::{
     convert::TryInto,
-    fmt::{Display, LowerHex},
+    fmt::{Debug, Display, LowerHex},
     ops::{Add, BitAnd, BitOr, BitXor, Not, RangeBounds, Sub},
+    sync::{Arc, Mutex},
 };
 
 pub trait Scalar:
@@ -43,12 +44,17 @@ pub trait Address: Sized + Display {
     fn to_value(&self) -> Option<Self::Value>;
 
     fn symbol_name(&self) -> Option<&str>;
+
+    fn is_absolute(&self) -> bool;
+
+    fn to_absolute(&self, base: Self::Value) -> Option<Self::Value>;
 }
 
 pub trait Operand: Sized + Display {
     type Arch: Architecture;
 
     fn as_address(&self) -> Option<&<Self::Arch as Architecture>::Address>;
+    fn as_indirect_address(&self) -> Option<&<Self::Arch as Architecture>::Address>;
     fn as_immediate(&self) -> Option<&<Self::Arch as Architecture>::Immediate>;
     fn as_address_fragment(&self) -> Option<&<Self::Arch as Architecture>::AddressPart>;
     fn as_register(&self) -> Option<&<Self::Arch as Architecture>::Register>;
@@ -76,6 +82,23 @@ pub trait Instruction: Sized + Display {
     fn operands(&self) -> &[<Self::Arch as Architecture>::Operand];
 }
 
+pub trait Relocation: Sized {
+    type Address: Address;
+    type AddressPart: AddressPart<Address = Self::Address>;
+    type RelocationType: Debug + Eq + Copy;
+
+    fn get_type(&self) -> Self::RelocationType;
+
+    fn get_address(&self) -> Option<&Self::Address>;
+    fn get_part(&self) -> Option<&Self::AddressPart>;
+}
+
+pub trait RelocationWriter {
+    type Relocation: Relocation;
+
+    fn write_relocation(&mut self, reloc: Self::Relocation);
+}
+
 pub trait Architecture: Sized {
     type Operand: Operand<Arch = Self>;
     type Address: Address;
@@ -83,16 +106,24 @@ pub trait Architecture: Sized {
     type AddressPart: AddressPart<Address = Self::Address>;
     type Register: Register;
     type Instruction: Instruction<Arch = Self>;
+    type Relocation: Relocation<Address = Self::Address>;
     type InstructionWriter: InstructionWriter<Arch = Self, Instruction = Self::Instruction>;
     type InstructionReader: InstructionReader<Arch = Self, Instruction = Self::Instruction>;
     fn registers(&self) -> &[Self::Register];
-    fn new_writer(&self) -> Self::InstructionWriter;
+    fn new_writer(
+        &self,
+        relocs: Arc<Mutex<dyn RelocationWriter<Relocation = Self::Relocation>>>,
+    ) -> Self::InstructionWriter;
     fn new_reader(&self) -> Self::InstructionReader;
 }
 
 pub trait InstructionWriter {
     type Arch: Architecture;
     type Instruction: Instruction;
+    type Relocation: Relocation<
+        Address = <Self::Arch as Architecture>::Address,
+        AddressPart = <Self::Arch as Architecture>::AddressPart,
+    >;
     type Error: std::error::Error;
 
     fn get_architecture(&self) -> &Self::Arch;
