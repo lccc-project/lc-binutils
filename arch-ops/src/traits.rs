@@ -1,8 +1,8 @@
 use std::{
     convert::TryInto,
     fmt::{Debug, Display, LowerHex},
-    ops::{Add, BitAnd, BitOr, BitXor, Not, RangeBounds, Sub},
-    sync::{Arc, Mutex},
+    io::{Read, Write},
+    ops::{Add, BitAnd, BitOr, BitXor, Not, RangeBounds, Sub}
 };
 
 pub trait Scalar:
@@ -103,7 +103,12 @@ pub trait RelocationWriter: 'static {
     fn write_relocation(&mut self, reloc: Self::Relocation);
 }
 
-pub trait Architecture: Sized + 'static {
+pub trait Instructions<'a> {
+    type InstructionWriter: InstructionWriter + 'a;
+    type InstructionReader: InstructionReader + 'a;
+}
+
+pub trait Architecture: Sized + for<'a> Instructions<'a> + 'static {
     type Operand: Operand<Arch = Self> + 'static;
     type Address: Address;
     type Immediate: Scalar;
@@ -111,15 +116,17 @@ pub trait Architecture: Sized + 'static {
     type Register: Register;
     type Instruction: Instruction<Arch = Self>;
     type Relocation: Relocation<Address = Self::Address>;
-    type InstructionWriter: InstructionWriter<Arch = Self, Instruction = Self::Instruction>;
-    type InstructionReader: InstructionReader<Arch = Self, Instruction = Self::Instruction>;
 
     fn registers(&self) -> &[Self::Register];
-    fn new_writer(
-        &self,
-        relocs: Arc<Mutex<dyn RelocationWriter<Relocation = Self::Relocation>>>,
-    ) -> Self::InstructionWriter;
-    fn new_reader(&self) -> Self::InstructionReader;
+    fn new_writer<'a>(
+        &'a self,
+        relocs: &'a mut (dyn RelocationWriter<Relocation = Self::Relocation> + 'a),
+        w: &'a mut (dyn Write + 'a),
+    ) -> <Self as Instructions<'a>>::InstructionWriter;
+    fn new_reader<'a>(
+        &'a self,
+        r: &'a mut (dyn Read + 'a),
+    ) -> <Self as Instructions<'a>>::InstructionReader;
 }
 
 pub trait InstructionWriter {

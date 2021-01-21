@@ -1,4 +1,9 @@
-use std::{fmt::Display, iter::FusedIterator, ops::Range};
+use std::{
+    fmt::Display,
+    io::{Read, Write},
+    iter::FusedIterator,
+    ops::Range,
+};
 
 use either::Either;
 
@@ -329,9 +334,13 @@ impl Relocation for Wc65c816Relocation {
         self.symbol.as_ref().right()
     }
 }
-pub struct Wc65c816InstructionWriter {}
+pub struct Wc65c816InstructionWriter<'a> {
+    _relocs: &'a mut dyn RelocationWriter<Relocation = Wc65c816Relocation>,
+    writer: &'a mut (dyn Write + 'a),
+    arch: &'a Wc65c816,
+}
 
-impl InstructionWriter for Wc65c816InstructionWriter {
+impl<'a> InstructionWriter for Wc65c816InstructionWriter<'a> {
     type Arch = Wc65c816;
 
     type Instruction = Wc65c816Instruction;
@@ -341,21 +350,24 @@ impl InstructionWriter for Wc65c816InstructionWriter {
     type Error = std::io::Error;
 
     fn get_architecture(&self) -> &Self::Arch {
-        todo!()
+        &self.arch
     }
 
     fn write_instruction(&mut self, _ins: Self::Instruction) -> Result<(), Self::Error> {
         todo!()
     }
 
-    fn write_bytes(&mut self, _bytes: &[u8]) -> Result<(), Self::Error> {
-        todo!()
+    fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
+        self.writer.write_all(bytes)
     }
 }
 
-pub struct Wc65c816InstructionReader {}
+pub struct Wc65c816InstructionReader<'a> {
+    read: &'a mut (dyn Read + 'a),
+    arch: &'a Wc65c816,
+}
 
-impl InstructionReader for Wc65c816InstructionReader {
+impl<'a> InstructionReader for Wc65c816InstructionReader<'a> {
     type Arch = Wc65c816;
 
     type Instruction = Wc65c816Instruction;
@@ -363,19 +375,25 @@ impl InstructionReader for Wc65c816InstructionReader {
     type Error = std::io::Error;
 
     fn get_architecture(&self) -> &Self::Arch {
-        todo!()
+        &self.arch
     }
 
     fn read_instruction(&mut self) -> Result<Self::Instruction, Self::Error> {
         todo!()
     }
 
-    fn read_bytes(&mut self, _bytes: &mut [u8]) -> Result<(), Self::Error> {
-        todo!()
+    fn read_bytes(&mut self, bytes: &mut [u8]) -> Result<(), Self::Error> {
+        self.read.read_exact(bytes)
     }
 }
 
 pub struct Wc65c816 {}
+
+impl<'a> Instructions<'a> for Wc65c816 {
+    type InstructionWriter = Wc65c816InstructionWriter<'a>;
+
+    type InstructionReader = Wc65c816InstructionReader<'a>;
+}
 
 impl Architecture for Wc65c816 {
     type Operand = Wc65c816Operand;
@@ -388,24 +406,19 @@ impl Architecture for Wc65c816 {
 
     type Relocation = Wc65c816Relocation;
 
-    type InstructionWriter = Wc65c816InstructionWriter;
-
-    type InstructionReader = Wc65c816InstructionReader;
-
     fn registers(&self) -> &[Self::Register] {
         todo!()
     }
 
-    fn new_writer(
-        &self,
-        _relocs: std::sync::Arc<
-            std::sync::Mutex<dyn crate::traits::RelocationWriter<Relocation = Self::Relocation>>,
-        >,
-    ) -> Self::InstructionWriter {
+    fn new_writer<'a>(
+        &'a self,
+        _relocs: &'a mut (dyn crate::traits::RelocationWriter<Relocation = Self::Relocation> + 'a),
+        _w: &'a mut (dyn Write + 'a),
+    ) -> Wc65c816InstructionWriter<'a> {
         todo!()
     }
 
-    fn new_reader(&self) -> Self::InstructionReader {
+    fn new_reader<'a>(&'a self, _r: &'a mut (dyn Read + 'a)) -> Wc65c816InstructionReader {
         todo!()
     }
 }

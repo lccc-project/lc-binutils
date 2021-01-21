@@ -1,4 +1,4 @@
-use std::mem;
+use std::mem::size_of;
 
 use crate::traits::Numeric;
 use crate::{debug::PrintHex, traits::private::Sealed};
@@ -50,7 +50,7 @@ pub trait ElfProgramHeader: Sealed {
 
 pub trait ElfClass: Sealed + Sized + Copy {
     type Byte: Numeric;
-    const EI_CLASS: ElfByte<Self>;
+    const EI_CLASS: consts::EIClass;
     type Half: Numeric;
     type Word: Numeric;
     type Sword: Numeric;
@@ -217,7 +217,7 @@ impl ElfSymbol for Elf64Sym {
 
 impl Sealed for Elf64 {}
 impl ElfClass for Elf64 {
-    const EI_CLASS: u8 = 2;
+    const EI_CLASS: consts::EIClass = consts::ELFCLASS64;
     type Addr = u64;
     type Offset = i64;
     type Size = u64;
@@ -256,7 +256,7 @@ impl ElfRelocationExtractHelpers for Elf64 {
 
 impl Sealed for Elf32 {}
 impl ElfClass for Elf32 {
-    const EI_CLASS: u8 = 1;
+    const EI_CLASS: consts::EIClass = consts::ELFCLASS32;
     type Addr = u32;
     type Offset = i32;
     type Size = u32;
@@ -314,6 +314,8 @@ pub mod consts {
             }
         }
     }
+
+    pub const ELFMAG: [u8; 4] = *b"\x7fELF";
 
     fake_enum! {
         #[repr(u16)] pub enum ElfType{
@@ -636,104 +638,7 @@ pub struct ElfHeader<E: ElfClass> {
     e_shsnidx: ElfHalf<E>,
 }
 
-impl<E: ElfClass> ElfHeader<E> {
-    pub fn get_program_headers<'a>(
-        &self,
-        bytes: &'a [u8],
-    ) -> Result<&'a [<E as ElfClass>::ProgramHeader], BadElfHeader> {
-        if self.e_phentsize.as_usize() != mem::size_of::<<E as ElfClass>::ProgramHeader>() {
-            return Err(BadElfHeader);
-        }
-        if bytes.len() <= self.e_phoff.as_usize() {
-            return Err(BadElfHeader);
-        }
-        let bytes = &bytes[(self.e_phoff.as_usize())..];
-        if bytes.len() < (self.e_phentsize * self.e_phnum).as_usize() {
-            return Err(BadElfHeader);
-        }
-        // SAFETY:
-        // bytes is valid for 'a
-        // And size is checked above.
-        Ok(unsafe {
-            core::slice::from_raw_parts(
-                bytes.as_ptr() as *const <E as ElfClass>::ProgramHeader,
-                self.e_phnum.as_usize(),
-            )
-        })
-    }
-}
-
-#[derive(Copy, Clone)]
-pub enum ParsedHeader<'a> {
-    Elf32(&'a ElfHeader<Elf32>),
-    Elf64(&'a ElfHeader<Elf64>),
-}
-
-impl<'a> ::core::fmt::Debug for ParsedHeader<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Self::Elf32(hdr) => ::core::fmt::Debug::fmt(hdr, f),
-            Self::Elf64(hdr) => ::core::fmt::Debug::fmt(hdr, f),
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct BadElfHeader;
-
-pub fn parse_header(bytes: &[u8]) -> Result<ParsedHeader, BadElfHeader> {
-    if bytes.len() < mem::size_of::<ElfIdent>() {
-        return Err(BadElfHeader);
-    }
-    // SAFETY:
-    // bytes is valid for 'a
-    // bytes as at least a length of ElfIdent
-    let hdr = unsafe { &*(bytes.as_ptr() as *const ElfIdent) };
-
-    match hdr.ei_mag {
-        [0x7f, b'E', b'L', b'F'] => {}
-        _ => return Err(BadElfHeader),
-    }
-
-    match hdr.ei_version {
-        consts::EV_CURRENT => {}
-        _ => return Err(BadElfHeader),
-    }
-
-    match hdr.ei_data {
-        consts::ELFDATA2LSB => {}
-        consts::ELFDATA2MSB => todo!(),
-        _ => return Err(BadElfHeader),
-    }
-
-    match hdr.ei_class {
-        consts::ELFCLASS32 => {
-            if bytes.len() < mem::size_of::<ElfHeader<Elf32>>() {
-                return Err(BadElfHeader);
-            }
-
-            // SAFETY:
-            // bytes is valid for 'a
-            // length of bytes is verified above
-            Ok(ParsedHeader::Elf32(unsafe {
-                &*(bytes.as_ptr() as *const ElfHeader<Elf32>)
-            }))
-        }
-        consts::ELFCLASS64 => {
-            if bytes.len() < mem::size_of::<ElfHeader<Elf64>>() {
-                return Err(BadElfHeader);
-            }
-
-            // SAFETY:
-            // bytes is valid for 'a
-            // length of bytes is verified above
-            Ok(ParsedHeader::Elf64(unsafe {
-                &*(bytes.as_ptr() as *const ElfHeader<Elf64>)
-            }))
-        }
-        _ => Err(BadElfHeader),
-    }
-}
+impl<E: ElfClass> ElfHeader<E> {}
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
@@ -834,5 +739,131 @@ impl ElfProgramHeader for Elf64Phdr {
 
     fn flags(&self) -> ElfWord<Self::Class> {
         self.p_flags
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct BadElfHeader;
+
+pub struct ElfReader<'a, Class: ElfClass> {
+    bytes: &'a [u8],
+    header: &'a ElfHeader<Class>,
+    phdr: &'a [Class::ProgramHeader],
+}
+
+impl<'a, Class: ElfClass> ElfReader<'a, Class> {
+    pub fn parse(bytes: &'a [u8]) -> Result<Self, BadElfHeader> {
+        if bytes.len() < size_of::<ElfIdent>() {
+            return Err(BadElfHeader);
+        }
+        // SAFETY:
+        // bytes are valid for the lifetime of eident, because they are valid for 'a
+        // Length is checked above
+        let eident: &ElfIdent = unsafe { &*(bytes.as_ptr() as *const ElfIdent) };
+
+        if eident.ei_mag != consts::ELFMAG {
+            return Err(BadElfHeader);
+        }
+
+        if eident.ei_class != Class::EI_CLASS {
+            return Err(BadElfHeader);
+        }
+
+        if bytes.len() < size_of::<ElfHeader<Class>>() {
+            return Err(BadElfHeader);
+        }
+
+        // SAFETY:
+        // bytes is valid 'a
+        // Length is checked above
+        let header: &'a ElfHeader<Class> = unsafe { &*(bytes.as_ptr() as *const ElfHeader<Class>) };
+
+        if header.e_phentsize.as_usize() != size_of::<Class::ProgramHeader>() {
+            return Err(BadElfHeader);
+        }
+
+        let ptr = bytes.as_ptr();
+
+        if bytes.len()
+            < (header.e_phoff.as_usize()).saturating_add(
+                header
+                    .e_phnum
+                    .as_usize()
+                    .saturating_mul(header.e_phentsize.as_usize()),
+            )
+        {
+            return Err(BadElfHeader);
+        }
+
+        let phdr: &'a [Class::ProgramHeader] = unsafe {
+            core::slice::from_raw_parts(
+                ptr.add(header.e_phoff.as_usize()) as *const Class::ProgramHeader,
+                header.e_phnum.as_usize(),
+            )
+        };
+
+        Ok(Self {
+            bytes,
+            header,
+            phdr,
+        })
+    }
+
+    pub fn get_file_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    pub fn get_header(&self) -> &ElfHeader<Class> {
+        &self.header
+    }
+
+    pub fn get_program_headers(&self) -> &[Class::ProgramHeader] {
+        &self.phdr
+    }
+
+    pub fn get_segment_bytes(&self, shnum: usize) -> Option<&[u8]> {
+        let hdr = self.phdr.get(shnum)?;
+        let off = hdr.offset().as_usize();
+        let filesz = hdr.filesize().as_usize();
+
+        if self.bytes.len() < off.saturating_add(filesz) {
+            None
+        } else {
+            Some(unsafe { core::slice::from_raw_parts(self.bytes.as_ptr().add(off), filesz) })
+        }
+    }
+}
+
+pub enum ParsedElfFile<'a> {
+    Elf32(ElfReader<'a, Elf32>),
+    Elf64(ElfReader<'a, Elf64>),
+}
+
+pub fn parse_file(bytes: &[u8]) -> Result<ParsedElfFile, BadElfHeader> {
+    if let Ok(read) = ElfReader::parse(bytes) {
+        Ok(ParsedElfFile::Elf32(read))
+    } else {
+        Ok(ParsedElfFile::Elf64(ElfReader::parse(bytes)?))
+    }
+}
+
+impl<'a> ::core::fmt::Debug for ParsedElfFile<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ElfFile")
+            .field(
+                "header",
+                match self {
+                    ParsedElfFile::Elf32(e) => e.get_header(),
+                    ParsedElfFile::Elf64(e) => e.get_header(),
+                },
+            )
+            .field(
+                "phdr",
+                match self {
+                    ParsedElfFile::Elf32(e) => &e.phdr,
+                    ParsedElfFile::Elf64(e) => &e.phdr,
+                },
+            )
+            .finish()
     }
 }

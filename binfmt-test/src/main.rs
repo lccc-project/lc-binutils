@@ -1,7 +1,5 @@
 use std::{fs::File, io::Read};
 
-use binfmt::elf::ParsedHeader;
-
 fn main() {
     let mut args = std::env::args();
     let prg_name = args.next().unwrap();
@@ -14,16 +12,8 @@ fn main() {
                     eprintln!("Failed to read from {}: {}", &fname, e);
                     std::process::exit(1)
                 }
-                if let Ok(ehdr) = binfmt::elf::parse_header(&*bytes) {
-                    println!("{:#?}", ehdr);
-                    match ehdr {
-                        ParsedHeader::Elf32(ehdr32) => {
-                            println!("{:#?}", ehdr32.get_program_headers(&*bytes))
-                        }
-                        ParsedHeader::Elf64(ehdr64) => {
-                            println!("{:#?}", ehdr64.get_program_headers(&*bytes))
-                        }
-                    }
+                if let Ok(file) = binfmt::elf::parse_file(&bytes) {
+                    println!("{:#?}", file);
                 } else {
                     eprintln!("Failed to parse object file, unknown format")
                 }
