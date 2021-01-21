@@ -113,11 +113,11 @@ impl Address for Wc65c816Address {
                 Wc65c816Address::BankLocal(_) => unreachable!(),
                 Wc65c816Address::PCRelLong(off) => Some(
                     base & 0xff0000
-                        | (((part as i32).wrapping_add(*off as i32)) as u32 & 0xffff as u32),
+                        | (((part as i32).wrapping_add(*off as i32)) as u32 & 0xffffu32),
                 ),
                 Wc65c816Address::PCRelShort(off) => Some(
                     base & 0xff0000
-                        | (((part as i32).wrapping_add(*off as i32)) as u32 & 0xffff as u32),
+                        | (((part as i32).wrapping_add(*off as i32)) as u32 & 0xffffu32),
                 ),
                 Wc65c816Address::Symbol(_) => None,
             }
@@ -178,7 +178,7 @@ pub enum Wc65c816Operand {
 
 impl Display for Wc65c816Operand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Ok(match self {
+        match self {
             Wc65c816Operand::Indirect(a, r) => {
                 f.write_str("(")?;
                 a.fmt(f)?;
@@ -187,21 +187,21 @@ impl Display for Wc65c816Operand {
                     f.write_str(",")?;
                     r.fmt(f)?;
                 }
+                Ok(())
             }
-            Wc65c816Operand::IndirectLong(a) => {
-                f.write_fmt(format_args!("[{}]", a))?;
-            }
+            Wc65c816Operand::IndirectLong(a) => f.write_fmt(format_args!("[{}]", a)),
             Wc65c816Operand::Address(a, r) => {
                 a.fmt(f)?;
                 if let Some(r) = r {
                     f.write_str(",")?;
                     r.fmt(f)?;
                 }
+                Ok(())
             }
-            Wc65c816Operand::AddressPart(p) => p.fmt(f)?,
-            Wc65c816Operand::Register(r) => r.fmt(f)?,
-            Wc65c816Operand::Immediate(i) => i.fmt(f)?,
-        })
+            Wc65c816Operand::AddressPart(p) => p.fmt(f),
+            Wc65c816Operand::Register(r) => r.fmt(f),
+            Wc65c816Operand::Immediate(i) => i.fmt(f),
+        }
     }
 }
 
