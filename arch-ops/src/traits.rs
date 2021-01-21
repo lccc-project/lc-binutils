@@ -2,7 +2,7 @@ use std::{
     convert::TryInto,
     fmt::{Debug, Display, LowerHex},
     io::{Read, Write},
-    ops::{Add, BitAnd, BitOr, BitXor, Not, RangeBounds, Sub}
+    ops::{Add, BitAnd, BitOr, BitXor, Not, RangeBounds, Sub},
 };
 
 pub trait Scalar:
