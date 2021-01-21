@@ -8,5 +8,6 @@ members = [
     "objdump",
     "lto",
     "binfmt-test",
-    "arch-ops"
+    "arch-ops",
+    "lc-as"
 ]

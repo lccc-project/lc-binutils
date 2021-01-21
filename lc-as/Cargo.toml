@@ -1,0 +1,36 @@
+[package]
+name = "lc-as"
+version = "0.1.0"
+authors = ["Connor <chorman64@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+x86 = ["arch-ops/x86"]
+arm = ["arch-ops/arm"]
+aarch64 = ["arch-ops/aarch64"]
+wc65c816 = []
+riscv = []
+propeller = []
+propeller2 = []
+aout = []
+coff = []
+elf = []
+macho = []
+pe = []
+llir = []
+xir = []
+default-formats = ["coff","elf","macho","pe","llir","xir"]
+all-formats = ["default-formats","aout"]
+default-archs = ["x86","arm","aarch64","wc65c816","riscv","propeller","propeller2"]
+default = ["default-archs","default-formats"]
+all-archs = ["default-archs"]
+all = ["all-archs","all-formats"]
+
+
+
+[dependencies]
+binfmt = {path = "../binfmt"}
+arch-ops = {path = "../arch-ops"}
+target-tuples = "0.1.0"

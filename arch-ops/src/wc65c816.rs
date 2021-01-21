@@ -1,6 +1,8 @@
-use std::{fmt::Display, ops::Range};
+use std::{fmt::Display, iter::FusedIterator, ops::Range};
 
-use crate::traits::{Address, AddressPart, Register};
+use either::Either;
+
+use crate::traits::*;
 
 #[derive(Copy, Clone)]
 pub enum Wc65c816Register {
@@ -51,6 +53,7 @@ impl Register for Wc65c816Register {
     }
 }
 
+#[derive(Clone)]
 pub enum Wc65c816Address {
     Absolute(u32),
     BankLocal(u16),
@@ -122,6 +125,7 @@ impl Address for Wc65c816Address {
     }
 }
 
+#[derive(Clone)]
 pub enum Wc65c816AddressPart {
     Bank(Wc65c816Address),
     DirectPage(Wc65c816Address),
@@ -159,5 +163,249 @@ impl AddressPart for Wc65c816AddressPart {
         match self {
             Self::Bank(a) | Self::DirectPage(a) => a,
         }
+    }
+}
+
+#[derive(Clone)]
+pub enum Wc65c816Operand {
+    Indirect(Box<Wc65c816Operand>, Option<Wc65c816Register>),
+    IndirectLong(Wc65c816Address),
+    Address(Wc65c816Address, Option<Wc65c816Register>),
+    AddressPart(Wc65c816AddressPart),
+    Register(Wc65c816Register),
+    Immediate(u16),
+}
+
+impl Display for Wc65c816Operand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Ok(match self {
+            Wc65c816Operand::Indirect(a, r) => {
+                f.write_str("(")?;
+                a.fmt(f)?;
+                f.write_str(")")?;
+                if let Some(r) = r {
+                    f.write_str(",")?;
+                    r.fmt(f)?;
+                }
+            }
+            Wc65c816Operand::IndirectLong(a) => {
+                f.write_fmt(format_args!("[{}]", a))?;
+            }
+            Wc65c816Operand::Address(a, r) => {
+                a.fmt(f)?;
+                if let Some(r) = r {
+                    f.write_str(",")?;
+                    r.fmt(f)?;
+                }
+            }
+            Wc65c816Operand::AddressPart(p) => p.fmt(f)?,
+            Wc65c816Operand::Register(r) => r.fmt(f)?,
+            Wc65c816Operand::Immediate(i) => i.fmt(f)?,
+        })
+    }
+}
+
+impl Operand for Wc65c816Operand {
+    type Arch = Wc65c816;
+
+    fn as_address(&self) -> Option<&Wc65c816Address> {
+        if let Self::Address(addr, _) = self {
+            Some(addr)
+        } else {
+            None
+        }
+    }
+
+    fn as_indirect_address(&self) -> Option<&Wc65c816Address> {
+        todo!()
+    }
+
+    fn as_immediate(&self) -> Option<&u16> {
+        todo!()
+    }
+
+    fn as_address_fragment(&self) -> Option<&Wc65c816AddressPart> {
+        todo!()
+    }
+
+    fn as_register(&self) -> Option<&Wc65c816Register> {
+        todo!()
+    }
+
+    fn is_implied(&self) -> bool {
+        todo!()
+    }
+}
+
+#[non_exhaustive]
+pub enum Wc65c816Instruction {
+    ADC(Wc65c816Operand),
+}
+
+impl Display for Wc65c816Instruction {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+pub struct Wc65c816InstructionIterator<'a> {
+    immediate: <&'a [Wc65c816Operand] as IntoIterator>::IntoIter,
+    last: Option<&'a Wc65c816Operand>,
+}
+
+impl<'a> Iterator for Wc65c816InstructionIterator<'a> {
+    type Item = &'a Wc65c816Operand;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.immediate.next().or_else(|| self.last.take())
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (min, max) = self.immediate.size_hint();
+        (
+            min.saturating_add(if self.last.is_some() { 1 } else { 0 }),
+            max.map(|v| v.checked_add(if self.last.is_some() { 1 } else { 0 }))
+                .flatten(),
+        )
+    }
+}
+
+impl<'a> FusedIterator for Wc65c816InstructionIterator<'a> {}
+
+impl<'a> ExactSizeIterator for Wc65c816InstructionIterator<'a> {}
+
+impl<'a> InstructionLifetime<'a> for Wc65c816Instruction {
+    type Arch = Wc65c816;
+
+    type Operands = Wc65c816InstructionIterator<'a>;
+}
+
+impl Instruction for Wc65c816Instruction {
+    fn name(&self) -> &str {
+        todo!()
+    }
+
+    fn operands(&self) -> Wc65c816InstructionIterator {
+        todo!()
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
+pub enum Wc65c816RelocationType {
+    None,
+    Long,
+    Short,
+    Rel8,
+    Rel16,
+    Bank,
+    DirectPage,
+}
+
+pub struct Wc65c816Relocation {
+    rel_type: Wc65c816RelocationType,
+    symbol: Either<Wc65c816Address, Wc65c816AddressPart>,
+}
+
+impl Relocation for Wc65c816Relocation {
+    type Address = Wc65c816Address;
+
+    type AddressPart = Wc65c816AddressPart;
+
+    type RelocationType = Wc65c816RelocationType;
+
+    fn get_type(&self) -> Self::RelocationType {
+        self.rel_type
+    }
+
+    fn get_address(&self) -> Option<&Self::Address> {
+        match &self.symbol {
+            Either::Left(a) => Some(a),
+            Either::Right(a) => Some(a.get_address()),
+        }
+    }
+
+    fn get_part(&self) -> Option<&Self::AddressPart> {
+        self.symbol.as_ref().right()
+    }
+}
+pub struct Wc65c816InstructionWriter {}
+
+impl InstructionWriter for Wc65c816InstructionWriter {
+    type Arch = Wc65c816;
+
+    type Instruction = Wc65c816Instruction;
+
+    type Relocation = Wc65c816Relocation;
+
+    type Error = std::io::Error;
+
+    fn get_architecture(&self) -> &Self::Arch {
+        todo!()
+    }
+
+    fn write_instruction(&mut self, _ins: Self::Instruction) -> Result<(), Self::Error> {
+        todo!()
+    }
+
+    fn write_bytes(&mut self, _bytes: &[u8]) -> Result<(), Self::Error> {
+        todo!()
+    }
+}
+
+pub struct Wc65c816InstructionReader {}
+
+impl InstructionReader for Wc65c816InstructionReader {
+    type Arch = Wc65c816;
+
+    type Instruction = Wc65c816Instruction;
+
+    type Error = std::io::Error;
+
+    fn get_architecture(&self) -> &Self::Arch {
+        todo!()
+    }
+
+    fn read_instruction(&mut self) -> Result<Self::Instruction, Self::Error> {
+        todo!()
+    }
+
+    fn read_bytes(&mut self, _bytes: &mut [u8]) -> Result<(), Self::Error> {
+        todo!()
+    }
+}
+
+pub struct Wc65c816 {}
+
+impl Architecture for Wc65c816 {
+    type Operand = Wc65c816Operand;
+    type Address = Wc65c816Address;
+    type Immediate = u16;
+    type AddressPart = Wc65c816AddressPart;
+    type Register = Wc65c816Register;
+
+    type Instruction = Wc65c816Instruction;
+
+    type Relocation = Wc65c816Relocation;
+
+    type InstructionWriter = Wc65c816InstructionWriter;
+
+    type InstructionReader = Wc65c816InstructionReader;
+
+    fn registers(&self) -> &[Self::Register] {
+        todo!()
+    }
+
+    fn new_writer(
+        &self,
+        _relocs: std::sync::Arc<
+            std::sync::Mutex<dyn crate::traits::RelocationWriter<Relocation = Self::Relocation>>,
+        >,
+    ) -> Self::InstructionWriter {
+        todo!()
+    }
+
+    fn new_reader(&self) -> Self::InstructionReader {
+        todo!()
     }
 }

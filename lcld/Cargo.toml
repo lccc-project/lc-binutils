@@ -28,6 +28,7 @@ lto = ["lto-formats"]
 
 [dependencies]
 clap = "2.33"
+target-tuples = "0.1.0"
 binfmt = {path = "../binfmt"}
 
 [package.metadata.install-targets.lcld]

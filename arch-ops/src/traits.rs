@@ -36,7 +36,7 @@ impl Scalar for i64 {}
 impl Scalar for i128 {}
 impl Scalar for isize {}
 
-pub trait Address: Sized + Display {
+pub trait Address: Sized + Display + 'static {
     type Value: Scalar;
 
     fn is_symbol(&self) -> bool;
@@ -50,7 +50,7 @@ pub trait Address: Sized + Display {
     fn to_absolute(&self, base: Self::Value) -> Option<Self::Value>;
 }
 
-pub trait Operand: Sized + Display {
+pub trait Operand: Sized + Display + 'static {
     type Arch: Architecture;
 
     fn as_address(&self) -> Option<&<Self::Arch as Architecture>::Address>;
@@ -61,14 +61,14 @@ pub trait Operand: Sized + Display {
     fn is_implied(&self) -> bool;
 }
 
-pub trait Register: Sized + Display {
+pub trait Register: Sized + Display + 'static {
     type Value: Scalar;
 
     fn known_size(&self) -> Option<u32>;
     fn size_range(&self) -> (u32, u32);
 }
 
-pub trait AddressPart: Sized {
+pub trait AddressPart: Sized + Display + 'static {
     type Address: Address;
     type PositionRange: RangeBounds<u32>;
     fn get_bits(&self) -> Self::PositionRange;
@@ -76,13 +76,17 @@ pub trait AddressPart: Sized {
     fn get_address(&self) -> &Self::Address;
 }
 
-pub trait Instruction: Sized + Display {
+pub trait InstructionLifetime<'a>: 'a {
     type Arch: Architecture;
-    fn name(&self) -> &str;
-    fn operands(&self) -> &[<Self::Arch as Architecture>::Operand];
+    type Operands: IntoIterator<Item = &'a <Self::Arch as Architecture>::Operand>;
 }
 
-pub trait Relocation: Sized {
+pub trait Instruction: Sized + Display + for<'a> InstructionLifetime<'a> {
+    fn name(&self) -> &str;
+    fn operands(&self) -> <Self as InstructionLifetime<'_>>::Operands;
+}
+
+pub trait Relocation: Sized + 'static {
     type Address: Address;
     type AddressPart: AddressPart<Address = Self::Address>;
     type RelocationType: Debug + Eq + Copy;
@@ -93,14 +97,14 @@ pub trait Relocation: Sized {
     fn get_part(&self) -> Option<&Self::AddressPart>;
 }
 
-pub trait RelocationWriter {
+pub trait RelocationWriter: 'static {
     type Relocation: Relocation;
 
     fn write_relocation(&mut self, reloc: Self::Relocation);
 }
 
-pub trait Architecture: Sized {
-    type Operand: Operand<Arch = Self>;
+pub trait Architecture: Sized + 'static {
+    type Operand: Operand<Arch = Self> + 'static;
     type Address: Address;
     type Immediate: Scalar;
     type AddressPart: AddressPart<Address = Self::Address>;
@@ -109,6 +113,7 @@ pub trait Architecture: Sized {
     type Relocation: Relocation<Address = Self::Address>;
     type InstructionWriter: InstructionWriter<Arch = Self, Instruction = Self::Instruction>;
     type InstructionReader: InstructionReader<Arch = Self, Instruction = Self::Instruction>;
+
     fn registers(&self) -> &[Self::Register];
     fn new_writer(
         &self,
@@ -131,8 +136,6 @@ pub trait InstructionWriter {
     fn write_instruction(&mut self, ins: Self::Instruction) -> Result<(), Self::Error>;
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error>;
-
-    fn registers(&self) -> &Self;
 }
 
 pub trait InstructionReader {
