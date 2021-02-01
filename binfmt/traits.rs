@@ -1,5 +1,5 @@
 use crate::traits::private::Sealed;
-use std::{
+use core::{
     convert::TryInto,
     fmt::{Debug, LowerHex},
     ops::*,

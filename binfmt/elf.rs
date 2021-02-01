@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
 use crate::traits::Numeric;
 use crate::{debug::PrintHex, traits::private::Sealed};
@@ -46,6 +46,11 @@ pub trait ElfProgramHeader: Sealed {
     fn filesize(&self) -> ElfSize<Self::Class>;
     fn align(&self) -> ElfSize<Self::Class>;
     fn flags(&self) -> ElfWord<Self::Class>;
+}
+
+pub trait ElfSectionHeader: Sealed {
+    type Class: ElfClass;
+    fn st_type(&self) -> consts::SectionType;
 }
 
 pub trait ElfClass: Sealed + Sized + Copy {
@@ -303,11 +308,11 @@ pub mod consts {
 
             $($vis const $item: $name = $name($expr);)*
 
-            impl ::std::fmt::Debug for $name{
+            impl ::core::fmt::Debug for $name{
                 #[allow(unreachable_patterns)]
-                fn fmt(&self,f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result{
+                fn fmt(&self,f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result{
                     match self{
-                        $(Self($expr) => f.write_str(::std::stringify!($item)),)*
+                        $(Self($expr) => f.write_str(::core::stringify!($item)),)*
                         e => e.0.fmt(f)
                     }
                 }
@@ -575,7 +580,7 @@ pub mod consts {
         }
     }
 
-    #[repr(C)]
+    #[repr(C, packed)]
     #[derive(Copy, Clone, Debug)]
     pub struct ElfIdent {
         pub ei_mag: [u8; 4],
@@ -588,6 +593,7 @@ pub mod consts {
     }
 
     static_assertions::const_assert_eq!(core::mem::size_of::<ElfIdent>(), 16);
+    static_assertions::const_assert_eq!(core::mem::align_of::<ElfIdent>(), 1);
 
     fake_enum! {
         #[repr(u32)] pub enum ProgramType{
@@ -747,8 +753,8 @@ pub struct BadElfHeader;
 
 pub struct ElfReader<'a, Class: ElfClass> {
     bytes: &'a [u8],
-    header: &'a ElfHeader<Class>,
-    phdr: &'a [Class::ProgramHeader],
+    header: ElfHeader<Class>,
+    phdr: Box<[Class::ProgramHeader]>,
 }
 
 impl<'a, Class: ElfClass> ElfReader<'a, Class> {
@@ -776,7 +782,8 @@ impl<'a, Class: ElfClass> ElfReader<'a, Class> {
         // SAFETY:
         // bytes is valid 'a
         // Length is checked above
-        let header: &'a ElfHeader<Class> = unsafe { &*(bytes.as_ptr() as *const ElfHeader<Class>) };
+        let header: ElfHeader<Class> =
+            unsafe { core::ptr::read(bytes.as_ptr() as *const ElfHeader<Class>) };
 
         if header.e_phentsize.as_usize() != size_of::<Class::ProgramHeader>() {
             return Err(BadElfHeader);
@@ -795,11 +802,15 @@ impl<'a, Class: ElfClass> ElfReader<'a, Class> {
             return Err(BadElfHeader);
         }
 
-        let phdr: &'a [Class::ProgramHeader] = unsafe {
-            core::slice::from_raw_parts(
+        let phdr: Box<[Class::ProgramHeader]> = unsafe {
+            let mut phdr = Vec::with_capacity(header.e_phnum.as_usize());
+            core::ptr::copy_nonoverlapping(
                 ptr.add(header.e_phoff.as_usize()) as *const Class::ProgramHeader,
+                phdr.as_mut_ptr(),
                 header.e_phnum.as_usize(),
-            )
+            );
+            phdr.set_len(header.e_phnum.as_usize());
+            phdr.into_boxed_slice()
         };
 
         Ok(Self {
@@ -848,7 +859,7 @@ pub fn parse_file(bytes: &[u8]) -> Result<ParsedElfFile, BadElfHeader> {
 }
 
 impl<'a> ::core::fmt::Debug for ParsedElfFile<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ElfFile")
             .field(
                 "header",
@@ -865,5 +876,25 @@ impl<'a> ::core::fmt::Debug for ParsedElfFile<'a> {
                 },
             )
             .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{consts, Elf32, ElfReader};
+
+    #[test]
+    pub fn elf32_test() {
+        let file: [u8; 52] = [
+            0x7f, 0x45, 0x4C, 0x46, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x00,
+            0x20, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x0D, 0x00,
+        ];
+        let read = ElfReader::<Elf32>::parse(&file).unwrap();
+        let hdr = read.get_header();
+
+        assert_eq!(hdr.e_ident.ei_osabi, consts::ELFOSABI_NONE);
+        assert_eq!(hdr.e_machine, consts::EM_386);
     }
 }

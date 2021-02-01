@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 static_assertions = "1.1.0"
+aligned = "0.3.4"
 
 [lib]
 name = "binfmt"
