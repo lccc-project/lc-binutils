@@ -33,6 +33,8 @@ pub trait Numeric:
     fn min() -> Self;
     fn max() -> Self;
     fn as_usize(self) -> usize;
+    fn from_be(self) -> Self;
+    fn from_le(self) -> Self;
 }
 
 #[doc(hide)]
@@ -55,6 +57,14 @@ macro_rules! impl_numeric {
                 }
                 fn as_usize(self) -> usize{
                     self as usize
+                }
+
+                fn from_be(self) -> Self{
+                    $n::from_be(self)
+                }
+
+                fn from_le(self) -> Self{
+                    $n::from_le(self)
                 }
             }
             )*
