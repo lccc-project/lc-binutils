@@ -184,6 +184,7 @@ impl ArchiveMember {
             for i in 0..bytes.len() {
                 if bytes[i] == b'/' {
                     bytes = &bytes[..i];
+                    break;
                 }
             }
             {
@@ -347,9 +348,8 @@ impl Archive {
                                 "Invalid Archive Table",
                             ));
                         }
-
-                        members.push(m);
                     }
+                    members.push(m);
                 }
                 Err(e) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e),
