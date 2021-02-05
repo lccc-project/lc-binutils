@@ -109,7 +109,7 @@ pub mod raw {
     pub const XIR_MAGIC: [u8; 4] = [0xC6, b'X', b'I', b'R'];
 
     #[repr(C)]
-    pub struct XIRHeader {
+    pub struct XiRHeader {
         pub magic: [u8; 4],
         pub version: [u8; 2],
         pub target_components: XLangTarget,
@@ -120,7 +120,7 @@ pub mod raw {
 
     fake_enum! {
         #[repr(u16)]
-        pub enum STChar{
+        pub enum StChar{
             Bytes = 0,
             Utf8 = 2,
             Utf16 = 3,
@@ -129,8 +129,8 @@ pub mod raw {
     }
 
     #[repr(C)]
-    pub struct STEntry {
-        pub char: STChar,
+    pub struct StEntry {
+        pub char: StChar,
         pub char_width: u16,
         pub sz: u32,
     }

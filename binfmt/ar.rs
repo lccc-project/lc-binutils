@@ -234,7 +234,7 @@ impl Archive {
     }
 
     pub fn ranlib(&mut self) -> &mut ArchiveMember {
-        if let None = self.symtab {
+        if self.symtab.is_none() {
             let mut symtab = ArchiveMember::new();
             symtab.set_name(SYMTAB);
             self.symtab = Some(symtab);
@@ -251,7 +251,7 @@ impl Archive {
             .collect::<Vec<_>>();
 
         if !names.is_empty() {
-            if let None = self.strtab {
+            if self.strtab.is_none() {
                 let mut strtab = ArchiveMember::new();
                 strtab.set_name(STRTAB);
                 self.strtab = Some(strtab);
@@ -299,10 +299,10 @@ impl Archive {
         loop {
             match ArchiveMember::read(&mut r) {
                 Ok(mut m) => {
-                    if &m.header.ar_name == SYMTAB.as_bytes() {
+                    if m.header.ar_name == SYMTAB.as_bytes() {
                         symtab = Some(m);
                         continue;
-                    } else if &m.header.ar_name == STRTAB.as_bytes() {
+                    } else if m.header.ar_name == STRTAB.as_bytes() {
                         strtab = Some(m);
                         continue;
                     } else if m.header.ar_name[0] == b'/' {

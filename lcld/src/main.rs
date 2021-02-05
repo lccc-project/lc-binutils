@@ -7,7 +7,7 @@ pub mod driver;
 
 pub enum Mode {
     Unix,
-    MacOS,
+    Darwin,
     Windows,
 }
 
@@ -24,19 +24,18 @@ fn main() {
             std::process::exit(1);
         });
 
-    match if &exe_name == "ld.lc" || &exe_name == "ld" {
-        Some(Mode::Unix)
-    } else if &exe_name == "ld64.lc" || &exe_name == "ld64" {
-        Some(Mode::MacOS)
-    } else if &exe_name == "lc-link" || &exe_name == "link" {
-        Some(Mode::Windows)
-    } else {
-        None
-    }{
+    let driver = match &*exe_name {
+        x if x.ends_with("ld") || x.ends_with("ld.lc") => Some(Mode::Unix),
+        x if x.ends_with("ld64") || x.ends_with("ld64.lc") => Some(Mode::Darwin),
+        x if x.ends_with("link") => Some(Mode::Windows),
+        _ => None,
+    };
+
+    match driver{
         Some(Mode::Unix) => {
             driver::ld::main()
         },
-        Some(Mode::MacOS) => {
+        Some(Mode::Darwin) => {
             driver::ld64::main()
         },
         Some(Mode::Windows) => {

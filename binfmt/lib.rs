@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![allow(clippy::clippy::wrong_self_convention)]
 
 pub mod traits;
 
@@ -22,7 +23,7 @@ pub mod aout;
 #[cfg(feature = "xir")]
 pub mod xir;
 
-#[cfg(feature="ar")]
+#[cfg(feature = "ar")]
 pub mod ar;
 
 pub mod binary;

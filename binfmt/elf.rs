@@ -55,7 +55,7 @@ pub trait ElfSectionHeader: Sealed {
 
 pub trait ElfClass: Sealed + Sized + Copy {
     type Byte: Numeric;
-    const EI_CLASS: consts::EIClass;
+    const EI_CLASS: consts::EiClass;
     type Half: Numeric;
     type Word: Numeric;
     type Sword: Numeric;
@@ -222,7 +222,7 @@ impl ElfSymbol for Elf64Sym {
 
 impl Sealed for Elf64 {}
 impl ElfClass for Elf64 {
-    const EI_CLASS: consts::EIClass = consts::ELFCLASS64;
+    const EI_CLASS: consts::EiClass = consts::ELFCLASS64;
     type Addr = u64;
     type Offset = i64;
     type Size = u64;
@@ -261,7 +261,7 @@ impl ElfRelocationExtractHelpers for Elf64 {
 
 impl Sealed for Elf32 {}
 impl ElfClass for Elf32 {
-    const EI_CLASS: consts::EIClass = consts::ELFCLASS32;
+    const EI_CLASS: consts::EiClass = consts::ELFCLASS32;
     type Addr = u32;
     type Offset = i32;
     type Size = u32;
@@ -527,7 +527,7 @@ pub mod consts {
     }
 
     fake_enum! {
-        #[repr(u8)] pub enum EIClass{
+        #[repr(u8)] pub enum EiClass{
             ELFCLASSNONE = 0,
             ELFCLASS32 = 1,
             ELFCLASS64 = 2
@@ -535,7 +535,7 @@ pub mod consts {
     }
 
     fake_enum! {
-        #[repr(u8)] pub enum EIData{
+        #[repr(u8)] pub enum EiData{
             ELFDATANONE = 0,
             ELFDATA2LSB = 1,
             ELFDATA2MSB = 2
@@ -543,14 +543,14 @@ pub mod consts {
     }
 
     fake_enum! {
-        #[repr(u8)] pub enum EIVersion{
+        #[repr(u8)] pub enum EiVersion{
             EV_NONE = 0,
             EV_CURRENT = 1
         }
     }
 
     fake_enum! {
-        #[repr(u8)] pub enum EIOsAbi{
+        #[repr(u8)] pub enum EiOsAbi{
             ELFOSABI_NONE = 0,           // UNIX System V ABI
             ELFOSABI_HPUX = 1,           // HP-UX operating system
             ELFOSABI_NETBSD = 2,         // NetBSD
@@ -584,10 +584,10 @@ pub mod consts {
     #[derive(Copy, Clone, Debug)]
     pub struct ElfIdent {
         pub ei_mag: [u8; 4],
-        pub ei_class: EIClass,
-        pub ei_data: EIData,
-        pub ei_version: EIVersion,
-        pub ei_osabi: EIOsAbi,
+        pub ei_class: EiClass,
+        pub ei_data: EiData,
+        pub ei_version: EiVersion,
+        pub ei_osabi: EiOsAbi,
         pub ei_abiversion: u8,
         ei_pad: [u8; 7],
     }
