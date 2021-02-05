@@ -10,3 +10,4 @@ edition = "2018"
 binfmt = {path = "../binfmt",features=["ar"]}
 
 [features]
+elf = ["binfmt/elf"]

@@ -11,7 +11,7 @@ use std::{
 pub const ARMAG: [u8; 8] = *b"!<arch>\n";
 pub const STRTAB: &str = "//              ";
 pub const SYMTAB: &str = "/               ";
-pub const FMAG: [u8; 2] = [0x96, 0x0A];
+pub const FMAG: [u8; 2] = [0x60, 0x0A];
 #[repr(C, align(1))]
 #[derive(Copy, Clone, Debug)]
 pub struct ArchiveHeader {
@@ -24,6 +24,7 @@ pub struct ArchiveHeader {
     pub ar_fmag: [u8; 2],
 }
 
+#[derive(Debug)]
 pub struct Archive {
     mag: [u8; 8],
     symtab: Option<ArchiveMember>,
@@ -31,6 +32,7 @@ pub struct Archive {
     members: Vec<ArchiveMember>,
 }
 
+#[derive(Debug)]
 pub struct ArchiveMember {
     header: ArchiveHeader,
     long_name: Option<OsString>,
@@ -95,10 +97,11 @@ impl ArchiveMember {
             ));
         }
 
-        let size = std::str::from_utf8(&header.ar_name)
+        let size = std::str::from_utf8(&header.ar_size)
             .map_err(|v| std::io::Error::new(ErrorKind::InvalidData, v))
             .and_then(|s| {
-                s.parse::<u64>()
+                s.trim()
+                    .parse::<u64>()
                     .map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e))
             })?;
         #[cfg(target_pointer_width = "32")]
@@ -177,14 +180,22 @@ impl ArchiveMember {
         if let Some(o) = &self.long_name {
             o
         } else {
-            #[cfg(unix)]
-            {
-                use std::os::unix::ffi::OsStrExt as _;
-                OsStr::from_bytes(&self.header.ar_name)
+            let mut bytes: &[u8] = &self.header.ar_name;
+            for i in 0..bytes.len() {
+                if bytes[i] == b'/' {
+                    bytes = &bytes[..i];
+                }
             }
-            #[cfg(not(unix))]
             {
-                OsStr::new(std::str::from_utf8(&self.header.ar_name).unwrap())
+                #[cfg(unix)]
+                {
+                    use std::os::unix::ffi::OsStrExt as _;
+                    OsStr::from_bytes(bytes)
+                }
+                #[cfg(not(unix))]
+                {
+                    OsStr::new(std::str::from_utf8(bytes).unwrap())
+                }
             }
         }
     }
@@ -359,4 +370,15 @@ impl Archive {
         self.members.push(member);
         self.members.last_mut().unwrap()
     }
+
+    pub fn members(&self) -> &[ArchiveMember] {
+        &self.members
+    }
+
+    pub fn members_mut(&mut self) -> &mut [ArchiveMember] {
+        &mut self.members
+    }
 }
+
+#[cfg(test)]
+pub mod tests;

@@ -1,0 +1,5 @@
+[binutils.tools.ar]
+# default-target = ""
+# default-sysroot = "/"
+default-formats = ["elf","coff"]
+
