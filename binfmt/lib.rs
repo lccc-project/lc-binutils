@@ -22,4 +22,7 @@ pub mod aout;
 #[cfg(feature = "xir")]
 pub mod xir;
 
+#[cfg(feature="ar")]
+pub mod ar;
+
 pub mod binary;
