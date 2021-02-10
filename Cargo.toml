@@ -9,5 +9,6 @@ members = [
     "lto",
     "binfmt-test",
     "arch-ops",
-    "lc-as"
+    "lc-as",
+    "tablegen"
 ]

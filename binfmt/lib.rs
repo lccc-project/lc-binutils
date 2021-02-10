@@ -5,6 +5,8 @@ pub mod traits;
 
 pub mod debug;
 
+pub mod fmt;
+
 #[cfg(feature = "elf")]
 pub mod elf;
 

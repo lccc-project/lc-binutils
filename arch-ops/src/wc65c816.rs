@@ -1,8 +1,9 @@
 use std::{
     fmt::Display,
-    io::{Read, Write},
+    io::{ErrorKind, Read, Write},
     ops::Range,
     slice::{self, Iter},
+    u16,
 };
 
 use either::Either;
@@ -65,6 +66,8 @@ pub enum Wc65c816Address {
     PCRelLong(i16),
     PCRelShort(i8),
     Symbol(String),
+    LongSymbol(String),
+    Stack(u8),
 }
 
 impl Display for Wc65c816Address {
@@ -75,6 +78,8 @@ impl Display for Wc65c816Address {
             Wc65c816Address::PCRelLong(i) => f.write_fmt(format_args!("$+{:x}", i)),
             Wc65c816Address::PCRelShort(i) => f.write_fmt(format_args!("$+{:x}", i)),
             Wc65c816Address::Symbol(s) => s.fmt(f),
+            Wc65c816Address::LongSymbol(s) => s.fmt(f),
+            Wc65c816Address::Stack(i) => f.write_fmt(format_args!("{},S", i)),
         }
     }
 }
@@ -92,13 +97,14 @@ impl Address for Wc65c816Address {
             Wc65c816Address::BankLocal(v) => Some(*v as u32),
             Wc65c816Address::PCRelLong(_) => None,
             Wc65c816Address::PCRelShort(_) => None,
-            Wc65c816Address::Symbol(_) => None,
+            Wc65c816Address::Symbol(_) | Wc65c816Address::LongSymbol(_) => None,
+            Wc65c816Address::Stack(_) => None,
         }
     }
 
     fn symbol_name(&self) -> Option<&str> {
-        if let Self::Symbol(s) = self {
-            Some(&**s)
+        if let Self::Symbol(s) | Wc65c816Address::LongSymbol(s) = self {
+            Some(s)
         } else {
             None
         }
@@ -124,7 +130,8 @@ impl Address for Wc65c816Address {
                     base & 0xff0000
                         | (((part as i32).wrapping_add(*off as i32)) as u32 & 0xffffu32),
                 ),
-                Wc65c816Address::Symbol(_) => None,
+                Wc65c816Address::Symbol(_) | Wc65c816Address::LongSymbol(_) => None,
+                Wc65c816Address::Stack(_) => None,
             }
         }
     }
@@ -724,10 +731,10 @@ impl Relocation for Wc65c816Relocation {
     }
 }
 pub struct Wc65c816InstructionWriter<'a> {
-    _relocs: &'a mut dyn RelocationWriter<Relocation = Wc65c816Relocation>,
+    relocs: &'a mut dyn RelocationWriter<Relocation = Wc65c816Relocation>,
     writer: &'a mut (dyn Write + 'a),
     arch: &'a Wc65c816,
-    _acc8: bool,
+    acc8: bool,
     _idx8: bool,
 }
 
@@ -744,8 +751,177 @@ impl<'a> InstructionWriter for Wc65c816InstructionWriter<'a> {
         &self.arch
     }
 
-    fn write_instruction(&mut self, _ins: Self::Instruction) -> Result<(), Self::Error> {
-        todo!();
+    fn write_instruction(&mut self, ins: Self::Instruction) -> Result<(), Self::Error> {
+        match ins {
+            Wc65c816Instruction::Adc(Wc65c816Operand::Immediate(v)) => {
+                let insbytes = [0x69, (v & 0xff) as u8, (v >> 8) as u8];
+                if self.acc8 {
+                    self.write_bytes(&insbytes[0..2])?;
+                } else {
+                    self.write_bytes(&insbytes)?;
+                }
+            }
+            Wc65c816Instruction::Adc(Wc65c816Operand::Address(v, None)) => match v {
+                Wc65c816Address::Absolute(v) => {
+                    let insbytes = ((v << 8) | 0x6F).to_le_bytes();
+                    self.write_bytes(&insbytes)?;
+                }
+                Wc65c816Address::BankLocal(v) => {
+                    let insbytes = [0x6D, v as u8, (v >> 8) as u8];
+                    self.write_bytes(&insbytes)?;
+                }
+                i @ Wc65c816Address::PCRelLong(_)
+                | i @ Wc65c816Address::PCRelShort(_)
+                | i @ Wc65c816Address::Symbol(_) => {
+                    let insbytes = [0x6D, 0, 0];
+                    self.write_bytes(&insbytes)?;
+                    let rel = Wc65c816Relocation {
+                        rel_type: Wc65c816RelocationType::Short,
+                        symbol: Either::Left(i),
+                    };
+                    self.relocs.write_relocation(rel)
+                }
+                i @ Wc65c816Address::LongSymbol(_) => {
+                    let insbytes = [0x6F, 0, 0, 0];
+                    self.write_bytes(&insbytes)?;
+                    let rel = Wc65c816Relocation {
+                        rel_type: Wc65c816RelocationType::Long,
+                        symbol: Either::Left(i),
+                    };
+                    self.relocs.write_relocation(rel)
+                }
+                Wc65c816Address::Stack(off) => {
+                    let insbytes = [0x63, off];
+                    self.write_bytes(&insbytes)?;
+                }
+            },
+            Wc65c816Instruction::Adc(Wc65c816Operand::Address(v, Some(Wc65c816Register::IdxX))) => {
+                match v {
+                    Wc65c816Address::Absolute(v) => {
+                        let insbytes = ((v << 8) | 0x7F).to_le_bytes();
+                        self.write_bytes(&insbytes)?;
+                    }
+                    Wc65c816Address::BankLocal(v) => {
+                        let insbytes = [0x7D, v as u8, (v >> 8) as u8];
+                        self.write_bytes(&insbytes)?;
+                    }
+                    i @ Wc65c816Address::PCRelLong(_)
+                    | i @ Wc65c816Address::PCRelShort(_)
+                    | i @ Wc65c816Address::Symbol(_) => {
+                        let insbytes = [0x7D, 0, 0];
+                        self.write_bytes(&insbytes)?;
+                        let rel = Wc65c816Relocation {
+                            rel_type: Wc65c816RelocationType::Short,
+                            symbol: Either::Left(i),
+                        };
+                        self.relocs.write_relocation(rel)
+                    }
+                    i @ Wc65c816Address::LongSymbol(_) => {
+                        let insbytes = [0x7F, 0, 0, 0];
+                        self.write_bytes(&insbytes)?;
+                        let rel = Wc65c816Relocation {
+                            rel_type: Wc65c816RelocationType::Long,
+                            symbol: Either::Left(i),
+                        };
+                        self.relocs.write_relocation(rel)
+                    }
+                    o => {
+                        return Err(std::io::Error::new(
+                            ErrorKind::Other,
+                            format!("Invalid instruction: adc {},X", o),
+                        ))
+                    }
+                }
+            }
+            Wc65c816Instruction::Sbc(_) => {}
+            Wc65c816Instruction::Cmp(_) => {}
+            Wc65c816Instruction::Cpx(_) => {}
+            Wc65c816Instruction::Cpy(_) => {}
+            Wc65c816Instruction::Dec(_) => {}
+            Wc65c816Instruction::Dex(_) => {}
+            Wc65c816Instruction::Dey(_) => {}
+            Wc65c816Instruction::Inc(_) => {}
+            Wc65c816Instruction::Inx(_) => {}
+            Wc65c816Instruction::Iny(_) => {}
+            Wc65c816Instruction::And(_) => {}
+            Wc65c816Instruction::Eor(_) => {}
+            Wc65c816Instruction::Ora(_) => {}
+            Wc65c816Instruction::Bit(_) => {}
+            Wc65c816Instruction::Trb(_) => {}
+            Wc65c816Instruction::Tsb(_) => {}
+            Wc65c816Instruction::Asl(_) => {}
+            Wc65c816Instruction::Lsr(_) => {}
+            Wc65c816Instruction::Ror(_) => {}
+            Wc65c816Instruction::Rol(_) => {}
+            Wc65c816Instruction::Bcc(_) => {}
+            Wc65c816Instruction::Bcs(_) => {}
+            Wc65c816Instruction::Beq(_) => {}
+            Wc65c816Instruction::Bne(_) => {}
+            Wc65c816Instruction::Bmi(_) => {}
+            Wc65c816Instruction::Bpl(_) => {}
+            Wc65c816Instruction::Bra(_) => {}
+            Wc65c816Instruction::Bvc(_) => {}
+            Wc65c816Instruction::Bvs(_) => {}
+            Wc65c816Instruction::Brl(_) => {}
+            Wc65c816Instruction::Jmp(_) => {}
+            Wc65c816Instruction::Jsr(_) => {}
+            Wc65c816Instruction::Jsl(_) => {}
+            Wc65c816Instruction::Rts => {}
+            Wc65c816Instruction::Rtl => {}
+            Wc65c816Instruction::Brk(_) => {}
+            Wc65c816Instruction::Cop(_) => {}
+            Wc65c816Instruction::Rti => {}
+            Wc65c816Instruction::Clc => {}
+            Wc65c816Instruction::Cld => {}
+            Wc65c816Instruction::Cli => {}
+            Wc65c816Instruction::Clv => {}
+            Wc65c816Instruction::Sec => {}
+            Wc65c816Instruction::Sed => {}
+            Wc65c816Instruction::Sei => {}
+            Wc65c816Instruction::Rep(_) => {}
+            Wc65c816Instruction::Sep(_) => {}
+            Wc65c816Instruction::Lda(_) => {}
+            Wc65c816Instruction::Ldx(_) => {}
+            Wc65c816Instruction::Ldy(_) => {}
+            Wc65c816Instruction::Sta(_) => {}
+            Wc65c816Instruction::Stx(_) => {}
+            Wc65c816Instruction::Sty(_) => {}
+            Wc65c816Instruction::Stz(_) => {}
+            Wc65c816Instruction::Mvn(_) => {}
+            Wc65c816Instruction::Mvp(_) => {}
+            Wc65c816Instruction::Nop => {}
+            Wc65c816Instruction::Wdm(_) => {}
+            Wc65c816Instruction::Pea(_) => {}
+            Wc65c816Instruction::Pha => {}
+            Wc65c816Instruction::Phx => {}
+            Wc65c816Instruction::Phy => {}
+            Wc65c816Instruction::Pla => {}
+            Wc65c816Instruction::Plx => {}
+            Wc65c816Instruction::Ply => {}
+            Wc65c816Instruction::Phb => {}
+            Wc65c816Instruction::Phd => {}
+            Wc65c816Instruction::Phk => {}
+            Wc65c816Instruction::Php => {}
+            Wc65c816Instruction::Plb => {}
+            Wc65c816Instruction::Pld => {}
+            Wc65c816Instruction::Plp => {}
+            Wc65c816Instruction::Stp => {}
+            Wc65c816Instruction::Wai => {}
+            Wc65c816Instruction::Tcd => {}
+            Wc65c816Instruction::Tcs => {}
+            Wc65c816Instruction::Tdc => {}
+            Wc65c816Instruction::Tsc => {}
+            Wc65c816Instruction::Xba => {}
+            Wc65c816Instruction::Xce => {}
+            i => {
+                return Err(std::io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("invalid instruction {}", i),
+                ))
+            }
+        }
+
+        Ok(())
     }
 
     fn write_bytes(&mut self, bytes: &[u8]) -> Result<(), Self::Error> {
