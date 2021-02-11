@@ -11,5 +11,12 @@ macro_rules! registers{
                 }
             }
         }
+        impl $crate::traits::Register for Registers{
+            fn size(&self) -> u32{
+                match self{
+                    $(Self::$def => $size),*
+                }
+            }
+        }
     }
 }

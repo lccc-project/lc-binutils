@@ -126,11 +126,9 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
         (Ok(m1), Ok(m2))
             if m1
                 .modified()
-                .and_then(|d| {
-                    d.duration_since(m2.modified()?)
-                        .map_err(|e| std::io::Error::new(ErrorKind::Other, e))
-                })
-                .is_err() =>
+                .map_err(|_| ())
+                .and_then(|d| Ok(d < m2.modified().map_err(|_| ())?))
+                != Ok(true) =>
         {
             if let Ok(s) = which::which("llvm-tblgen") {
                 let output = File::create(&file).unwrap();

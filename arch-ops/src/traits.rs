@@ -62,8 +62,6 @@ pub trait Operand: Sized + Display + 'static {
 }
 
 pub trait Register: Sized + Display + 'static {
-    type Value: Scalar;
-
     fn size(&self) -> u32;
 }
 

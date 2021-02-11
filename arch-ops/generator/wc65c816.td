@@ -23,7 +23,7 @@ def Minus     : Wc65c816StatusFlag<"m",0x80>{}
 def Emulation : Wc65c816Flag<"e">{}
 
 
-class Wc65c816Register<string Name,int Size> : Register<Name,Size>{
+class Wc65c816Register<string Name,int Size> : Register<Name,Size>, Operand{
 
 }
 
@@ -44,3 +44,5 @@ def ProgramCounter: Wc65c816Register<"PC",16>{}
 def StackPointer  : Wc65c816Register<"S",16> {}
 def ProgramBank   : Wc65c816Register<"K",8>  {}
 def DataBank      : Wc65c816Register<"B",8>  {}
+
+

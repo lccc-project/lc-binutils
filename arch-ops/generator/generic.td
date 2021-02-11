@@ -4,3 +4,5 @@ class Register<string Name,int Size>{
     int size = Size;
 }
 
+class Operand{
+}
