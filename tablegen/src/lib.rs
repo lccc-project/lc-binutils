@@ -3,7 +3,7 @@ use std::{fs::File, io::ErrorKind, path::PathBuf, process::Command};
 use proc_macro::TokenStream;
 
 use quote::ToTokens;
-use syn::{parse::Parse, punctuated::Punctuated, token::Bracket, Ident};
+use syn::{parse::Parse, punctuated::Punctuated, token::Bracket};
 
 mod kw {
     syn::custom_keyword!(arch);
@@ -25,12 +25,18 @@ impl Parse for Fields {
 
 struct FieldOutput {
     pub bracket: syn::token::Bracket,
+    pub name: syn::Ident,
+    pub comma: syn::Token![,],
     pub fields: Punctuated<syn::Lit, syn::Token![,]>,
 }
 
 impl ToTokens for FieldOutput {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        tokens.extend(quote::quote! {[#self.fields]})
+        let name = &self.name;
+        let comma = &self.comma;
+        let fields = &self.fields;
+
+        tokens.extend(quote::quote! {[#name #comma #fields]})
     }
 }
 
@@ -157,15 +163,13 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
     let mut output_fields = Punctuated::<FieldOutput, syn::Token![,]>::new();
     if let Some(a) = json["!instanceof"][invoke.class.to_string()].as_array() {
         for v in a {
+            let name = v.as_str().expect("No !name from tablegen class");
             let mut f = FieldOutput {
                 bracket: Bracket::default(),
+                name: syn::Ident::new(name, proc_macro2::Span::call_site()),
+                comma: Default::default(),
                 fields: Punctuated::new(),
             };
-            let name = v.as_str().expect("No !name from tablegen class");
-            f.fields.push(syn::Lit::Str(syn::LitStr::new(
-                name,
-                proc_macro2::Span::call_site(),
-            )));
             for k in &invoke.fields.fields {
                 let field = &json[name][k.to_string()];
                 if let Some(s) = field.as_str() {
@@ -195,7 +199,7 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     quote::quote!(
-        #path ! (#arch, #output_fields)
+        #path!(#arch, #output_fields);
     )
     .into()
 }
