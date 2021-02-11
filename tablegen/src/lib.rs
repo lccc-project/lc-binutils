@@ -81,6 +81,7 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
     let path = mac.path;
     let invoke: MacroInvoke = syn::parse2(mac.tokens).unwrap();
     file.push("generator");
+    let generator_dir = file.clone();
     file.push(attr.arch.to_string());
     let mut source = file.clone();
     file.set_extension("td.json");
@@ -94,10 +95,12 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
                     .arg("--dump-json")
                     .arg(&source)
                     .stdout(output)
+                    .current_dir(generator_dir)
                     .status()
                 {
                     Ok(s) => {
                         if !s.success() {
+                            let _ = std::fs::remove_file(&file);
                             panic!(
                                 "Failed to evaluate tablegen in {} for {}: llvm-tblgen returned an error",
                                 &dir,
@@ -105,10 +108,13 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
                             );
                         }
                     }
-                    Err(e) => panic!(
-                        "Failed to evaluate tablegen in {} for {}: {}",
-                        &dir, &attr.arch, e
-                    ),
+                    Err(e) => {
+                        let _ = std::fs::remove_file(&file);
+                        panic!(
+                            "Failed to evaluate tablegen in {} for {}: {}",
+                            &dir, &attr.arch, e
+                        )
+                    }
                 }
             } else {
                 panic!(
@@ -133,6 +139,7 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
                     .arg("--dump-json")
                     .arg(&source)
                     .stdout(output)
+                    .current_dir(generator_dir)
                     .status()
                 {
                     Ok(s) => {
@@ -143,7 +150,9 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
                             );
                         }
                     }
-                    Err(e) => panic!("Failed to evaluate tablegen for {}: {}", &attr.arch, e),
+                    Err(e) => {
+                        panic!("Failed to evaluate tablegen for {}: {}", &attr.arch, e);
+                    }
                 }
             } else {
                 /* warning case: If we had it, emit a warning here. Since we don't, do nothing */

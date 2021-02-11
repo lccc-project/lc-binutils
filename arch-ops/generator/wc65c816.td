@@ -1,21 +1,26 @@
 
 include "generic.td"
 
-class Wc65c816Flag<string Name,bits<8> Mask>{
+class Wc65c816Flag<string Name>{
     string name = Name;
+}
+
+class Wc65c816StatusFlag<string Name,bits<8> Mask> : Wc65c816Flag<Name>{
     bits<8> mask = Mask;
 }
 
 
-def Carry     : Wc65c816Flag<"c",0x01>{}
-def Zero      : Wc65c816Flag<"z",0x02>{}
-def Interrupt : Wc65c816Flag<"i",0x04>{}
-def Decimal   : Wc65c816Flag<"d",0x08>{}
-def IndexWidth: Wc65c816Flag<"x",0x10>{}
-def Break     : Wc65c816Flag<"b",0x10>{}
-def MemWidth  : Wc65c816Flag<"m",0x20>{}
-def Overflow  : Wc65c816Flag<"v",0x40>{}
-def Minus     : Wc65c816Flag<"m",0x80>{}
+
+def Carry     : Wc65c816StatusFlag<"c",0x01>{}
+def Zero      : Wc65c816StatusFlag<"z",0x02>{}
+def Interrupt : Wc65c816StatusFlag<"i",0x04>{}
+def Decimal   : Wc65c816StatusFlag<"d",0x08>{}
+def IndexWidth: Wc65c816StatusFlag<"x",0x10>{}
+def Break     : Wc65c816StatusFlag<"b",0x10>{}
+def MemWidth  : Wc65c816StatusFlag<"m",0x20>{}
+def Overflow  : Wc65c816StatusFlag<"v",0x40>{}
+def Minus     : Wc65c816StatusFlag<"m",0x80>{}
+def Emulation : Wc65c816Flag<"e">{}
 
 
 class Wc65c816Register<string Name,int Size> : Register<Name,Size>{
