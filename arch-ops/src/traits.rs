@@ -64,8 +64,7 @@ pub trait Operand: Sized + Display + 'static {
 pub trait Register: Sized + Display + 'static {
     type Value: Scalar;
 
-    fn known_size(&self) -> Option<u32>;
-    fn size_range(&self) -> (u32, u32);
+    fn size(&self) -> u32;
 }
 
 pub trait AddressPart: Sized + Display + 'static {

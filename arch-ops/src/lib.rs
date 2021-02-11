@@ -8,4 +8,7 @@ pub mod wc65c816;
 #[cfg(feature = "x86")]
 pub mod x86;
 
-pub mod tablegen;
+mod generators;
+
+#[macro_use]
+extern crate tablegen;
