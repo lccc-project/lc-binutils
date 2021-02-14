@@ -19,7 +19,7 @@ jobs:
     - name: Build
     
       run: |
-        rustup toolchain add beta --components rustfmt
+        rustup toolchain add beta --component rustfmt
         rustup default beta
         rustup update
         cargo fmt -- --check
