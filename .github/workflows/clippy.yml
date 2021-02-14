@@ -17,5 +17,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Build
-      run: cargo clippy --all-features
+      run: |
+        rustup toolchain add beta --components clippy
+        rustup default beta
+        rustup update
+        cargo clippy --all-features
     

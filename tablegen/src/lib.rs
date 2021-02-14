@@ -2,7 +2,9 @@ use std::{fs::File, io::ErrorKind, path::PathBuf, process::Command};
 
 use proc_macro::TokenStream;
 
+use proc_macro2::{Delimiter, Group, Ident, Literal, Span, TokenTree};
 use quote::ToTokens;
+use serde_json::Value;
 use syn::{parse::Parse, punctuated::Punctuated, token::Bracket};
 
 mod kw {
@@ -27,7 +29,7 @@ struct FieldOutput {
     pub bracket: syn::token::Bracket,
     pub name: syn::Ident,
     pub comma: syn::Token![,],
-    pub fields: Punctuated<syn::Lit, syn::Token![,]>,
+    pub fields: Punctuated<proc_macro2::TokenStream, syn::Token![,]>,
 }
 
 impl ToTokens for FieldOutput {
@@ -67,6 +69,43 @@ impl Parse for Input {
             eq1: input.parse()?,
             arch: input.parse()?,
         })
+    }
+}
+
+fn value_to_tokens(v: &Value, s: Span) -> proc_macro2::TokenStream {
+    match v {
+        Value::Null => proc_macro2::TokenStream::new(),
+        Value::Bool(true) => {
+            let tt = TokenTree::Ident(Ident::new("true", s));
+            tt.into()
+        }
+        Value::Bool(false) => {
+            let tt = TokenTree::Ident(Ident::new("false", s));
+            tt.into()
+        }
+        Value::Number(i) => {
+            let lit;
+            if i.is_u64() {
+                lit = Literal::u64_unsuffixed(i.as_u64().unwrap());
+            } else if i.is_i64() {
+                lit = Literal::i64_unsuffixed(i.as_i64().unwrap());
+            } else {
+                lit = Literal::f64_unsuffixed(i.as_f64().unwrap());
+            }
+
+            TokenTree::Literal(lit).into()
+        }
+        Value::String(s) => TokenTree::Literal(Literal::string(&s)).into(),
+        Value::Array(v) => {
+            let st = v
+                .iter()
+                .map(|v| value_to_tokens(v, s))
+                .collect::<Punctuated<proc_macro2::TokenStream, syn::Token![,]>>()
+                .into_token_stream();
+
+            TokenTree::Group(Group::new(Delimiter::Bracket, st)).into()
+        }
+        Value::Object(_) => panic!("Objects are not implemented yet"),
     }
 }
 
@@ -179,27 +218,7 @@ pub fn tablegen(attr: TokenStream, input: TokenStream) -> TokenStream {
             };
             for k in &invoke.fields.fields {
                 let field = &json[name][k.to_string()];
-                if let Some(s) = field.as_str() {
-                    f.fields.push(syn::Lit::Str(syn::LitStr::new(
-                        s,
-                        proc_macro2::Span::call_site(),
-                    )));
-                } else if let Some(i) = field.as_u64() {
-                    f.fields.push(syn::Lit::Int(syn::LitInt::new(
-                        &i.to_string(),
-                        proc_macro2::Span::call_site(),
-                    )));
-                } else if let Some(i) = field.as_i64() {
-                    f.fields.push(syn::Lit::Int(syn::LitInt::new(
-                        &i.to_string(),
-                        proc_macro2::Span::call_site(),
-                    )));
-                } else if let Some(i) = field.as_f64() {
-                    f.fields.push(syn::Lit::Float(syn::LitFloat::new(
-                        &i.to_string(),
-                        proc_macro2::Span::call_site(),
-                    )));
-                }
+                f.fields.push(value_to_tokens(field, Span::call_site()));
             }
             output_fields.push(f)
         }

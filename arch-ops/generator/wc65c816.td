@@ -51,8 +51,27 @@ class Wc65c816Scalar<Wc65c816Flag Control> : Operand{
     Wc65c816Flag control = Control;
 }
 
+class Wc65c816Address<int Size> : Operand{
+    int size = Size;
+}
+
+def LongAddress : Wc65c816Address<24>{}
+def ShortAddress : Wc65c816Address<16>{}
+def Relative8 : Wc65c816Address<8>{}
+def Relative16 : Wc65c816Address<16>{}
+class Symbol<Wc65c816Address Underlying> : Wc65c816Address<Underlying.size>{
+    Wc65c816Address underlying = Underlying;
+}
+
+
+
 def Nop : Wc65c816Instruction<"nop",0xea,[]>{}
 
 def Wdm : Wc65c816Instruction<"wdm",0x42,[Optional<Scalar<8>>]>{}
 
+def Rts : Wc65c816Instruction<"rts",0xb6,[]>{}
+def Rtl : Wc65c816Instruction<"rtl",0x60,[]>{}
+
+def Brk : Wc65c816Instruction<"brk",0x00,[Optional<Scalar<8>>]>{}
+def Cop : Wc65c816Instruction<"cop",0x02,[Optional<Scalar<8>>]>{}
 
