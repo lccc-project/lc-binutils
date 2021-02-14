@@ -45,4 +45,14 @@ def StackPointer  : Wc65c816Register<"S",16> {}
 def ProgramBank   : Wc65c816Register<"K",8>  {}
 def DataBank      : Wc65c816Register<"B",8>  {}
 
+class Wc65c816Instruction<string Name,bits<8> Opcode,list<Operand> Operands>: Instruction<Name,[Opcode],Operands>{}
+
+class Wc65c816Scalar<Wc65c816Flag Control> : Operand{
+    Wc65c816Flag control = Control;
+}
+
+def Nop : Wc65c816Instruction<"nop",0xea,[]>{}
+
+def Wdm : Wc65c816Instruction<"wdm",0x42,[Optional<Scalar<8>>]>{}
+
 
