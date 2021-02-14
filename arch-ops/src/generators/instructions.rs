@@ -1,7 +1,7 @@
 #[doc(hidden)]
 const fn __from_bit(t: &str) -> u8 {
     if t.len() != 1 {
-        return 255;
+        255
     } else {
         match t.as_bytes()[0] {
             b'0' => 0,
