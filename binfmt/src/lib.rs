@@ -29,3 +29,24 @@ pub mod xir;
 pub mod ar;
 
 pub mod binary;
+
+extern crate lazy_static;
+
+use std::{collections::HashMap, io::Read};
+
+use traits::BinaryFile;
+
+pub type BinfmtConstructor =
+    Box<(dyn Fn(&mut (dyn Read + '_)) -> std::io::Result<Box<dyn BinaryFile>> + Sync)>;
+
+lazy_static::lazy_static! {
+    static ref BINFMTS: HashMap<&'static str,BinfmtConstructor> = {
+        #[allow(unused_mut)]
+        let mut hm = HashMap::<&'static str,BinfmtConstructor>::new();
+        hm.insert("raw", Box::new(|r|Ok(binary::RawBinaryFile::read(r)?)));
+
+        hm
+    };
+
+    static ref SELECT: Vec<BinfmtConstructor> = vec![Box::new(|r|Ok(binary::RawBinaryFile::read(r)?))];
+}
