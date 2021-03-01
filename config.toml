@@ -1,0 +1,8 @@
+[targets]
+#default-target = "<host>"
+
+[paths]
+#prefix = "/usr/local"
+#exec_prefix = ""
+#bindir = "bin"
+#libdir = "lib"
