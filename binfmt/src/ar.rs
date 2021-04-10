@@ -358,9 +358,9 @@ impl Archive {
 
         Ok(Self {
             mag,
-            members,
             symtab,
             strtab,
+            members,
         })
     }
 
