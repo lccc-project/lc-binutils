@@ -1,6 +1,11 @@
-use core::mem::size_of;
+use std::{
+    fmt::Display,
+    io::{BufReader, Read},
+};
 
-use crate::traits::Numeric;
+use bytemuck::{Pod, Zeroable};
+
+use crate::traits::{BinaryFile, Numeric};
 use crate::{debug::PrintHex, traits::private::Sealed};
 
 pub type ElfByte<E> = <E as ElfClass>::Byte;
@@ -53,7 +58,7 @@ pub trait ElfSectionHeader: Sealed {
     fn st_type(&self) -> consts::SectionType;
 }
 
-pub trait ElfClass: Sealed + Sized + Copy {
+pub trait ElfClass: Sealed + Sized + Copy + 'static {
     type Byte: Numeric;
     const EI_CLASS: consts::EiClass;
     type Half: Numeric;
@@ -66,10 +71,10 @@ pub trait ElfClass: Sealed + Sized + Copy {
     type Section: Numeric;
     type Versym: Numeric;
     type Size: Numeric;
-    type Symbol: ElfSymbol<Class = Self>;
-    type Rel: ElfRelocation<Class = Self>;
-    type Rela: ElfRelocation<Class = Self>;
-    type ProgramHeader: ElfProgramHeader<Class = Self>;
+    type Symbol: ElfSymbol<Class = Self> + Pod;
+    type Rel: ElfRelocation<Class = Self> + Pod;
+    type Rela: ElfRelocation<Class = Self> + Pod;
+    type ProgramHeader: ElfProgramHeader<Class = Self> + Pod;
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -79,6 +84,7 @@ pub enum Elf64 {}
 pub enum Elf32 {}
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
 pub struct Elf32Sym {
     st_name: ElfWord<Elf32>,
     st_value: ElfAddr<Elf32>,
@@ -118,7 +124,7 @@ impl ElfSymbol for Elf32Sym {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
 pub struct Elf64Sym {
     st_name: ElfWord<Elf64>,
     st_info: ElfByte<Elf64>,
@@ -129,10 +135,14 @@ pub struct Elf64Sym {
 }
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub struct ElfRel<Class: ElfClass> {
     r_offset: ElfAddr<Class>,
     r_info: ElfSize<Class>,
 }
+
+unsafe impl<Class: ElfClass> Zeroable for ElfRel<Class> {}
+unsafe impl<Class: ElfClass> Pod for ElfRel<Class> {}
 
 mod private {
     use super::*;
@@ -142,7 +152,6 @@ mod private {
     }
 }
 
-use consts::ElfIdent;
 use private::*;
 
 impl<Class: ElfClass + ElfRelocationExtractHelpers> Sealed for ElfRel<Class> {}
@@ -164,11 +173,15 @@ impl<Class: ElfClass + ElfRelocationExtractHelpers> ElfRelocation for ElfRel<Cla
 }
 
 #[repr(C)]
+#[derive(Copy, Clone, Debug)]
 pub struct ElfRela<Class: ElfClass> {
     r_offset: ElfAddr<Class>,
     r_info: ElfSize<Class>,
     r_addend: ElfOffset<Class>,
 }
+
+unsafe impl<Class: ElfClass> Zeroable for ElfRela<Class> {}
+unsafe impl<Class: ElfClass> Pod for ElfRela<Class> {}
 
 impl<Class: ElfClass + ElfRelocationExtractHelpers> Sealed for ElfRela<Class> {}
 
@@ -297,12 +310,12 @@ impl ElfRelocationExtractHelpers for Elf32 {
 }
 
 pub mod consts {
-
+    use bytemuck::{Pod, Zeroable};
     macro_rules! fake_enum{
         {#[repr($t:ty)] $vis:vis enum $name:ident {
             $($item:ident = $expr:literal),*$(,)?
         }} => {
-            #[derive(Copy,Clone,Eq,PartialEq)]
+            #[derive(Copy,Clone,Eq,PartialEq,Zeroable,Pod)]
             #[repr(transparent)]
             $vis struct $name($t);
 
@@ -581,7 +594,7 @@ pub mod consts {
     }
 
     #[repr(C, packed)]
-    #[derive(Copy, Clone, Debug)]
+    #[derive(Copy, Clone, Debug, Zeroable, Pod)]
     pub struct ElfIdent {
         pub ei_mag: [u8; 4],
         pub ei_class: EiClass,
@@ -644,9 +657,10 @@ pub struct ElfHeader<E: ElfClass> {
     e_shsnidx: ElfHalf<E>,
 }
 
-impl<E: ElfClass> ElfHeader<E> {}
+unsafe impl<E: ElfClass> Zeroable for ElfHeader<E> {}
+unsafe impl<E: ElfClass + 'static> Pod for ElfHeader<E> {}
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
 #[repr(C)]
 pub struct Elf32Phdr {
     p_type: consts::ProgramType,
@@ -697,7 +711,7 @@ impl ElfProgramHeader for Elf32Phdr {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
 #[repr(C)]
 pub struct Elf64Phdr {
     p_type: consts::ProgramType,
@@ -751,133 +765,71 @@ impl ElfProgramHeader for Elf64Phdr {
 #[derive(Copy, Clone, Debug)]
 pub struct BadElfHeader;
 
-pub struct ElfReader<'a, Class: ElfClass> {
-    bytes: &'a [u8],
+impl Display for BadElfHeader {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fmt.write_str("Invalid Elf Header")
+    }
+}
+
+impl std::error::Error for BadElfHeader {}
+
+pub struct ElfFile<Class: ElfClass> {
     header: ElfHeader<Class>,
-    phdr: Box<[Class::ProgramHeader]>,
+    _segments: Vec<Class::ProgramHeader>,
 }
 
-impl<'a, Class: ElfClass> ElfReader<'a, Class> {
-    pub fn parse(bytes: &'a [u8]) -> Result<Self, BadElfHeader> {
-        if bytes.len() < size_of::<ElfIdent>() {
-            return Err(BadElfHeader);
-        }
-        // SAFETY:
-        // bytes are valid for the lifetime of eident, because they are valid for 'a
-        // Length is checked above
-        let eident: &ElfIdent = unsafe { &*(bytes.as_ptr() as *const ElfIdent) };
+impl<Class: ElfClass + 'static> BinaryFile for ElfFile<Class>
+where
+    ElfHeader<Class>: Pod,
+{
+    fn read(read: &mut (dyn std::io::Read + '_)) -> std::io::Result<Box<Self>>
+    where
+        Self: Sized,
+    {
+        let mut read = BufReader::new(read);
+        let mut ehdr = ElfHeader::<Class>::zeroed();
+        read.read_exact(bytemuck::bytes_of_mut(&mut ehdr))?;
 
-        if eident.ei_mag != consts::ELFMAG {
-            return Err(BadElfHeader);
-        }
-
-        if eident.ei_class != Class::EI_CLASS {
-            return Err(BadElfHeader);
-        }
-
-        if bytes.len() < size_of::<ElfHeader<Class>>() {
-            return Err(BadElfHeader);
-        }
-
-        // SAFETY:
-        // bytes is valid 'a
-        // Length is checked above
-        let header: ElfHeader<Class> =
-            unsafe { core::ptr::read(bytes.as_ptr() as *const ElfHeader<Class>) };
-
-        if header.e_phentsize.as_usize() != size_of::<Class::ProgramHeader>() {
-            return Err(BadElfHeader);
-        }
-
-        let ptr = bytes.as_ptr();
-
-        if bytes.len()
-            < (header.e_phoff.as_usize()).saturating_add(
-                header
-                    .e_phnum
-                    .as_usize()
-                    .saturating_mul(header.e_phentsize.as_usize()),
-            )
-        {
-            return Err(BadElfHeader);
-        }
-
-        let phdr: Box<[Class::ProgramHeader]> = unsafe {
-            let mut phdr = Vec::with_capacity(header.e_phnum.as_usize());
-            core::ptr::copy_nonoverlapping(
-                ptr.add(header.e_phoff.as_usize()) as *const Class::ProgramHeader,
-                phdr.as_mut_ptr(),
-                header.e_phnum.as_usize(),
-            );
-            phdr.set_len(header.e_phnum.as_usize());
-            phdr.into_boxed_slice()
-        };
-
-        Ok(Self {
-            bytes,
-            header,
-            phdr,
-        })
+        todo!()
     }
 
-    pub fn get_file_bytes(&self) -> &[u8] {
-        &self.bytes
+    fn write(&self, _write: &mut (dyn std::io::Write + '_)) -> std::io::Result<()> {
+        todo!()
     }
 
-    pub fn get_header(&self) -> &ElfHeader<Class> {
-        &self.header
+    fn is_relocatable(&self) -> bool {
+        self.header.e_type == consts::ET_REL
     }
 
-    pub fn get_program_headers(&self) -> &[Class::ProgramHeader] {
-        &self.phdr
+    fn has_symbols(&self) -> bool {
+        todo!()
     }
 
-    pub fn get_segment_bytes(&self, shnum: usize) -> Option<&[u8]> {
-        let hdr = self.phdr.get(shnum)?;
-        let off = hdr.offset().as_usize();
-        let filesz = hdr.filesize().as_usize();
+    fn has_sections(&self) -> bool {
+        todo!()
+    }
 
-        if self.bytes.len() < off.saturating_add(filesz) {
-            None
-        } else {
-            Some(unsafe { core::slice::from_raw_parts(self.bytes.as_ptr().add(off), filesz) })
-        }
+    fn section(&self, _name: &str) -> Option<&(dyn crate::traits::Section + '_)> {
+        todo!()
+    }
+
+    fn segments(&self) -> Vec<&(dyn crate::traits::Segment + '_)> {
+        todo!()
+    }
+
+    fn section_mut(&mut self, _name: &str) -> Option<&(dyn crate::traits::Segment + '_)> {
+        todo!()
+    }
+
+    fn segments_mut(&mut self) -> Vec<&mut (dyn crate::traits::Segment + '_)> {
+        todo!()
+    }
+
+    fn create_segment(&mut self) -> Option<&mut (dyn crate::traits::Segment + '_)> {
+        todo!()
+    }
+
+    fn insert_segment(&mut self, _idx: u32) -> Option<&mut (dyn crate::traits::Segment + '_)> {
+        todo!()
     }
 }
-
-pub enum ParsedElfFile<'a> {
-    Elf32(ElfReader<'a, Elf32>),
-    Elf64(ElfReader<'a, Elf64>),
-}
-
-pub fn parse_file(bytes: &[u8]) -> Result<ParsedElfFile, BadElfHeader> {
-    if let Ok(read) = ElfReader::parse(bytes) {
-        Ok(ParsedElfFile::Elf32(read))
-    } else {
-        Ok(ParsedElfFile::Elf64(ElfReader::parse(bytes)?))
-    }
-}
-
-impl<'a> ::core::fmt::Debug for ParsedElfFile<'a> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ElfFile")
-            .field(
-                "header",
-                match self {
-                    ParsedElfFile::Elf32(e) => e.get_header(),
-                    ParsedElfFile::Elf64(e) => e.get_header(),
-                },
-            )
-            .field(
-                "phdr",
-                match self {
-                    ParsedElfFile::Elf32(e) => &e.phdr,
-                    ParsedElfFile::Elf64(e) => &e.phdr,
-                },
-            )
-            .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests;

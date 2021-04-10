@@ -8,7 +8,7 @@ use core::{
 };
 use std::io::{Read, Write};
 
-#[doc(hide)]
+#[doc(hidden)]
 pub(crate) mod private {
     pub trait Sealed {}
 }

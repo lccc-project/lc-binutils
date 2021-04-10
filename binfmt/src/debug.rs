@@ -1,8 +1,13 @@
 use core::fmt::LowerHex;
 
+use bytemuck::{Pod, Zeroable};
+
 #[repr(transparent)]
 #[derive(Copy, Clone)]
 pub struct PrintHex<T>(pub T);
+
+unsafe impl<T: Zeroable> Zeroable for PrintHex<T> {}
+unsafe impl<T: Pod> Pod for PrintHex<T> {}
 
 impl<T> From<T> for PrintHex<T> {
     fn from(x: T) -> Self {
