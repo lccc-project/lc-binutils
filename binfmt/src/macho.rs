@@ -8,7 +8,7 @@ macro_rules! fake_enum{
         #[repr(transparent)]
         $vis struct $name($t);
 
-        $($vis const $item: $name = $name($expr);)*
+        $(#[allow(non_upper_case_globals)] $vis const $item: $name = $name($expr);)*
 
         impl ::core::fmt::Debug for $name{
             #[allow(unreachable_patterns)]
@@ -25,7 +25,7 @@ macro_rules! fake_enum{
 fake_enum! {
     #[repr(u32)]
     pub enum CpuType{
-        Any = -1,
+        Any = 0xffffffff,
         Vax = 1,
         MC68k = 6,
         X86 = 7,
