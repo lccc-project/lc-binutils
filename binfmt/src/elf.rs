@@ -611,12 +611,12 @@ pub mod consts {
     fake_enum! {
         #[repr(u32)] pub enum ProgramType{
             PT_NULL = 0,
-            PT_LOAD = 2,
-            PT_DYNAMIC = 3,
-            PT_INTERP = 4,
-            PT_NOTE = 5,
-            PT_SHLIB = 6,
-            PT_PHDR = 7,
+            PT_LOAD = 1,
+            PT_DYNAMIC = 2,
+            PT_INTERP = 3,
+            PT_NOTE = 4,
+            PT_SHLIB = 5,
+            PT_PHDR = 6,
         }
     }
 
