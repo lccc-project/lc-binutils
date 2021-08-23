@@ -1,87 +1,80 @@
-use crate::traits::{BinaryFile, Segment};
+use crate::fmt::{BinaryFile, Binfmt, CallbackError, Section, SectionType};
 
-pub struct RawBinaryFile {
-    bytes: Vec<u8>,
+pub struct Binary;
+
+pub fn create_format() -> Binary {
+    Binary
 }
 
-impl Segment for RawBinaryFile {
-    fn read(&self) -> Box<dyn std::io::Read + '_> {
-        Box::new(self.bytes.as_slice())
+impl Binfmt for Binary {
+    fn relnum_to_howto(&self, _relnum: u32) -> Option<&dyn crate::howto::HowTo> {
+        None
     }
 
-    fn write(&mut self) -> Box<dyn std::io::Write + '_> {
-        Box::new(&mut self.bytes)
+    fn code_to_howto(&self, _code: crate::howto::RelocCode) -> Option<&dyn crate::howto::HowTo> {
+        None
     }
 
-    fn flags(&self) -> u64 {
-        0
+    fn name(&self) -> &'static str {
+        "binary"
     }
 
-    fn set_flags(&mut self, _: u64) {}
-
-    fn segment_type(&self) -> u64 {
-        0
+    fn create_file(&self) -> crate::fmt::BinaryFile {
+        BinaryFile::create(self, Box::new(()))
     }
 
-    fn set_segment_type(&mut self, pt: u64) -> Result<(), u64> {
-        Err(pt)
+    fn read_file(
+        &self,
+        file: &mut (dyn std::io::Read + '_),
+    ) -> std::io::Result<Option<crate::fmt::BinaryFile>> {
+        let mut vec = Vec::new();
+        file.read_to_end(&mut vec)?;
+        let mut file = BinaryFile::create(self, Box::new(()));
+        let _ = file.add_section(Section {
+            align: 1,
+            content: vec,
+            name: ".data".to_string(),
+            ty: SectionType::ProgBits,
+        });
+
+        Ok(Some(file))
     }
 
-    fn align(&self) -> u64 {
-        0
-    }
-
-    fn set_alignment(&mut self, _: u64) {}
-}
-
-impl BinaryFile for RawBinaryFile {
-    fn read(read: &mut (dyn std::io::Read + '_)) -> std::io::Result<Box<Self>>
-    where
-        Self: Sized,
-    {
-        let mut bytes = Vec::new();
-        read.read_to_end(&mut bytes)?;
-
-        Ok(Box::new(Self { bytes }))
-    }
-
-    fn write(&self, write: &mut (dyn std::io::Write + '_)) -> std::io::Result<()> {
-        write.write_all(&self.bytes)
-    }
-
-    fn is_relocatable(&self) -> bool {
-        false
-    }
-
-    fn has_symbols(&self) -> bool {
-        false
+    fn write_file(
+        &self,
+        file: &mut (dyn std::io::Write + '_),
+        bfile: &crate::fmt::BinaryFile,
+    ) -> std::io::Result<()> {
+        for s in bfile.sections() {
+            file.write_all(&s.content)?;
+        }
+        Ok(())
     }
 
     fn has_sections(&self) -> bool {
-        false
+        true
     }
 
-    fn section(&self, _: &str) -> Option<&(dyn crate::traits::Section + '_)> {
-        None
+    fn create_section(
+        &self,
+        _section: &mut crate::fmt::Section,
+    ) -> Result<(), crate::fmt::CallbackError> {
+        Ok(())
     }
 
-    fn segments(&self) -> Vec<&(dyn crate::traits::Segment + '_)> {
-        vec![self]
+    fn create_symbol(
+        &self,
+        _sym: &mut crate::sym::Symbol,
+    ) -> Result<(), crate::fmt::CallbackError> {
+        Err(CallbackError::NotAccepted)
     }
 
-    fn section_mut(&mut self, _: &str) -> Option<&(dyn crate::traits::Segment + '_)> {
-        None
+    fn create_reloc(
+        &self,
+        _reloc: &mut crate::howto::Reloc,
+    ) -> Result<(), crate::fmt::CallbackError> {
+        Err(CallbackError::NotAccepted)
     }
 
-    fn segments_mut(&mut self) -> Vec<&mut (dyn crate::traits::Segment + '_)> {
-        vec![self]
-    }
-
-    fn create_segment(&mut self) -> Option<&mut (dyn crate::traits::Segment + '_)> {
-        None
-    }
-
-    fn insert_segment(&mut self, _idx: u32) -> Option<&mut (dyn crate::traits::Segment + '_)> {
-        None
-    }
+    fn before_relocate(&self, _reloc: &mut crate::howto::Reloc, _symbol: &crate::sym::Symbol) {}
 }

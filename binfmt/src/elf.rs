@@ -1,11 +1,11 @@
-use std::{
-    fmt::Display,
-    io::{BufReader, Read},
-};
+use std::fmt::Display;
+use std::marker::PhantomData;
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::traits::{BinaryFile, Numeric};
+use crate::fmt::Binfmt;
+use crate::howto::HowTo;
+use crate::traits::Numeric;
 use crate::{debug::PrintHex, traits::private::Sealed};
 
 pub type ElfByte<E> = <E as ElfClass>::Byte;
@@ -773,63 +773,64 @@ impl Display for BadElfHeader {
 
 impl std::error::Error for BadElfHeader {}
 
-pub struct ElfFile<Class: ElfClass> {
-    header: ElfHeader<Class>,
-    _segments: Vec<Class::ProgramHeader>,
+#[allow(dead_code)]
+pub struct ElfFormat<Class: ElfClass, Howto> {
+    em: consts::ElfMachine,
+    create_header: Option<fn(&mut ElfHeader<Class>)>,
+    name: &'static str,
+    _cl: PhantomData<Class>,
+    _howto: PhantomData<fn() -> Howto>,
 }
 
-impl<Class: ElfClass + 'static> BinaryFile for ElfFile<Class>
-where
-    ElfHeader<Class>: Pod,
-{
-    fn read(read: &mut (dyn std::io::Read + '_)) -> std::io::Result<Box<Self>>
-    where
-        Self: Sized,
-    {
-        let mut read = BufReader::new(read);
-        let mut ehdr = ElfHeader::<Class>::zeroed();
-        read.read_exact(bytemuck::bytes_of_mut(&mut ehdr))?;
+impl<Class: ElfClass, Howto> ElfFormat<Class, Howto> {
+    pub fn new(
+        em: consts::ElfMachine,
+        name: &'static str,
+        create_header: Option<fn(&mut ElfHeader<Class>)>,
+    ) -> Self {
+        Self {
+            em,
+            create_header,
+            name,
+            _cl: PhantomData,
+            _howto: PhantomData,
+        }
+    }
+}
 
+impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Class, Howto> {
+    fn relnum_to_howto(&self, relnum: u32) -> Option<&dyn HowTo> {
+        Howto::from_relnum(relnum).map(|x| x as &dyn HowTo)
+    }
+
+    fn code_to_howto(&self, code: crate::howto::RelocCode) -> Option<&dyn HowTo> {
+        Howto::from_reloc_code(code).map(|x| x as &dyn HowTo)
+    }
+
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn create_file(&self) -> crate::fmt::BinaryFile {
         todo!()
     }
 
-    fn write(&self, _write: &mut (dyn std::io::Write + '_)) -> std::io::Result<()> {
+    fn read_file(
+        &self,
+        _file: &mut (dyn std::io::Read + '_),
+    ) -> std::io::Result<Option<crate::fmt::BinaryFile>> {
         todo!()
     }
 
-    fn is_relocatable(&self) -> bool {
-        self.header.e_type == consts::ET_REL
-    }
-
-    fn has_symbols(&self) -> bool {
+    fn write_file(
+        &self,
+        _file: &mut (dyn std::io::Write + '_),
+        _bfile: &crate::fmt::BinaryFile,
+    ) -> std::io::Result<()> {
         todo!()
     }
 
     fn has_sections(&self) -> bool {
-        todo!()
-    }
-
-    fn section(&self, _name: &str) -> Option<&(dyn crate::traits::Section + '_)> {
-        todo!()
-    }
-
-    fn segments(&self) -> Vec<&(dyn crate::traits::Segment + '_)> {
-        todo!()
-    }
-
-    fn section_mut(&mut self, _name: &str) -> Option<&(dyn crate::traits::Segment + '_)> {
-        todo!()
-    }
-
-    fn segments_mut(&mut self) -> Vec<&mut (dyn crate::traits::Segment + '_)> {
-        todo!()
-    }
-
-    fn create_segment(&mut self) -> Option<&mut (dyn crate::traits::Segment + '_)> {
-        todo!()
-    }
-
-    fn insert_segment(&mut self, _idx: u32) -> Option<&mut (dyn crate::traits::Segment + '_)> {
         todo!()
     }
 }

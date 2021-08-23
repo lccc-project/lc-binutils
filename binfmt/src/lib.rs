@@ -6,9 +6,17 @@ pub mod traits;
 pub mod debug;
 
 pub mod fmt;
+pub mod howto;
+pub mod sym;
 
 #[cfg(feature = "elf")]
 pub mod elf;
+
+#[cfg(feature = "elf32")]
+pub mod elf32;
+
+#[cfg(feature = "elf64")]
+pub mod elf64;
 
 #[cfg(feature = "coff")]
 pub mod coff;
@@ -41,21 +49,28 @@ extern crate bytemuck;
 
 extern crate lazy_static;
 
-use std::{collections::HashMap, io::Read};
-
-use traits::BinaryFile;
-
-type BinfmtConstructor =
-    Box<(dyn Fn(&mut (dyn Read + '_)) -> std::io::Result<Box<dyn BinaryFile>> + Sync)>;
-
-lazy_static::lazy_static! {
-    static ref BINFMTS: HashMap<&'static str,BinfmtConstructor> = {
-        let mut hm = HashMap::<&'static str,BinfmtConstructor>::new();
-        hm.insert("binary", Box::new(|r|Ok(binary::RawBinaryFile::read(r)?)));
-
-
-        hm
-    };
-
-    static ref SELECT: Vec<BinfmtConstructor> = vec![Box::new(|r|Ok(binary::RawBinaryFile::read(r)?))];
+macro_rules! collect_dashed_idents{
+    ($($ident:ident)-+) => {
+        ::core::concat!("" $(, ::core::stringify!($ident), )"-"* )
+    }
 }
+
+macro_rules! define_formats{
+    [$($(#[$meta:meta])* $($fmt:ident)-*),* $(,)?] => {
+        lazy_static::lazy_static!{
+            static ref BINARY_FORMATS_BY_NAME: std::collections::HashMap<String,Box<(dyn crate::fmt::Binfmt + Sync + Send)>> = {
+                let mut map = std::collections::HashMap::<String,Box<(dyn crate::fmt::Binfmt + Sync + Send)>>::new();
+                $(
+                    $($meta)*{
+                        let fmt = Box::new(crate:: $($fmt)::* ::create_format());
+                        map.insert(String::from(collect_dashed_idents!($($fmt)-*)),fmt);
+                    }
+                )*
+
+                map
+            };
+        }
+    }
+}
+
+define_formats![binary];

@@ -8,10 +8,9 @@ edition = "2018"
 
 [dependencies]
 static_assertions = "1.1.0"
-aligned = "0.3.4"
 bytemuck = {version="1.5.1",features=["derive"]}
 lazy_static = "1.4.0"
-target-tuples = "0.2.2"
+target-tuples = "0.4.0"
 
 [lib]
 name = "binfmt"
@@ -19,6 +18,8 @@ name = "binfmt"
 [features]
 aout = []
 coff = []
+elf32 = ["elf"]
+elf64 = ["elf"]
 elf = []
 macho = []
 pe = ["coff"]
@@ -27,7 +28,16 @@ xir = []
 ar = []
 xo65 = []
 o65 = []
-default-formats = ["coff","elf","macho","pe","llir","xir","ar"]
-default = ["default-formats"]
+default-formats = ["coff","elf32","elf64","macho","pe","llir","xir","ar"]
 all-formats = ["default-formats","aout","xo65","o65"]
-all = ["all-formats"]
+w65 = []
+x86 = []
+arm = []
+aarch64 = []
+riscv = []
+m68k = []
+clever = []
+z80 = []
+m6502 = []
+default-archs = ["w65", "x86", "arm","riscv","m68k"]
+all-archs = ["default-archs", "z80", "m6502", "clever"]
