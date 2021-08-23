@@ -1,4 +1,5 @@
 fn main() {
-    let mut args = std::env::args();
-    let prg_name = args.next().unwrap();
+    for x in binfmt::formats() {
+        println!("{}", x.name())
+    }
 }

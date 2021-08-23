@@ -61,7 +61,7 @@ macro_rules! define_formats{
             static ref BINARY_FORMATS_BY_NAME: std::collections::HashMap<String,Box<(dyn crate::fmt::Binfmt + Sync + Send)>> = {
                 let mut map = std::collections::HashMap::<String,Box<(dyn crate::fmt::Binfmt + Sync + Send)>>::new();
                 $(
-                    $($meta)*{
+                    $(#[$meta])*{
                         let fmt = Box::new(crate:: $($fmt)::* ::create_format());
                         map.insert(String::from(collect_dashed_idents!($($fmt)-*)),fmt);
                     }
@@ -73,4 +73,19 @@ macro_rules! define_formats{
     }
 }
 
-define_formats![binary];
+use std::ops::Deref;
+
+#[rustfmt::skip]
+define_formats![
+    binary,
+    #[cfg(all(feature = "elf32", feature = "w65"))]
+    elf32-w65
+];
+
+pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt + Sync + Send)> {
+    BINARY_FORMATS_BY_NAME.values().map(Deref::deref)
+}
+
+pub fn format_by_name(name: &str) -> Option<&'static (dyn crate::fmt::Binfmt + Sync + Send)> {
+    BINARY_FORMATS_BY_NAME.get(name).map(Deref::deref)
+}

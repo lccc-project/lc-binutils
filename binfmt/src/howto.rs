@@ -16,7 +16,9 @@ pub trait HowTo {
     fn name(&self) -> &'static str;
     fn reloc_size(&self) -> usize;
     fn pcrel(&self) -> bool;
-    fn apply(&self, addr: u128, sym_addr: u128, region: &mut [u8]) -> Result<bool, HowToError>;
+    fn is_relax(&self) -> bool;
+    fn relax_size(&self, addr: u128, at_addr: u128) -> Option<usize>;
+    fn apply(&self, addr: u128, at_addr: u128, region: &mut [u8]) -> Result<bool, HowToError>;
 }
 
 pub enum RelocCode {
@@ -30,6 +32,13 @@ pub enum RelocCode {
     Plt { addr_width: usize },
     RelPlt { addr_width: usize },
     DynSymEntry { width: usize },
+    W65Direct,
+    W65RelaxJsl,
+    W65RelaxJml,
+    W65RelaxBrl,
+    W65RelaxDirect,
+    W65RelaxAbs,
+    W65RelaxJmp,
 }
 
 pub struct Reloc {

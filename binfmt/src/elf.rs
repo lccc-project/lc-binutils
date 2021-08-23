@@ -641,20 +641,20 @@ pub mod consts {
 #[derive(Copy, Clone, Debug)]
 #[repr(C)]
 pub struct ElfHeader<E: ElfClass> {
-    e_ident: consts::ElfIdent,
-    e_type: consts::ElfType,
-    e_machine: consts::ElfMachine,
-    e_version: ElfWord<E>,
-    e_entry: PrintHex<ElfAddr<E>>,
-    e_phoff: ElfOffset<E>,
-    e_shoff: ElfOffset<E>,
-    e_flags: PrintHex<ElfWord<E>>,
-    e_ehsize: ElfHalf<E>,
-    e_phentsize: ElfHalf<E>,
-    e_phnum: ElfHalf<E>,
-    e_shentsize: ElfHalf<E>,
-    e_shnum: ElfHalf<E>,
-    e_shsnidx: ElfHalf<E>,
+    pub e_ident: consts::ElfIdent,
+    pub e_type: consts::ElfType,
+    pub e_machine: consts::ElfMachine,
+    pub e_version: ElfWord<E>,
+    pub e_entry: PrintHex<ElfAddr<E>>,
+    pub e_phoff: ElfOffset<E>,
+    pub e_shoff: ElfOffset<E>,
+    pub e_flags: PrintHex<ElfWord<E>>,
+    pub e_ehsize: ElfHalf<E>,
+    pub e_phentsize: ElfHalf<E>,
+    pub e_phnum: ElfHalf<E>,
+    pub e_shentsize: ElfHalf<E>,
+    pub e_shnum: ElfHalf<E>,
+    pub e_shsnidx: ElfHalf<E>,
 }
 
 unsafe impl<E: ElfClass> Zeroable for ElfHeader<E> {}
