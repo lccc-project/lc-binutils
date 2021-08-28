@@ -1,4 +1,4 @@
-use crate::fmt::{BinaryFile, Binfmt, CallbackError, Section, SectionType};
+use crate::fmt::{BinaryFile, Binfmt, CallbackError, FileType, Section, SectionType};
 
 pub struct Binary;
 
@@ -19,8 +19,8 @@ impl Binfmt for Binary {
         "binary"
     }
 
-    fn create_file(&self) -> crate::fmt::BinaryFile {
-        BinaryFile::create(self, Box::new(()))
+    fn create_file(&self, ty: FileType) -> crate::fmt::BinaryFile {
+        BinaryFile::create(self, Box::new(()), ty)
     }
 
     fn read_file(
@@ -29,7 +29,7 @@ impl Binfmt for Binary {
     ) -> std::io::Result<Option<crate::fmt::BinaryFile>> {
         let mut vec = Vec::new();
         file.read_to_end(&mut vec)?;
-        let mut file = BinaryFile::create(self, Box::new(()));
+        let mut file = BinaryFile::create(self, Box::new(()), FileType::Exec);
         let _ = file.add_section(Section {
             align: 1,
             content: vec,

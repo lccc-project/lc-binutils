@@ -6,6 +6,7 @@ use core::{
     fmt::{Debug, LowerHex},
     ops::*,
 };
+use std::convert::TryFrom;
 
 #[doc(hidden)]
 pub(crate) mod private {
@@ -28,6 +29,9 @@ pub trait Numeric:
     + Debug
     + LowerHex
     + TryInto<usize>
+    + TryFrom<usize>
+    + Eq
+    + Ord
     + Pod
     + Sealed
 {
@@ -36,6 +40,7 @@ pub trait Numeric:
     fn min() -> Self;
     fn max() -> Self;
     fn as_usize(self) -> usize;
+    fn from_usize(x: usize) -> Self;
     fn from_be(self) -> Self;
     fn from_le(self) -> Self;
 }
@@ -60,6 +65,10 @@ macro_rules! impl_numeric {
                 }
                 fn as_usize(self) -> usize{
                     self as usize
+                }
+
+                fn from_usize(x: usize) -> Self{
+                    x as Self
                 }
 
                 fn from_be(self) -> Self{

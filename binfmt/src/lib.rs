@@ -70,22 +70,49 @@ macro_rules! define_formats{
                 map
             };
         }
+
+        lazy_static::lazy_static!{
+            static ref BINARY_FORMATS: std::vec::Vec<&'static (dyn crate::fmt::Binfmt + Sync + Send)> = {
+                let mut vec = std::vec::Vec::new();
+
+                $(
+                    $(#[$meta])* {
+                        vec.push(&*BINARY_FORMATS_BY_NAME[collect_dashed_idents!($($fmt)-*)]);
+                    }
+                )*
+
+                vec
+            };
+        }
     }
 }
 
 use std::ops::Deref;
 
+use target_tuples::Target;
+
 #[rustfmt::skip]
 define_formats![
-    binary,
     #[cfg(all(feature = "elf32", feature = "w65"))]
-    elf32-w65
+    elf32-w65,
+    binary
 ];
 
 pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt + Sync + Send)> {
-    BINARY_FORMATS_BY_NAME.values().map(Deref::deref)
+    BINARY_FORMATS.iter().copied()
 }
 
 pub fn format_by_name(name: &str) -> Option<&'static (dyn crate::fmt::Binfmt + Sync + Send)> {
     BINARY_FORMATS_BY_NAME.get(name).map(Deref::deref)
+}
+
+pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + Send) {
+    target_tuples::match_targets! {
+        match (targ){
+            w65-*-elf => &*BINARY_FORMATS_BY_NAME["elf32-w65"],
+            w65-*-snes-elf => &*BINARY_FORMATS_BY_NAME["elf32-w65"],
+
+            * => panic!("Unknown Target")
+        }
+    }
 }

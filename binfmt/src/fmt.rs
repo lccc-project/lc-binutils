@@ -20,7 +20,7 @@ pub trait Binfmt {
     fn code_to_howto(&self, code: RelocCode) -> Option<&dyn HowTo>;
 
     fn name(&self) -> &'static str;
-    fn create_file(&self) -> BinaryFile;
+    fn create_file(&self, ty: FileType) -> BinaryFile;
     fn read_file(&self, file: &mut (dyn Read + '_)) -> io::Result<Option<BinaryFile>>;
     fn write_file(&self, file: &mut (dyn Write + '_), bfile: &BinaryFile) -> io::Result<()>;
 
@@ -38,10 +38,12 @@ pub trait Binfmt {
     fn before_relocate(&self, _reloc: &mut Reloc, _symbol: &Symbol) {}
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum FileType {
     Exec,
     Relocatable,
     SharedObject,
+    FormatSpecific(u32),
 }
 
 pub struct BinaryFile<'a> {
@@ -50,17 +52,23 @@ pub struct BinaryFile<'a> {
     relocs: Option<Vec<Reloc>>,
     fmt: &'a dyn Binfmt,
     data: Box<dyn Any>,
+    ty: FileType,
 }
 
 impl<'a> BinaryFile<'a> {
-    pub fn create(fmt: &'a dyn Binfmt, data: Box<dyn Any>) -> Self {
+    pub fn create(fmt: &'a dyn Binfmt, data: Box<dyn Any>, ty: FileType) -> Self {
         Self {
             sections: None,
             symbols: None,
             relocs: None,
             fmt,
             data,
+            ty,
         }
+    }
+
+    pub fn file_type(&self) -> &FileType {
+        &self.ty
     }
 
     pub fn data(&self) -> &dyn Any {

@@ -1,11 +1,8 @@
-use crate::{
-    elf::ElfHeader,
-    howto::{HowTo, HowToError},
-};
+use crate::howto::{HowTo, HowToError};
 
 use std::convert::TryFrom;
 
-use super::{consts, Elf32};
+use super::consts;
 
 #[non_exhaustive]
 pub enum Elf32W65HowTo {
@@ -226,6 +223,16 @@ impl HowTo for Elf32W65HowTo {
             }
             Elf32W65HowTo::Rel8 => {
                 let val = (addr as i128) - (at_addr as i128);
+                if let Ok(x) = i8::try_from(val) {
+                    let bytes = x.to_le_bytes();
+                    region.copy_from_slice(&bytes);
+                    Ok(true)
+                } else {
+                    Err(HowToError::SignedOverflow)
+                }
+            }
+            Elf32W65HowTo::Rel16 => {
+                let val = (addr as i128) - (at_addr as i128);
                 if let Ok(x) = i16::try_from(val) {
                     let bytes = x.to_le_bytes();
                     region.copy_from_slice(&bytes);
@@ -234,10 +241,21 @@ impl HowTo for Elf32W65HowTo {
                     Err(HowToError::SignedOverflow)
                 }
             }
-            Elf32W65HowTo::Rel16 => todo!(),
-            Elf32W65HowTo::Bank => todo!(),
-            Elf32W65HowTo::Abs8 => todo!(),
-            Elf32W65HowTo::Direct => todo!(),
+            Elf32W65HowTo::Bank => {
+                let bytes = addr.to_le_bytes();
+                region.copy_from_slice(&bytes[3..4]);
+                Ok(true)
+            }
+            Elf32W65HowTo::Abs8 => {
+                let bytes = addr.to_le_bytes();
+                region.copy_from_slice(&bytes[..1]);
+                Ok(true)
+            }
+            Elf32W65HowTo::Direct => {
+                let bytes = (addr & !0xff).to_le_bytes();
+                region.copy_from_slice(&bytes[..2]);
+                Ok(true)
+            }
             Elf32W65HowTo::RelaxJsl => todo!(),
             Elf32W65HowTo::RelaxJml => todo!(),
             Elf32W65HowTo::RelaxBrl => todo!(),
@@ -248,11 +266,11 @@ impl HowTo for Elf32W65HowTo {
     }
 }
 
-fn create_header(x: &mut ElfHeader<Elf32>) {
-    x.e_ident.ei_data = consts::ELFDATA2LSB;
-    x.e_flags = From::from(0);
-}
-
 pub fn create_format() -> super::Elf32Format<Elf32W65HowTo> {
-    super::Elf32Format::new(super::consts::EM_WC65C816, "elf32-w65", Some(create_header))
+    super::Elf32Format::new(
+        super::consts::EM_WC65C816,
+        consts::ELFDATA2LSB,
+        "elf32-w65",
+        None,
+    )
 }

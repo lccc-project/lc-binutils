@@ -1,12 +1,14 @@
 use std::fmt::Display;
+use std::io::ErrorKind;
 use std::marker::PhantomData;
+use std::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::fmt::Binfmt;
+use crate::fmt::{BinaryFile, Binfmt, FileType};
 use crate::howto::HowTo;
+use crate::traits::private::Sealed;
 use crate::traits::Numeric;
-use crate::{debug::PrintHex, traits::private::Sealed};
 
 pub type ElfByte<E> = <E as ElfClass>::Byte;
 pub type ElfHalf<E> = <E as ElfClass>::Half;
@@ -51,11 +53,6 @@ pub trait ElfProgramHeader: Sealed {
     fn filesize(&self) -> ElfSize<Self::Class>;
     fn align(&self) -> ElfSize<Self::Class>;
     fn flags(&self) -> ElfWord<Self::Class>;
-}
-
-pub trait ElfSectionHeader: Sealed {
-    type Class: ElfClass;
-    fn st_type(&self) -> consts::SectionType;
 }
 
 pub trait ElfClass: Sealed + Sized + Copy + 'static {
@@ -153,6 +150,8 @@ mod private {
 }
 
 use private::*;
+
+use self::consts::ElfIdent;
 
 impl<Class: ElfClass + ElfRelocationExtractHelpers> Sealed for ElfRel<Class> {}
 
@@ -311,32 +310,13 @@ impl ElfRelocationExtractHelpers for Elf32 {
 
 pub mod consts {
     use bytemuck::{Pod, Zeroable};
-    macro_rules! fake_enum{
-        {#[repr($t:ty)] $vis:vis enum $name:ident {
-            $($item:ident = $expr:literal),*$(,)?
-        }} => {
-            #[derive(Copy,Clone,Eq,PartialEq,Zeroable,Pod)]
-            #[repr(transparent)]
-            $vis struct $name($t);
-
-            $($vis const $item: $name = $name($expr);)*
-
-            impl ::core::fmt::Debug for $name{
-                #[allow(unreachable_patterns)]
-                fn fmt(&self,f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result{
-                    match self{
-                        $(Self($expr) => f.write_str(::core::stringify!($item)),)*
-                        e => e.0.fmt(f)
-                    }
-                }
-            }
-        }
-    }
 
     pub const ELFMAG: [u8; 4] = *b"\x7fELF";
 
-    fake_enum! {
-        #[repr(u16)] pub enum ElfType{
+    fake_enum::fake_enum! {
+        #[repr(pub u16)]
+        #[derive(Zeroable,Pod)]
+        pub enum ElfType{
             ET_NONE = 0,
             ET_REL = 1,
             ET_EXEC = 2,
@@ -345,8 +325,10 @@ pub mod consts {
         }
     }
 
-    fake_enum! {
-        #[repr(u16)] pub enum ElfMachine{
+    fake_enum::fake_enum! {
+        #[repr(u16)]
+        #[derive(Zeroable,Pod)]
+        pub enum ElfMachine{
             EM_NONE = 0,           // No machine
             EM_M32 = 1,            // AT&T WE 32100
             EM_SPARC = 2,          // SPARC
@@ -539,31 +521,39 @@ pub mod consts {
         }
     }
 
-    fake_enum! {
-        #[repr(u8)] pub enum EiClass{
+    fake_enum::fake_enum! {
+        #[repr(u8)]
+        #[derive(Zeroable,Pod)]
+        pub enum EiClass{
             ELFCLASSNONE = 0,
             ELFCLASS32 = 1,
             ELFCLASS64 = 2
         }
     }
 
-    fake_enum! {
-        #[repr(u8)] pub enum EiData{
+    fake_enum::fake_enum! {
+        #[repr(u8)]
+        #[derive(Zeroable,Pod)]
+        pub enum EiData{
             ELFDATANONE = 0,
             ELFDATA2LSB = 1,
             ELFDATA2MSB = 2
         }
     }
 
-    fake_enum! {
-        #[repr(u8)] pub enum EiVersion{
+    fake_enum::fake_enum! {
+        #[repr(u8)]
+        #[derive(Zeroable,Pod)]
+        pub enum EiVersion{
             EV_NONE = 0,
             EV_CURRENT = 1
         }
     }
 
-    fake_enum! {
-        #[repr(u8)] pub enum EiOsAbi{
+    fake_enum::fake_enum! {
+        #[repr(u8)]
+        #[derive(Zeroable,Pod)]
+        pub enum EiOsAbi{
             ELFOSABI_NONE = 0,           // UNIX System V ABI
             ELFOSABI_HPUX = 1,           // HP-UX operating system
             ELFOSABI_NETBSD = 2,         // NetBSD
@@ -602,14 +592,16 @@ pub mod consts {
         pub ei_version: EiVersion,
         pub ei_osabi: EiOsAbi,
         pub ei_abiversion: u8,
-        ei_pad: [u8; 7],
+        pub ei_pad: [u8; 7],
     }
 
     static_assertions::const_assert_eq!(core::mem::size_of::<ElfIdent>(), 16);
     static_assertions::const_assert_eq!(core::mem::align_of::<ElfIdent>(), 1);
 
-    fake_enum! {
-        #[repr(u32)] pub enum ProgramType{
+    fake_enum::fake_enum! {
+        #[repr(pub u32)]
+        #[derive(Zeroable,Pod)]
+        pub enum ProgramType{
             PT_NULL = 0,
             PT_LOAD = 1,
             PT_DYNAMIC = 2,
@@ -620,8 +612,10 @@ pub mod consts {
         }
     }
 
-    fake_enum! {
-        #[repr(u32)] pub enum SectionType{
+    fake_enum::fake_enum! {
+        #[repr(pub u32)]
+        #[derive(Zeroable,Pod)]
+        pub enum SectionType{
             SHT_NULL = 0,
             SHT_PROGBITS = 1,
             SHT_SYMTAB = 2,
@@ -645,10 +639,10 @@ pub struct ElfHeader<E: ElfClass> {
     pub e_type: consts::ElfType,
     pub e_machine: consts::ElfMachine,
     pub e_version: ElfWord<E>,
-    pub e_entry: PrintHex<ElfAddr<E>>,
+    pub e_entry: ElfAddr<E>,
     pub e_phoff: ElfOffset<E>,
     pub e_shoff: ElfOffset<E>,
-    pub e_flags: PrintHex<ElfWord<E>>,
+    pub e_flags: ElfWord<E>,
     pub e_ehsize: ElfHalf<E>,
     pub e_phentsize: ElfHalf<E>,
     pub e_phnum: ElfHalf<E>,
@@ -660,17 +654,19 @@ pub struct ElfHeader<E: ElfClass> {
 unsafe impl<E: ElfClass> Zeroable for ElfHeader<E> {}
 unsafe impl<E: ElfClass + 'static> Pod for ElfHeader<E> {}
 
+pub trait SectionHeader {}
+
 #[derive(Copy, Clone, Debug, Zeroable, Pod)]
 #[repr(C)]
 pub struct Elf32Phdr {
-    p_type: consts::ProgramType,
-    p_offset: ElfOffset<Elf32>,
-    p_vaddr: PrintHex<ElfAddr<Elf32>>,
-    p_paddr: PrintHex<ElfAddr<Elf32>>,
-    p_filesz: ElfSize<Elf32>,
-    p_memsz: ElfSize<Elf32>,
-    p_flags: ElfWord<Elf32>,
-    p_align: ElfSize<Elf32>,
+    pub p_type: consts::ProgramType,
+    pub p_offset: ElfOffset<Elf32>,
+    pub p_vaddr: ElfAddr<Elf32>,
+    pub p_paddr: ElfAddr<Elf32>,
+    pub p_filesz: ElfSize<Elf32>,
+    pub p_memsz: ElfSize<Elf32>,
+    pub p_flags: ElfWord<Elf32>,
+    pub p_align: ElfSize<Elf32>,
 }
 
 impl Sealed for Elf32Phdr {}
@@ -687,11 +683,11 @@ impl ElfProgramHeader for Elf32Phdr {
     }
 
     fn vaddr(&self) -> ElfAddr<Self::Class> {
-        self.p_vaddr.0
+        self.p_vaddr
     }
 
     fn paddr(&self) -> ElfAddr<Self::Class> {
-        self.p_paddr.0
+        self.p_paddr
     }
 
     fn memsize(&self) -> ElfSize<Self::Class> {
@@ -714,14 +710,14 @@ impl ElfProgramHeader for Elf32Phdr {
 #[derive(Copy, Clone, Debug, Zeroable, Pod)]
 #[repr(C)]
 pub struct Elf64Phdr {
-    p_type: consts::ProgramType,
-    p_flags: ElfWord<Elf64>,
-    p_offset: ElfOffset<Elf64>,
-    p_vaddr: PrintHex<ElfAddr<Elf64>>,
-    p_paddr: PrintHex<ElfAddr<Elf64>>,
-    p_filesz: ElfSize<Elf64>,
-    p_memsz: ElfSize<Elf64>,
-    p_align: ElfSize<Elf64>,
+    pub p_type: consts::ProgramType,
+    pub p_flags: ElfWord<Elf64>,
+    pub p_offset: ElfOffset<Elf64>,
+    pub p_vaddr: ElfAddr<Elf64>,
+    pub p_paddr: ElfAddr<Elf64>,
+    pub p_filesz: ElfSize<Elf64>,
+    pub p_memsz: ElfSize<Elf64>,
+    pub p_align: ElfSize<Elf64>,
 }
 
 impl Sealed for Elf64Phdr {}
@@ -738,11 +734,11 @@ impl ElfProgramHeader for Elf64Phdr {
     }
 
     fn vaddr(&self) -> ElfAddr<Self::Class> {
-        self.p_vaddr.0
+        self.p_vaddr
     }
 
     fn paddr(&self) -> ElfAddr<Self::Class> {
-        self.p_paddr.0
+        self.p_paddr
     }
 
     fn memsize(&self) -> ElfSize<Self::Class> {
@@ -763,6 +759,24 @@ impl ElfProgramHeader for Elf64Phdr {
 }
 
 #[derive(Copy, Clone, Debug)]
+#[repr(C)]
+pub struct ElfSectionHeader<Class: ElfClass> {
+    pub sh_name: ElfWord<Class>,
+    pub sh_type: consts::SectionType,
+    pub sh_flags: ElfOffset<Class>,
+    pub sh_addr: ElfAddr<Class>,
+    pub sh_offset: ElfOffset<Class>,
+    pub sh_size: ElfSize<Class>,
+    pub sh_link: ElfWord<Class>,
+    pub sh_info: ElfWord<Class>,
+    pub sh_addralign: ElfAddr<Class>,
+    pub sh_entsize: ElfSize<Class>,
+}
+
+unsafe impl<Class: ElfClass> Zeroable for ElfSectionHeader<Class> {}
+unsafe impl<Class: ElfClass + 'static> Pod for ElfSectionHeader<Class> {}
+
+#[derive(Copy, Clone, Debug)]
 pub struct BadElfHeader;
 
 impl Display for BadElfHeader {
@@ -773,9 +787,32 @@ impl Display for BadElfHeader {
 
 impl std::error::Error for BadElfHeader {}
 
-#[allow(dead_code)]
+pub struct ElfFileData<Class: ElfClass> {
+    header: ElfHeader<Class>,
+    phdrs: Vec<Class::ProgramHeader>,
+}
+
+impl<Class: ElfClass> ElfFileData<Class> {
+    pub fn header(&self) -> &ElfHeader<Class> {
+        &self.header
+    }
+
+    pub fn flags_mut(&mut self) -> &mut ElfWord<Class> {
+        &mut self.header.e_flags
+    }
+
+    pub fn phdrs(&self) -> &[Class::ProgramHeader] {
+        &self.phdrs
+    }
+
+    pub fn phdrs_mut(&mut self) -> &mut Vec<Class::ProgramHeader> {
+        &mut self.phdrs
+    }
+}
+
 pub struct ElfFormat<Class: ElfClass, Howto> {
     em: consts::ElfMachine,
+    data: consts::EiData,
     create_header: Option<fn(&mut ElfHeader<Class>)>,
     name: &'static str,
     _cl: PhantomData<Class>,
@@ -785,16 +822,36 @@ pub struct ElfFormat<Class: ElfClass, Howto> {
 impl<Class: ElfClass, Howto> ElfFormat<Class, Howto> {
     pub fn new(
         em: consts::ElfMachine,
+        data: consts::EiData,
         name: &'static str,
         create_header: Option<fn(&mut ElfHeader<Class>)>,
     ) -> Self {
         Self {
             em,
+            data,
             create_header,
             name,
             _cl: PhantomData,
             _howto: PhantomData,
         }
+    }
+}
+
+fn file_type_to_elf_type(ty: FileType) -> consts::ElfType {
+    match ty {
+        FileType::Exec => consts::ET_EXEC,
+        FileType::Relocatable => consts::ET_REL,
+        FileType::SharedObject => consts::ET_DYN,
+        FileType::FormatSpecific(val) => consts::ElfType(val as u16),
+    }
+}
+
+fn elf_type_to_file_type(ty: consts::ElfType) -> FileType {
+    match ty {
+        consts::ET_EXEC => FileType::Exec,
+        consts::ET_REL => FileType::Relocatable,
+        consts::ET_DYN => FileType::SharedObject,
+        consts::ElfType(x) => FileType::FormatSpecific(x as u32),
     }
 }
 
@@ -811,15 +868,80 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         self.name
     }
 
-    fn create_file(&self) -> crate::fmt::BinaryFile {
-        todo!()
+    fn create_file(&self, ty: FileType) -> crate::fmt::BinaryFile {
+        let mut header = ElfHeader {
+            e_ident: ElfIdent {
+                ei_mag: consts::ELFMAG,
+                ei_class: Class::EI_CLASS,
+                ei_data: self.data,
+                ei_version: consts::EV_CURRENT,
+                ei_osabi: consts::ELFOSABI_NONE,
+                ei_abiversion: 0,
+                ..Zeroable::zeroed()
+            },
+            e_type: file_type_to_elf_type(ty),
+            e_machine: self.em,
+            e_version: Numeric::from_usize(bytemuck::cast::<_, u8>(consts::EV_CURRENT) as usize),
+            e_entry: Numeric::from_usize(0),
+            e_phoff: Numeric::from_usize(0),
+            e_shoff: Numeric::from_usize(0),
+            e_flags: Numeric::from_usize(0),
+            e_ehsize: Numeric::from_usize(0),
+            e_phentsize: Numeric::from_usize(0),
+            e_phnum: Numeric::from_usize(0),
+            e_shentsize: Numeric::from_usize(0),
+            e_shnum: Numeric::from_usize(0),
+            e_shsnidx: Numeric::from_usize(0),
+        };
+
+        if let Some(f) = self.create_header {
+            (f)(&mut header);
+        }
+
+        let data = ElfFileData {
+            header,
+            phdrs: Vec::new(),
+        };
+
+        crate::fmt::BinaryFile::create(self, Box::new(data), ty)
     }
 
     fn read_file(
         &self,
-        _file: &mut (dyn std::io::Read + '_),
+        file: &mut (dyn std::io::Read + '_),
     ) -> std::io::Result<Option<crate::fmt::BinaryFile>> {
-        todo!()
+        let mut header = ElfHeader::<Class>::zeroed();
+        file.read_exact(bytemuck::bytes_of_mut(&mut header.e_ident))?;
+
+        if header.e_ident.ei_mag != consts::ELFMAG {
+            return Ok(None);
+        }
+
+        if header.e_ident.ei_class != Class::EI_CLASS {
+            return Ok(None);
+        }
+
+        if header.e_ident.ei_data != self.data {
+            return Ok(None);
+        }
+
+        file.read_exact(&mut bytemuck::bytes_of_mut(&mut header)[16..])?;
+
+        if header.e_phentsize != Numeric::from_usize(size_of::<Class::ProgramHeader>()) {
+            return Err(std::io::Error::new(
+                ErrorKind::InvalidData,
+                "Invalid Program Header Entry Size",
+            ));
+        }
+        let mut phdrs = vec![Class::ProgramHeader::zeroed(); header.e_phnum.as_usize()];
+        file.read_exact(bytemuck::cast_slice_mut(&mut phdrs))?;
+
+        let data = ElfFileData { header, phdrs };
+        #[allow(unused_mut)]
+        let mut bfile =
+            BinaryFile::create(self, Box::new(data), elf_type_to_file_type(header.e_type));
+
+        Ok(Some(bfile))
     }
 
     fn write_file(
