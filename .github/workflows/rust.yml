@@ -1,24 +1,36 @@
 name: Rust
 
 on:
-  push:
-    branches: [ main ]
+  push: 
+    branches: [main]
   pull_request:
-    branches: [ main ]
-
-env:
-  CARGO_TERM_COLOR: always
+    branches: [main]
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
+  rust:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        rust-channel: [1.38.0, stable, beta,nightly]
+        exclude:
+          - os: [windows-latest, macos-latest]
+            rust-channel: [beta, nightly]
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: |
-        rustup toolchain add beta
-        rustup default beta
-        rustup update
-        cargo build --verbose --all-features
+      - uses: actions/checkout@v2
+      - name: Install Rustup Toolchain
+        run: |
+          rustup toolchain add --profile minimal ${{ matrix.rust-channel }}
+          rustup default ${{ matrix.rust-channel }}
+          rustup update
+      - name: Build
+        run: |
+           cargo build
+           cargo test
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build
+        run: cargo fmt -- --check  

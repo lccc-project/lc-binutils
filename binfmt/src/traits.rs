@@ -58,10 +58,10 @@ macro_rules! impl_numeric {
                     1 as $n
                 }
                 fn min()->Self{
-                    $n::MIN
+                    $n::min_value()
                 }
                 fn max()->Self{
-                    $n::MAX
+                    $n::max_value()
                 }
                 fn as_usize(self) -> usize{
                     self as usize

@@ -65,7 +65,7 @@ impl<T: Display> Display for ArchiveMetaOutOfRange<T> {
 impl<T> Error for ArchiveMetaOutOfRange<T> where Self: std::fmt::Debug + Display {}
 
 impl ArchiveMember {
-    pub const fn new() -> ArchiveMember {
+    pub fn new() -> ArchiveMember {
         Self {
             header: ArchiveHeader {
                 ar_name: [b' '; 16],
@@ -105,11 +105,13 @@ impl ArchiveMember {
                     .map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e))
             })?;
         #[cfg(target_pointer_width = "32")]
-        if size > (usize::MAX as u64) {
-            return Err(std::io::Error::new(
-                ErrorKind::InvalidData,
-                ArchiveMetaOutOfRange(size),
-            ));
+        {
+            if size > (usize::MAX as u64) {
+                return Err(std::io::Error::new(
+                    ErrorKind::InvalidData,
+                    ArchiveMetaOutOfRange(size),
+                ));
+            }
         }
 
         let mut bytes = vec![0u8; size as usize];
@@ -236,7 +238,7 @@ impl Write for ArchiveMember {
 }
 
 impl Archive {
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             mag: ARMAG,
             members: Vec::new(),
@@ -259,7 +261,7 @@ impl Archive {
             .members
             .iter()
             .enumerate()
-            .filter_map(|(i, f)| Some(i).zip(f.long_name.clone()))
+            .filter_map(|(i, f)| f.long_name.clone().map(|x| (i, x)))
             .collect::<Vec<_>>();
 
         if !names.is_empty() {
@@ -351,7 +353,7 @@ impl Archive {
                     }
                     members.push(m);
                 }
-                Err(e) if e.kind() == ErrorKind::UnexpectedEof => break,
+                Err(ref e) if e.kind() == ErrorKind::UnexpectedEof => break,
                 Err(e) => return Err(e),
             }
         }

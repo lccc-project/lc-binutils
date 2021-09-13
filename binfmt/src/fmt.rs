@@ -88,7 +88,7 @@ impl<'a> BinaryFile<'a> {
         }
         let sections = self.sections.as_mut().unwrap();
         let num = sections.len();
-        if num >= (u32::MAX as usize) {
+        if num >= (u32::max_value() as usize) {
             panic!("Too many sections created in a binary file");
         }
         if self.fmt.create_section(&mut sect).is_err() {
@@ -99,11 +99,11 @@ impl<'a> BinaryFile<'a> {
     }
 
     pub fn sections(&self) -> Sections<'_> {
-        Sections(self.sections.as_deref().map(|x| x.iter()))
+        Sections(self.sections.as_ref().map(|x| x.iter()))
     }
 
     pub fn sections_mut(&mut self) -> SectionsMut<'_> {
-        SectionsMut(self.sections.as_deref_mut().map(|x| x.iter_mut()))
+        SectionsMut(self.sections.as_mut().map(|x| x.iter_mut()))
     }
 
     pub fn remove_section(&mut self, x: u32) -> Option<Section> {

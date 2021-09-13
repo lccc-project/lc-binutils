@@ -927,7 +927,9 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
 
         file.read_exact(&mut bytemuck::bytes_of_mut(&mut header)[16..])?;
 
-        if header.e_phentsize != Numeric::from_usize(size_of::<Class::ProgramHeader>()) {
+        if header.e_phentsize != Numeric::from_usize(size_of::<Class::ProgramHeader>())
+            && header.e_phnum != Numeric::zero()
+        {
             return Err(std::io::Error::new(
                 ErrorKind::InvalidData,
                 "Invalid Program Header Entry Size",
@@ -941,6 +943,18 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         let mut bfile =
             BinaryFile::create(self, Box::new(data), elf_type_to_file_type(header.e_type));
 
+        if header.e_shentsize != Numeric::from_usize(size_of::<ElfSectionHeader<Class>>())
+            && header.e_shnum != Numeric::zero()
+        {
+            return Err(std::io::Error::new(
+                ErrorKind::InvalidData,
+                "Invalid Program Header Entry Size",
+            ));
+        }
+
+        let mut shdrs = vec![ElfSectionHeader::<Class>::zeroed(); header.e_shnum.as_usize()];
+        file.read_exact(bytemuck::cast_slice_mut(&mut shdrs))?;
+
         Ok(Some(bfile))
     }
 
@@ -949,10 +963,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         _file: &mut (dyn std::io::Write + '_),
         _bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
-        todo!()
+        unimplemented!()
     }
 
     fn has_sections(&self) -> bool {
-        todo!()
+        true
     }
 }

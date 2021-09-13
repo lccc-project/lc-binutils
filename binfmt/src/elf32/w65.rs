@@ -4,7 +4,6 @@ use std::convert::TryFrom;
 
 use super::consts;
 
-#[non_exhaustive]
 pub enum Elf32W65HowTo {
     None,
     Abs24,
@@ -20,6 +19,8 @@ pub enum Elf32W65HowTo {
     RelaxDirect,
     RelaxAbs,
     RelaxJmp,
+    #[doc(hidden)]
+    __Nonexhastive,
 }
 
 mod howtos {
@@ -71,7 +72,7 @@ impl HowTo for Elf32W65HowTo {
         howtos::RELOCS
             .get(num as usize)
             .map(|x| x.as_ref())
-            .flatten()
+            .unwrap_or(None)
     }
 
     fn from_reloc_code<'a>(code: crate::howto::RelocCode) -> Option<&'a Self>
@@ -116,6 +117,7 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::RelaxDirect => 13,
             Elf32W65HowTo::RelaxAbs => 14,
             Elf32W65HowTo::RelaxJmp => 15,
+            Elf32W65HowTo::__Nonexhastive => unreachable!(),
         }
     }
 
@@ -135,6 +137,7 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::RelaxDirect => "R_WC65C816_RELAX_DIRECT",
             Elf32W65HowTo::RelaxAbs => "R_WC65C816_RELAX_ABS",
             Elf32W65HowTo::RelaxJmp => "R_WC65C816_RELAX_JMP",
+            Elf32W65HowTo::__Nonexhastive => unreachable!(),
         }
     }
 
@@ -154,6 +157,7 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::RelaxDirect => 4,
             Elf32W65HowTo::RelaxAbs => 4,
             Elf32W65HowTo::RelaxJmp => 3,
+            Elf32W65HowTo::__Nonexhastive => unreachable!(),
         }
     }
 
@@ -173,6 +177,7 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::RelaxJml => false,
             Elf32W65HowTo::RelaxDirect => false,
             Elf32W65HowTo::RelaxAbs => false,
+            Elf32W65HowTo::__Nonexhastive => unreachable!(),
         }
     }
 
@@ -192,6 +197,7 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::RelaxDirect => true,
             Elf32W65HowTo::RelaxAbs => true,
             Elf32W65HowTo::RelaxJmp => true,
+            Elf32W65HowTo::__Nonexhastive => unreachable!(),
         }
     }
 
@@ -256,12 +262,13 @@ impl HowTo for Elf32W65HowTo {
                 region.copy_from_slice(&bytes[..2]);
                 Ok(true)
             }
-            Elf32W65HowTo::RelaxJsl => todo!(),
-            Elf32W65HowTo::RelaxJml => todo!(),
-            Elf32W65HowTo::RelaxBrl => todo!(),
-            Elf32W65HowTo::RelaxDirect => todo!(),
-            Elf32W65HowTo::RelaxAbs => todo!(),
-            Elf32W65HowTo::RelaxJmp => todo!(),
+            Elf32W65HowTo::RelaxJsl => unimplemented!(),
+            Elf32W65HowTo::RelaxJml => unimplemented!(),
+            Elf32W65HowTo::RelaxBrl => unimplemented!(),
+            Elf32W65HowTo::RelaxDirect => unimplemented!(),
+            Elf32W65HowTo::RelaxAbs => unimplemented!(),
+            Elf32W65HowTo::RelaxJmp => unimplemented!(),
+            Elf32W65HowTo::__Nonexhastive => unreachable!(),
         }
     }
 }

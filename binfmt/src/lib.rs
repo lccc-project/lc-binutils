@@ -98,15 +98,18 @@ define_formats![
     binary
 ];
 
-pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt + Sync + Send)> {
+pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt + Sync + Send + 'static)>
+{
     BINARY_FORMATS.iter().copied()
 }
 
-pub fn format_by_name(name: &str) -> Option<&'static (dyn crate::fmt::Binfmt + Sync + Send)> {
+pub fn format_by_name(
+    name: &str,
+) -> Option<&'static (dyn crate::fmt::Binfmt + Sync + Send + 'static)> {
     BINARY_FORMATS_BY_NAME.get(name).map(Deref::deref)
 }
 
-pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + Send) {
+pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + Send + 'static) {
     target_tuples::match_targets! {
         match (targ){
             w65-*-elf => &*BINARY_FORMATS_BY_NAME["elf32-w65"],

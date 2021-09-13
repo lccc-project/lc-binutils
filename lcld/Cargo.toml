@@ -27,7 +27,7 @@ sosigning = []
 lto = ["lto-formats"]
 
 [dependencies]
-target-tuples = "0.1.0"
+target-tuples = "0.4.1"
 binfmt = {path = "../binfmt"}
 
 [package.metadata.install-targets.lcld]
