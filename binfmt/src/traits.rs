@@ -45,7 +45,7 @@ pub trait Numeric:
     fn from_le(self) -> Self;
 }
 
-#[doc(hide)]
+#[doc(hidden)]
 macro_rules! impl_numeric {
         ($($n:ident),*) => {
             $(
