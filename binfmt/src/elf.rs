@@ -948,7 +948,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         {
             return Err(std::io::Error::new(
                 ErrorKind::InvalidData,
-                "Invalid Program Header Entry Size",
+                "Invalid Section Header Entry Size",
             ));
         }
 

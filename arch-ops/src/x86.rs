@@ -16,6 +16,23 @@ pub enum X86RegisterClass {
     Tr,
 }
 
+impl X86RegisterClass {
+    pub fn size(&self, mode: X86Mode) -> usize {
+        match self {
+            Self::Byte | Self::ByteRex => 1,
+            Self::Word | Self::Sreg => 2,
+            Self::Double | Self::Tr | Self::Dr => 4,
+            Self::Quad | Self::Mmx => 8,
+            Self::Xmm => 16,
+            Self::Ymm => 32,
+            Self::Zmm => 64,
+            Self::Tmm => 1024,
+            Self::Cr if mode == X86Mode::Long => 8,
+            Self::Cr => 4,
+        }
+    }
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 pub enum X86Register {
     // r8
@@ -149,6 +166,8 @@ macro_rules! define_x86_registers{
 
 use X86Register::*;
 
+use self::insn::X86Mode;
+
 define_x86_registers! {
     regs [Al, Cl, Dl, Bl, Ah, Ch, Dh, Bh]: Byte;
     regs [Al, Cl, Dl, Bl, Spl, Bpl, Sil, Dil, R8b, R9b, R10b, R11b, R12b, R13b, R14b, R15b]: ByteRex;
@@ -266,3 +285,8 @@ impl Display for X86Register {
         }
     }
 }
+
+pub mod cpu;
+pub mod features;
+
+pub mod insn;
