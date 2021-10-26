@@ -86,10 +86,17 @@ pub enum X86OperandType {
     /// Immediate value depending on prefix and mode (no REX)
     ImmGeneral,
 
+    /// A relative Word with a given Instruction Instruction size
     Rel(usize),
 
     /// Sets bits in the R field of the ModR/M byte.
     RControlBits(u8),
+
+    /// xmm/ymm/zmm depending on prefixes and control bits in prefixes
+    AvxReg,
+
+    /// m128/256/512 depending on prefixes and control bits in prefixes
+    AvxMem
 }
 
 macro_rules! define_x86_instructions{
@@ -258,4 +265,53 @@ define_x86_instructions! {
     (PopMR,   "pop", 0x8F, [ModRMMode]),
     (Nop90,   "nop", 0x90, []),
     (XchgReg, "xchg",0x90, [OpRegGeneral,ARegGeneral]),
+    (Cbw, "cbw", 0x98, [AReg(Word), AReg(Byte)]),
+    (Cwde, "cwde", 0x98, [AReg(Double), AReg(Word)]),
+    (Cdqe, "cdqe", 0x98, [AReg(Quad), AReg(Word)]),
+    (Cwd, "cwd", 0x99, [DReg(Word), AReg(Word)]),
+    (Cdq, "cdq", 0x99, [DReg(Double), DReg(Double)]),
+    (Cdo, "cdo", 0x99, [DReg()])
+    (Fwait, "fwait", 0x9B, [])
+}
+
+pub enum ModRMRegOrSib{
+    Reg(X86Register),
+    Abs(u32),
+    RipRel(i32),
+    Sib{
+        scale: u32,
+        index: X86Register,
+        base: X86Register
+    },
+    Index16{
+        base: X86Register,
+        index: X86Register
+    }
+}
+
+
+pub enum ModRM{
+    Indirect{
+        reg: u8,
+        mode: ModRMRegOrSib
+    },
+    IndirectDisp8{
+        reg: u8, 
+        mode: ModRMRegOrSib,
+        disp8: i8
+    },
+    IndirectDisp32{
+        reg: u8,
+        mode: ModRMRegOrSib,
+        disp32: i32
+    },
+    Direct(X86Register)
+}
+
+
+pub enum X86Operand{
+    Register(X86Register),
+    ModRM(ModRM),
+    Immediate(u64),
+    
 }

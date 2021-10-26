@@ -14,6 +14,7 @@ pub enum X86RegisterClass {
     Cr,
     Dr,
     Tr,
+    St,
 }
 
 impl X86RegisterClass {
@@ -133,6 +134,8 @@ pub enum X86Register {
     Dr(u8),
     Tr(u8),
 
+    Fp(u8),
+
     Es,
     Cs,
     Ss,
@@ -186,6 +189,7 @@ define_x86_registers! {
     regs [Cr(0), Cr(1), Cr(2), Cr(3), Cr(4), Cr(5), Cr(6), Cr(7), Cr(8), Cr(9), Cr(10), Cr(11), Cr(12), Cr(13), Cr(14), Cr(15)]: Cr;
     regs [Dr(0), Dr(1), Dr(2), Dr(3), Dr(4), Dr(5), Dr(6), Dr(7), Dr(8), Dr(9), Dr(10), Dr(11), Dr(12), Dr(13), Dr(14), Dr(15)]: Dr;
     regs [Tr(0), Tr(1), Tr(2), Tr(3), Tr(4), Tr(5), Tr(6), Tr(7)]: Tr;
+    regs [Fp(0), Fp(1), Fp(2)]
 }
 
 impl X86Register {
@@ -273,6 +277,7 @@ impl Display for X86Register {
             Cr(n) => f.write_fmt(format_args!("cr{}", n)),
             Dr(n) => f.write_fmt(format_args!("dr{}", n)),
             Tr(n) => f.write_fmt(format_args!("tr{}", n)),
+            Fp(n) => f.write_fmt(format_args!("st{}", n)),
             Es => f.write_str("es"),
             Cs => f.write_str("cs"),
             Ss => f.write_str("ss"),
