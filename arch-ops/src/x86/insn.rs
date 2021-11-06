@@ -98,7 +98,7 @@ pub enum X86OperandType {
     AvxReg,
 
     /// m128/256/512 depending on prefixes and control bits in prefixes
-    AvxMem
+    AvxMem,
 }
 
 macro_rules! define_x86_instructions{
@@ -277,70 +277,63 @@ define_x86_instructions! {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ModRMRegOrSib{
+pub enum ModRMRegOrSib {
     Reg(X86Register),
     Abs(Address),
     RipRel(Address),
-    Sib{
+    Sib {
         scale: u32,
         index: X86Register,
-        base: X86Register
-    },
-    Index16{
         base: X86Register,
-        index: X86Register
-    }
+    },
+    Index16 {
+        base: X86Register,
+        index: X86Register,
+    },
 }
 
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum ModRM{
-    Indirect{
-        reg: u8,
-        mode: ModRMRegOrSib
-    },
-    IndirectDisp8{
-        reg: u8, 
-        mode: ModRMRegOrSib,
-        disp8: i8
-    },
-    IndirectDisp32{
+pub enum ModRM {
+    Indirect {
         reg: u8,
         mode: ModRMRegOrSib,
-        disp32: i32
     },
-    Direct(X86Register)
+    IndirectDisp8 {
+        reg: u8,
+        mode: ModRMRegOrSib,
+        disp8: i8,
+    },
+    IndirectDisp32 {
+        reg: u8,
+        mode: ModRMRegOrSib,
+        disp32: i32,
+    },
+    Direct(X86Register),
 }
 
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub enum X86Operand{
+pub enum X86Operand {
     Register(X86Register),
     ModRM(ModRM),
     Immediate(u64),
 }
 
-
-
 #[derive(Clone, Debug)]
-pub struct X86Instruction{
+pub struct X86Instruction {
     opc: X86Opcode,
-    operands: Vec<X86Operand>
+    operands: Vec<X86Operand>,
 }
 
-impl X86Instruction{
-    pub fn new(opc: X86Opcode, operands: Vec<X86Operand>) -> Self{
-        Self{
-            opc,
-            operands
-        }
+impl X86Instruction {
+    pub fn new(opc: X86Opcode, operands: Vec<X86Operand>) -> Self {
+        Self { opc, operands }
     }
 
-    pub fn opcode(&self) -> X86Opcode{
+    pub fn opcode(&self) -> X86Opcode {
         self.opc
     }
 
-    pub fn operands(&self) -> &[X86Operand]{
+    pub fn operands(&self) -> &[X86Operand] {
         &self.operands
     }
 }

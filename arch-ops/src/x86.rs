@@ -149,7 +149,6 @@ pub enum X86Register {
     Fs,
     Gs,
     UndefSeg,
-
 }
 
 use std::{collections::HashMap, fmt::Display};
@@ -194,7 +193,7 @@ define_x86_registers! {
     regs [Dr(0), Dr(1), Dr(2), Dr(3), Dr(4), Dr(5), Dr(6), Dr(7), Dr(8), Dr(9), Dr(10), Dr(11), Dr(12), Dr(13), Dr(14), Dr(15)]: Dr;
     regs [Tr(0), Tr(1), Tr(2), Tr(3), Tr(4), Tr(5), Tr(6), Tr(7)]: Tr;
     regs [Fp(0), Fp(1), Fp(2), Fp(3), Fp(4), Fp(5), Fp(6), Fp(7),Fp(0), Fp(1), Fp(2), Fp(3), Fp(4), Fp(5), Fp(6), Fp(7)]: St;
-    regs [K(0), K(1), K(2), K(3), K(4), K(5), K(6), K(7)]: AvxMask; 
+    regs [K(0), K(1), K(2), K(3), K(4), K(5), K(6), K(7)]: AvxMask;
 }
 
 impl X86Register {
@@ -202,8 +201,8 @@ impl X86Register {
         X86REGISTERS[&rclass].get(rnum as usize).copied()
     }
 
-    pub fn regnum(self) -> u8{
-        match self{
+    pub fn regnum(self) -> u8 {
+        match self {
             Al => 0,
             Cl => 1,
             Dl => 2,
@@ -274,14 +273,14 @@ impl X86Register {
             R15 => 15,
             Mmx(m) => m,
             Xmm(m) => m,
-            Ymm(m) =>m,
+            Ymm(m) => m,
             Zmm(m) => m,
             Tmm(m) => m,
             Cr(m) => m,
             Dr(m) => m,
             Tr(m) => m,
             Fp(m) => m,
-            K(m) =>  m,
+            K(m) => m,
             Es => 0,
             Cs => 1,
             Ss => 2,
@@ -373,7 +372,7 @@ impl Display for X86Register {
             Dr(n) => f.write_fmt(format_args!("dr{}", n)),
             Tr(n) => f.write_fmt(format_args!("tr{}", n)),
             Fp(n) => f.write_fmt(format_args!("st{}", n)),
-            K(n) => f.write_fmt(format_args!("k{}",n)),
+            K(n) => f.write_fmt(format_args!("k{}", n)),
             Es => f.write_str("es"),
             Cs => f.write_str("cs"),
             Ss => f.write_str("ss"),
@@ -381,7 +380,6 @@ impl Display for X86Register {
             Fs => f.write_str("fs"),
             Gs => f.write_str("gs"),
             UndefSeg => f.write_str("undef"),
-
         }
     }
 }
