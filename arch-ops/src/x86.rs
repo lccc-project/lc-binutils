@@ -15,6 +15,7 @@ pub enum X86RegisterClass {
     Dr,
     Tr,
     St,
+    AvxMask,
 }
 
 impl X86RegisterClass {
@@ -30,11 +31,14 @@ impl X86RegisterClass {
             Self::Tmm => 1024,
             Self::Cr if mode == X86Mode::Long => 8,
             Self::Cr => 4,
+            Self::St => 80,
+            Self::AvxMask => 64,
         }
     }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+#[non_exhaustive]
 pub enum X86Register {
     // r8
     Al,
@@ -136,6 +140,8 @@ pub enum X86Register {
 
     Fp(u8),
 
+    K(u8),
+
     Es,
     Cs,
     Ss,
@@ -144,8 +150,6 @@ pub enum X86Register {
     Gs,
     UndefSeg,
 
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 use std::{collections::HashMap, fmt::Display};
@@ -189,12 +193,103 @@ define_x86_registers! {
     regs [Cr(0), Cr(1), Cr(2), Cr(3), Cr(4), Cr(5), Cr(6), Cr(7), Cr(8), Cr(9), Cr(10), Cr(11), Cr(12), Cr(13), Cr(14), Cr(15)]: Cr;
     regs [Dr(0), Dr(1), Dr(2), Dr(3), Dr(4), Dr(5), Dr(6), Dr(7), Dr(8), Dr(9), Dr(10), Dr(11), Dr(12), Dr(13), Dr(14), Dr(15)]: Dr;
     regs [Tr(0), Tr(1), Tr(2), Tr(3), Tr(4), Tr(5), Tr(6), Tr(7)]: Tr;
-    regs [Fp(0), Fp(1), Fp(2)]
+    regs [Fp(0), Fp(1), Fp(2), Fp(3), Fp(4), Fp(5), Fp(6), Fp(7),Fp(0), Fp(1), Fp(2), Fp(3), Fp(4), Fp(5), Fp(6), Fp(7)]: St;
+    regs [K(0), K(1), K(2), K(3), K(4), K(5), K(6), K(7)]: AvxMask; 
 }
 
 impl X86Register {
-    pub fn from_class(rclass: X86RegisterClass, rnum: usize) -> Option<X86Register> {
-        X86REGISTERS[&rclass].get(rnum).copied()
+    pub fn from_class(rclass: X86RegisterClass, rnum: u8) -> Option<X86Register> {
+        X86REGISTERS[&rclass].get(rnum as usize).copied()
+    }
+
+    pub fn regnum(self) -> u8{
+        match self{
+            Al => 0,
+            Cl => 1,
+            Dl => 2,
+            Bl => 3,
+            Ah => 4,
+            Ch => 5,
+            Dh => 6,
+            Bh => 7,
+            Spl => 4,
+            Bpl => 5,
+            Sil => 6,
+            Dil => 7,
+            R8b => 8,
+            R9b => 9,
+            R10b => 10,
+            R11b => 11,
+            R12b => 12,
+            R13b => 13,
+            R14b => 14,
+            R15b => 15,
+            Ax => 0,
+            Cx => 1,
+            Dx => 2,
+            Bx => 3,
+            Sp => 4,
+            Bp => 5,
+            Si => 6,
+            Di => 7,
+            R8w => 8,
+            R9w => 9,
+            R10w => 10,
+            R11w => 11,
+            R12w => 12,
+            R13w => 13,
+            R14w => 14,
+            R15w => 15,
+            Eax => 0,
+            Ecx => 1,
+            Edx => 2,
+            Ebx => 3,
+            Esp => 4,
+            Ebp => 5,
+            Esi => 6,
+            Edi => 7,
+            R8d => 8,
+            R9d => 9,
+            R10d => 10,
+            R11d => 11,
+            R12d => 12,
+            R13d => 13,
+            R14d => 14,
+            R15d => 15,
+            Rax => 0,
+            Rcx => 1,
+            Rdx => 2,
+            Rbx => 3,
+            Rsp => 4,
+            Rbp => 5,
+            Rsi => 6,
+            Rdi => 7,
+            R8 => 8,
+            R9 => 9,
+            R10 => 10,
+            R11 => 11,
+            R12 => 12,
+            R13 => 13,
+            R14 => 14,
+            R15 => 15,
+            Mmx(m) => m,
+            Xmm(m) => m,
+            Ymm(m) =>m,
+            Zmm(m) => m,
+            Tmm(m) => m,
+            Cr(m) => m,
+            Dr(m) => m,
+            Tr(m) => m,
+            Fp(m) => m,
+            K(m) =>  m,
+            Es => 0,
+            Cs => 1,
+            Ss => 2,
+            Ds => 3,
+            Fs => 4,
+            Gs => 5,
+            UndefSeg => 255,
+        }
     }
 }
 
@@ -278,6 +373,7 @@ impl Display for X86Register {
             Dr(n) => f.write_fmt(format_args!("dr{}", n)),
             Tr(n) => f.write_fmt(format_args!("tr{}", n)),
             Fp(n) => f.write_fmt(format_args!("st{}", n)),
+            K(n) => f.write_fmt(format_args!("k{}",n)),
             Es => f.write_str("es"),
             Cs => f.write_str("cs"),
             Ss => f.write_str("ss"),
@@ -286,7 +382,6 @@ impl Display for X86Register {
             Gs => f.write_str("gs"),
             UndefSeg => f.write_str("undef"),
 
-            __Nonexhaustive => unreachable!(),
         }
     }
 }

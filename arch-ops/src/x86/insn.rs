@@ -1,4 +1,6 @@
-use super::X86RegisterClass;
+use crate::traits::Address;
+
+use super::{X86Register, X86RegisterClass};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Prefix {
@@ -104,14 +106,14 @@ macro_rules! define_x86_instructions{
         $(($enum:ident, $mneomic:literal, $opcode:literal, [$($operand:expr),*] $(, [$($mode:ident),*] $(, [$($feature:ident),*])?)?)),* $(,)?
     } => {
         #[derive(Copy,Clone,Debug,Hash,PartialEq,Eq)]
-        pub enum X86Instruction{
+        pub enum X86Opcode{
             $($enum,)*
 
             #[doc(hidden)]
             __Nonexhaustive
         }
 
-        impl X86Instruction{
+        impl X86Opcode{
             pub fn opcode(&self) -> u64{
                 match self{
                     $(Self::$enum => $opcode,)*
@@ -270,14 +272,15 @@ define_x86_instructions! {
     (Cdqe, "cdqe", 0x98, [AReg(Quad), AReg(Word)]),
     (Cwd, "cwd", 0x99, [DReg(Word), AReg(Word)]),
     (Cdq, "cdq", 0x99, [DReg(Double), DReg(Double)]),
-    (Cdo, "cdo", 0x99, [DReg()])
+    (Cdo, "cqo", 0x99, [DReg(Quad),DReg(Quad)]),
     (Fwait, "fwait", 0x9B, [])
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ModRMRegOrSib{
     Reg(X86Register),
-    Abs(u32),
-    RipRel(i32),
+    Abs(Address),
+    RipRel(Address),
     Sib{
         scale: u32,
         index: X86Register,
@@ -290,6 +293,7 @@ pub enum ModRMRegOrSib{
 }
 
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ModRM{
     Indirect{
         reg: u8,
@@ -309,9 +313,34 @@ pub enum ModRM{
 }
 
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum X86Operand{
     Register(X86Register),
     ModRM(ModRM),
     Immediate(u64),
-    
+}
+
+
+
+#[derive(Clone, Debug)]
+pub struct X86Instruction{
+    opc: X86Opcode,
+    operands: Vec<X86Operand>
+}
+
+impl X86Instruction{
+    pub fn new(opc: X86Opcode, operands: Vec<X86Operand>) -> Self{
+        Self{
+            opc,
+            operands
+        }
+    }
+
+    pub fn opcode(&self) -> X86Opcode{
+        self.opc
+    }
+
+    pub fn operands(&self) -> &[X86Operand]{
+        &self.operands
+    }
 }

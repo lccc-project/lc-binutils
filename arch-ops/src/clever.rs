@@ -1,3 +1,5 @@
+
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverExtension {
     Base,
@@ -10,6 +12,8 @@ pub enum CleverExtension {
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct CleverRegister(pub u8);
+
+
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverOperand {
@@ -39,6 +43,8 @@ pub enum CleverOperand {
         zz: u16,
     },
 }
+
+
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverIndex {
