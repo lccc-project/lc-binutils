@@ -1,4 +1,4 @@
-use crate::traits::Address;
+use crate::traits::{Address, InsnWrite};
 
 use super::{X86Register, X86RegisterClass};
 
@@ -335,5 +335,44 @@ impl X86Instruction {
 
     pub fn operands(&self) -> &[X86Operand] {
         &self.operands
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub struct X86Encoder<W> {
+    writer: W,
+    mode: X86Mode,
+}
+
+impl<W> X86Encoder<W> {
+    pub const fn new(writer: W, defmode: X86Mode) -> Self {
+        Self {
+            writer,
+            mode: defmode,
+        }
+    }
+
+    pub fn into_inner(self) -> W {
+        self.writer
+    }
+
+    pub fn writer_mut(&mut self) -> &mut W {
+        &mut self.writer
+    }
+
+    pub fn mode(&self) -> X86Mode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: X86Mode) {
+        self.mode = mode
+    }
+}
+
+impl<W: InsnWrite> X86Encoder<W> {
+    pub fn write_insn(&mut self, insn: X86Instruction) -> std::io::Result<()> {
+        let _opcode = insn.opc;
+        let _opval = opcode.opcode();
+        todo!()
     }
 }

@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 lazy_static = "1"
+target-tuples = "0.5"
 
 [features]
 x86 = []
