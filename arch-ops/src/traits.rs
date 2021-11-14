@@ -18,11 +18,11 @@ impl<R: InsnRead> InsnRead for R {
 }
 
 pub trait InsnWrite: Write {
-    fn write_addr(&mut self, size: usize) -> std::io::Result<()>;
+    fn write_addr(&mut self, size: usize, addr: Address) -> std::io::Result<()>;
 }
 
 impl<W: InsnWrite> InsnWrite for W {
-    fn write_addr(&mut self, size: usize) -> std::io::Result<()> {
-        <W as InsnWrite>::write_addr(self, size)
+    fn write_addr(&mut self, size: usize, addr: Address) -> std::io::Result<()> {
+        <W as InsnWrite>::write_addr(self, size, addr)
     }
 }
