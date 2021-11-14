@@ -148,7 +148,7 @@ define_x86_instructions! {
     (OrRM8,   "or",  0x0A, [Reg(Byte), ModRM(Byte)]),
     (OrRM,    "or",  0x0B, [RegGeneral, ModRMGeneral]),
     (OrAImm8, "or",  0x0C, [AReg(Byte), Imm(1)]),
-    (OArImm,  "or",  0x0D, [ARegGeneral, ImmGeneral]),
+    (OrAImm,  "or",  0x0D, [ARegGeneral, ImmGeneral]),
     (AdcMR8,  "adc", 0x10, [ModRM(Byte), Reg(Byte)]),
     (AdcMR,   "adc", 0x11, [ModRMGeneral, RegGeneral]),
     (AdcRM8,  "adc", 0x12, [Reg(Byte), ModRM(Byte)]),
@@ -371,8 +371,44 @@ impl<W> X86Encoder<W> {
 
 impl<W: InsnWrite> X86Encoder<W> {
     pub fn write_insn(&mut self, insn: X86Instruction) -> std::io::Result<()> {
-        let opcode = insn.opc;
-        let _opval = opcode.opcode();
-        todo!()
+        let opcode_long = insn.opcode().opcode();
+        let mut opcode = if opcode_long < 0x100 {
+            vec![opcode_long as u8]
+        } else if opcode_long < 0x10000 {
+            vec![(opcode_long >> 8) as u8, opcode_long as u8]
+        } else if opcode_long < 0x1000000 {
+            vec![
+                (opcode_long >> 16) as u8,
+                (opcode_long >> 8) as u8,
+                opcode_long as u8,
+            ]
+        } else {
+            vec![
+                (opcode_long >> 24) as u8,
+                (opcode_long >> 16) as u8,
+                (opcode_long >> 8) as u8,
+                opcode_long as u8,
+            ]
+        };
+        match insn.opcode().operands() {
+            [] => {
+                assert!(insn.operands.is_empty());
+                self.writer.write_all(&opcode)
+            }
+            [OpRegMode] => {
+                assert_eq!(insn.operands.len(), 1);
+                let reg = match insn.operands()[0] {
+                    X86Operand::Register(reg) => reg,
+                    _ => panic!(),
+                };
+                if reg.regnum() >= 8 {
+                    self.writer.write_all(&[0x44])?; // REX.R
+                }
+                let len = opcode.len();
+                opcode[len - 1] = opcode[len - 1] + reg.regnum() % 7;
+                self.writer.write_all(&opcode)
+            }
+            _ => todo!(),
+        }
     }
 }
