@@ -371,7 +371,7 @@ impl<W> X86Encoder<W> {
 
 impl<W: InsnWrite> X86Encoder<W> {
     pub fn write_insn(&mut self, insn: X86Instruction) -> std::io::Result<()> {
-        let _opcode = insn.opc;
+        let opcode = insn.opc;
         let _opval = opcode.opcode();
         todo!()
     }
