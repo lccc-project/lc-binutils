@@ -401,8 +401,11 @@ impl<W: InsnWrite> X86Encoder<W> {
                     X86Operand::Register(reg) => reg,
                     _ => panic!(),
                 };
+                if matches!(reg.class, X86Register::Word) {
+                    self.writer.write_all(&[0x66])?; // 16-bit operand override
+                }
                 if reg.regnum() >= 8 {
-                    self.writer.write_all(&[0x44])?; // REX.R
+                    self.writer.write_all(&[0x41])?; // REX.B
                 }
                 let len = opcode.len();
                 opcode[len - 1] = opcode[len - 1] + reg.regnum() % 7;
