@@ -401,7 +401,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                     X86Operand::Register(reg) => reg,
                     _ => panic!(),
                 };
-                if matches!(reg.class, X86Register::Word) {
+                if matches!(reg.class(), X86RegisterClass::Word) {
                     self.writer.write_all(&[0x66])?; // 16-bit operand override
                 }
                 if reg.regnum() >= 8 {
