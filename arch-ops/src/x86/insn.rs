@@ -395,6 +395,14 @@ impl<W: InsnWrite> X86Encoder<W> {
                 assert!(insn.operands.is_empty());
                 self.writer.write_all(&opcode)
             }
+            [Imm(1)] | [Rel(8)] => {
+                self.writer.write_all(&opcode)?;
+                self.writer.write_all(&[match insn.operands()[0] {
+                    X86Operand::Immediate(x) => x as u8,
+                    _ => panic!(),
+                }])
+            }
+            [Insn] => todo!(),
             [OpRegMode] => {
                 assert_eq!(insn.operands.len(), 1);
                 let reg = match insn.operands()[0] {
@@ -411,7 +419,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                 opcode[len - 1] = opcode[len - 1] + reg.regnum() % 7;
                 self.writer.write_all(&opcode)
             }
-            _ => todo!(),
+            _ => panic!(),
         }
     }
 }
