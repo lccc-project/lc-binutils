@@ -292,7 +292,7 @@ impl X86Register {
         }
     }
 
-    fn class(&self) -> X86RegisterClass {
+    pub fn class(&self) -> X86RegisterClass {
         match self {
             Al => X86RegisterClass::Byte,
             Cl => X86RegisterClass::Byte,
@@ -372,13 +372,13 @@ impl X86Register {
             Tr(_) => X86RegisterClass::Tr,
             Fp(_) => X86RegisterClass::St,
             K(_) => X86RegisterClass::AvxMask,
-            Es => X86RegiserClass::Sreg,
-            Cs => X86RegiserClass::Sreg,
-            Ss => X86RegiserClass::Sreg,
-            Ds => X86RegiserClass::Sreg,
-            Fs => X86RegiserClass::Sreg,
-            Gs => X86RegiserClass::Sreg,
-            UndefSeg => X86RegiserClass::Sreg,
+            Es => X86RegisterClass::Sreg,
+            Cs => X86RegisterClass::Sreg,
+            Ss => X86RegisterClass::Sreg,
+            Ds => X86RegisterClass::Sreg,
+            Fs => X86RegisterClass::Sreg,
+            Gs => X86RegisterClass::Sreg,
+            UndefSeg => X86RegisterClass::Sreg,
         }
     }
 }
