@@ -8,21 +8,21 @@ pub enum Address {
 }
 
 pub trait InsnRead: Read {
-    fn read_addr(&mut self, size: usize) -> std::io::Result<Address>;
+    fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address>;
 }
 
 impl<R: InsnRead> InsnRead for R {
-    fn read_addr(&mut self, size: usize) -> std::io::Result<Address> {
-        <R as InsnRead>::read_addr(self, size)
+    fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
+        <R as InsnRead>::read_addr(self, size, rel)
     }
 }
 
 pub trait InsnWrite: Write {
-    fn write_addr(&mut self, size: usize, addr: Address) -> std::io::Result<()>;
+    fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()>;
 }
 
 impl<W: InsnWrite> InsnWrite for W {
-    fn write_addr(&mut self, size: usize, addr: Address) -> std::io::Result<()> {
-        <W as InsnWrite>::write_addr(self, size, addr)
+    fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
+        <W as InsnWrite>::write_addr(self, size, addr, rel)
     }
 }
