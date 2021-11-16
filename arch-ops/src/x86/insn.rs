@@ -396,6 +396,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                 self.writer.write_all(&opcode)
             }
             [Imm(1)] | [Rel(8)] => {
+                assert_eq!(insn.operands.len(), 1);
                 self.writer.write_all(&opcode)?;
                 self.writer.write_all(&[match insn.operands()[0] {
                     X86Operand::Immediate(x) => x as u8,
@@ -403,6 +404,45 @@ impl<W: InsnWrite> X86Encoder<W> {
                 }])
             }
             [Insn] => todo!(),
+            [ModRM(Byte), Reg(Byte)] => {
+                assert_eq!(insn.operands.len(), 2);
+                let mut rex = false;
+                let b = match insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(reg)) => {
+                        if matches!(reg.class(), X86RegisterClass::ByteRex) {
+                            rex = true;
+                        }
+                        reg.regnum() >= 8
+                    }
+                    _ => todo!(),
+                };
+                if b {
+                    rex = true;
+                }
+                let (r, reg) = match insn.operands()[1] {
+                    X86Operand::Register(reg) => {
+                        if matches!(reg.class(), X86RegisterClass::ByteRex) {
+                            rex = true;
+                        }
+                        (reg.regnum() >= 8, reg.regnum() % 7)
+                    }
+                    _ => todo!(),
+                };
+                if r {
+                    rex = true;
+                }
+                if rex {
+                    let rex = 0x40 | if b { 0x01 } else { 0x00 } | if r { 0x04 } else { 0x00 };
+                    self.writer.write_all(&[rex])?;
+                }
+                self.writer.write_all(&opcode)?;
+                match insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
+                        self.writer.write_all(&[0xC0 + (reg << 3) + regrm.regnum()])
+                    }
+                    _ => todo!(),
+                }
+            }
             [OpRegMode] => {
                 assert_eq!(insn.operands.len(), 1);
                 let reg = match insn.operands()[0] {
