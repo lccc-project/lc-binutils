@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-        rust-channel: [1.54.0, stable, beta,nightly]
+        rust-channel: [1.56.0, stable, beta,nightly]
         exclude:
           - os: [windows-latest, macos-latest]
             rust-channel: [beta, nightly]
