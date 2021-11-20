@@ -28,6 +28,7 @@ jobs:
         run: |
            cargo build
            cargo test
+           cargo clippy
   rustfmt:
     runs-on: ubuntu-latest
     steps:
