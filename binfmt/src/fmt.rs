@@ -10,6 +10,8 @@ use crate::{
     sym::{Symbol, SymbolKind, SymbolType},
 };
 
+use arch_ops::traits::{Address, InsnWrite};
+
 pub enum CallbackError {
     InvalidType,
     NotAccepted,
@@ -242,4 +244,21 @@ pub struct Section {
     pub align: usize,
     pub ty: SectionType,
     pub content: Vec<u8>,
+    pub __private: (),
+}
+
+impl InsnWrite for Section {
+    fn write_addr(&mut self, _size: usize, _addr: Address, _rel: bool) -> std::io::Result<()> {
+        todo!()
+    }
+}
+
+impl Write for Section {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.content.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.content.flush()
+    }
 }

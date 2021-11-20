@@ -14,20 +14,16 @@ macro_rules! define_x86_features{
         $(($enum:ident, $feature:literal)),* $(,)?
     } => {
         #[derive(Copy,Clone,Debug,Hash,PartialEq,Eq)]
+        #[non_exhaustive]
         #[repr(i32)]
         pub enum X86Feature{
             $($enum,)*
-
-
-            #[doc(hidden)]
-            __Nonexhaustive = -1
         }
 
         impl X86Feature{
             pub fn feature_name(&self) -> &'static str{
                 match self{
                     $(#[allow(unreachable_patterns)] Self::$enum => $feature,)*
-                    Self::__Nonexhaustive => panic!(),
                 }
             }
         }
@@ -47,7 +43,6 @@ macro_rules! define_x86_features{
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result{
                 match self{
                     $(Self::$enum => f.write_str($feature),)*
-                    Self::__Nonexhaustive => unreachable!(),
                 }
             }
         }

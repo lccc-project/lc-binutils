@@ -12,6 +12,7 @@ bytemuck = {version="1.5.1",features=["derive"]}
 lazy_static = "1.4.0"
 target-tuples = "0.4.1"
 fake-enum = "0.1.4"
+arch-ops = {path="../arch-ops"}
 
 [lib]
 name = "binfmt"

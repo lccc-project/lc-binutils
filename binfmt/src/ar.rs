@@ -217,6 +217,12 @@ impl ArchiveMember {
     }
 }
 
+impl Default for ArchiveMember {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Write for ArchiveMember {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let prev_size = self.bytes.len();
@@ -379,6 +385,12 @@ impl Archive {
 
     pub fn members_mut(&mut self) -> &mut [ArchiveMember] {
         &mut self.members
+    }
+}
+
+impl Default for Archive {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

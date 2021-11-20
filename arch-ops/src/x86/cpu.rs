@@ -16,28 +16,22 @@ macro_rules! define_x86_cpus{
         $(($enum:ident, $cpu_type:literal, [$($feature:ident),* $(,)?])),* $(,)?
     } => {
         #[derive(Copy,Clone,Hash,PartialEq,Eq)]
+        #[non_exhaustive]
         #[repr(i32)]
         pub enum X86Machine{
             $($enum ,)*
-
-            #[doc(hidden)]
-            __Nonexhaustive = -1
         }
 
         impl X86Machine{
             pub fn cpu_name(&self) -> &'static str{
                 match self{
                     $(X86Machine:: $enum => $cpu_type,)*
-
-                    X86Machine::__Nonexhaustive => panic!(),
                 }
             }
 
             pub fn cpu_features(&self) -> &'static [X86Feature]{
                 match self{
                     $(Self::$enum => &[$(X86Feature:: $feature),*],)*
-
-                    Self::__Nonexhaustive => panic!(),
                 }
             }
         }
@@ -46,8 +40,6 @@ macro_rules! define_x86_cpus{
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result{
                 match self{
                     $(Self:: $enum => f.write_str($cpu_type),)*
-
-                    Self::__Nonexhaustive => panic!(),
                 }
             }
         }

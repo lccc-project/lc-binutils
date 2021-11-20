@@ -1,11 +1,9 @@
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CleverExtension {
     Base,
     Float,
     Vector,
-
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]

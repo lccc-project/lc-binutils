@@ -106,26 +106,21 @@ macro_rules! define_x86_instructions{
         $(($enum:ident, $mneomic:literal, $opcode:literal, [$($operand:expr),*] $(, [$($mode:ident),*] $(, [$($feature:ident),*])?)?)),* $(,)?
     } => {
         #[derive(Copy,Clone,Debug,Hash,PartialEq,Eq)]
+        #[non_exhaustive]
         pub enum X86Opcode{
             $($enum,)*
-
-            #[doc(hidden)]
-            __Nonexhaustive
         }
 
         impl X86Opcode{
             pub fn opcode(&self) -> u64{
                 match self{
                     $(Self::$enum => $opcode,)*
-                    Self::__Nonexhaustive => unreachable!(),
                 }
             }
 
             pub fn operands(&self) -> &'static [X86OperandType]{
                 match self{
                     $(Self::$enum => &[$($operand),*],)*
-
-                    Self::__Nonexhaustive => unreachable!()
                 }
             }
 
@@ -456,7 +451,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                     self.writer.write_all(&[0x41])?; // REX.B
                 }
                 let len = opcode.len();
-                opcode[len - 1] = opcode[len - 1] + reg.regnum() % 7;
+                opcode[len - 1] += reg.regnum() % 7;
                 self.writer.write_all(&opcode)
             }
             _ => panic!(),

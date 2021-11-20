@@ -1,8 +1,9 @@
 [package]
 name = "arch-ops"
 version = "0.1.0"
-authors = ["chorm"]
-edition = "2018"
+authors = ["chorm", "rdrpenguin"]
+edition = "2021"
+rust-version = "1.56"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
