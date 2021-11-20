@@ -24,6 +24,7 @@ jobs:
           rustup toolchain add ${{ matrix.rust-channel }}
           rustup default ${{ matrix.rust-channel }}
           rustup update
+          rustup component add clippy
       - name: Build
         run: |
            cargo build
