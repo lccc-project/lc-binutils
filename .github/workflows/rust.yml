@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install Rustup Toolchain
         run: |
-          rustup toolchain add --profile minimal ${{ matrix.rust-channel }}
+          rustup toolchain add ${{ matrix.rust-channel }}
           rustup default ${{ matrix.rust-channel }}
           rustup update
       - name: Build
