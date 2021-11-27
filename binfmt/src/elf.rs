@@ -955,6 +955,8 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         let mut shdrs = vec![ElfSectionHeader::<Class>::zeroed(); header.e_shnum.as_usize()];
         file.read_exact(bytemuck::cast_slice_mut(&mut shdrs))?;
 
+        for _shdr in &shdrs {}
+
         Ok(Some(bfile))
     }
 
