@@ -1,4 +1,4 @@
-use crate::howto::{HowTo, HowToError};
+use crate::howto::{HowTo, HowToError, RelocCode};
 
 use super::consts;
 
@@ -75,6 +75,46 @@ impl HowTo for Elf64X86_64HowTo {
             .get(num as usize)
             .map(|x| x.as_ref())
             .unwrap_or(None)
+    }
+
+    fn from_reloc_code<'a>(_code: RelocCode) -> Option<&'a Self>
+    where
+        Self: Sized + 'a,
+    {
+        todo!()
+    }
+
+    fn reloc_num(&self) -> u32 {
+        todo!()
+    }
+
+    fn name(&self) -> &'static str {
+        todo!()
+    }
+
+    fn reloc_size(&self) -> usize {
+        todo!()
+    }
+
+    fn pcrel(&self) -> bool {
+        todo!()
+    }
+
+    fn is_relax(&self) -> bool {
+        false
+    }
+
+    fn relax_size(&self, _addr: u128, _at_addr: u128) -> Option<usize> {
+        None
+    }
+
+    fn apply(
+        &self,
+        _addr: u128,
+        _at_addr: u128,
+        _region: &mut [u8],
+    ) -> Result<bool, HowToError> {
+        todo!()
     }
 }
 

@@ -24,6 +24,7 @@ pub trait HowTo {
 pub enum RelocCode {
     None,
     Abs { addr_width: usize },
+    BaseRel { addr_width: usize },
     Rel { addr_width: usize },
     AbsShifted { addr_width: usize, shift: usize },
     RelShifted { addr_width: usize, shift: usize },
