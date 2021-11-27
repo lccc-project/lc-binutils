@@ -108,12 +108,7 @@ impl HowTo for Elf64X86_64HowTo {
         None
     }
 
-    fn apply(
-        &self,
-        _addr: u128,
-        _at_addr: u128,
-        _region: &mut [u8],
-    ) -> Result<bool, HowToError> {
+    fn apply(&self, _addr: u128, _at_addr: u128, _region: &mut [u8]) -> Result<bool, HowToError> {
         todo!()
     }
 }
