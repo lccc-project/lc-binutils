@@ -27,9 +27,9 @@ jobs:
           rustup component add clippy
       - name: Build
         run: |
-           cargo build
-           cargo test
-           cargo clippy
+           cargo build --all-features
+           cargo test --all-features
+           cargo clippy --all-features
   rustfmt:
     runs-on: ubuntu-latest
     steps:

@@ -962,10 +962,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
 
     fn write_file(
         &self,
-        _file: &mut (dyn std::io::Write + '_),
-        _bfile: &crate::fmt::BinaryFile,
+        file: &mut (dyn std::io::Write + '_),
+        bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
-        unimplemented!()
+        todo!()
     }
 
     fn has_sections(&self) -> bool {
