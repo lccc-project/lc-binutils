@@ -95,7 +95,7 @@ use target_tuples::Target;
 define_formats![
     #[cfg(all(feature = "elf32", feature = "w65"))]
     elf32-w65,
-    #[cfg(all(feature = "elf64", feature = "x86_64"))]
+    #[cfg(all(feature = "elf64", feature = "x86"))]
     elf64-x86_64,
     binary
 ];
