@@ -962,8 +962,8 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
 
     fn write_file(
         &self,
-        file: &mut (dyn std::io::Write + '_),
-        bfile: &crate::fmt::BinaryFile,
+        _file: &mut (dyn std::io::Write + '_),
+        _bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
         todo!()
     }
