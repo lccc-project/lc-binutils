@@ -8,6 +8,7 @@ use bytemuck::{Pod, Zeroable};
 
 use crate::fmt::{BinaryFile, Binfmt, FileType, SectionType};
 use crate::howto::HowTo;
+use crate::sym::{SymbolKind, SymbolType};
 use crate::traits::private::Sealed;
 use crate::traits::Numeric;
 
@@ -73,6 +74,15 @@ pub trait ElfClass: Sealed + Sized + Copy + 'static {
     type Rel: ElfRelocation<Class = Self> + Pod;
     type Rela: ElfRelocation<Class = Self> + Pod;
     type ProgramHeader: ElfProgramHeader<Class = Self> + Pod;
+
+    fn new_sym(
+        st_name: Self::Word,
+        st_value: Self::Addr,
+        st_size: Self::Size,
+        st_info: u8,
+        st_other: u8,
+        st_shndx: Self::Half,
+    ) -> Self::Symbol;
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -89,7 +99,7 @@ pub struct Elf32Sym {
     st_size: ElfSize<Elf32>,
     st_info: ElfByte<Elf32>,
     st_other: ElfByte<Elf32>,
-    st_shnidx: ElfSection<Elf32>,
+    st_shndx: ElfSection<Elf32>,
 }
 
 impl Sealed for Elf32Sym {}
@@ -117,7 +127,7 @@ impl ElfSymbol for Elf32Sym {
     }
 
     fn section(&self) -> u16 {
-        self.st_shnidx
+        self.st_shndx
     }
 }
 
@@ -127,7 +137,7 @@ pub struct Elf64Sym {
     st_name: ElfWord<Elf64>,
     st_info: ElfByte<Elf64>,
     st_other: ElfByte<Elf64>,
-    st_shnidx: ElfSection<Elf64>,
+    st_shndx: ElfSection<Elf64>,
     st_value: ElfAddr<Elf64>,
     st_size: ElfSize<Elf64>,
 }
@@ -229,7 +239,7 @@ impl ElfSymbol for Elf64Sym {
     }
 
     fn section(&self) -> u16 {
-        self.st_shnidx
+        self.st_shndx
     }
 }
 
@@ -260,6 +270,24 @@ impl ElfClass for Elf64 {
     type Versym = u16;
 
     type ProgramHeader = Elf64Phdr;
+
+    fn new_sym(
+        st_name: Self::Word,
+        st_value: Self::Addr,
+        st_size: Self::Size,
+        st_info: u8,
+        st_other: u8,
+        st_shndx: Self::Half,
+    ) -> Self::Symbol {
+        Elf64Sym {
+            st_name,
+            st_info,
+            st_other,
+            st_shndx,
+            st_value,
+            st_size,
+        }
+    }
 }
 
 impl ElfRelocationExtractHelpers for Elf64 {
@@ -297,6 +325,24 @@ impl ElfClass for Elf32 {
 
     type Versym = u16;
     type ProgramHeader = Elf32Phdr;
+
+    fn new_sym(
+        st_name: Self::Word,
+        st_value: Self::Addr,
+        st_size: Self::Size,
+        st_info: u8,
+        st_other: u8,
+        st_shndx: Self::Half,
+    ) -> Self::Symbol {
+        Elf32Sym {
+            st_name,
+            st_value,
+            st_size,
+            st_info,
+            st_other,
+            st_shndx,
+        }
+    }
 }
 
 impl ElfRelocationExtractHelpers for Elf32 {
@@ -649,7 +695,7 @@ pub struct ElfHeader<E: ElfClass> {
     pub e_phnum: ElfHalf<E>,
     pub e_shentsize: ElfHalf<E>,
     pub e_shnum: ElfHalf<E>,
-    pub e_shsnidx: ElfHalf<E>,
+    pub e_shstrndx: ElfHalf<E>,
 }
 
 unsafe impl<E: ElfClass> Zeroable for ElfHeader<E> {}
@@ -892,7 +938,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             e_phnum: Numeric::from_usize(0),
             e_shentsize: Numeric::from_usize(size_of::<ElfSectionHeader<Class>>()),
             e_shnum: Numeric::from_usize(0),
-            e_shsnidx: Numeric::from_usize(0),
+            e_shstrndx: Numeric::from_usize(0),
         };
 
         if let Some(f) = self.create_header {
@@ -963,7 +1009,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
 
     fn write_file(
         &self,
-        _file: &mut (dyn std::io::Write + '_),
+        file: &mut (dyn std::io::Write + '_),
         bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
         let mut shstrtab = (vec![0u8], HashMap::new());
@@ -1004,7 +1050,13 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, &section.name)),
                 sh_type: match section.ty {
                     SectionType::NoBits => consts::SHT_NOBITS,
-                    _ => todo!(),
+                    SectionType::ProgBits => consts::SHT_PROGBITS,
+                    SectionType::SymbolTable => consts::SHT_SYMTAB,
+                    SectionType::StringTable => consts::SHT_STRTAB,
+                    SectionType::Dynamic => consts::SHT_DYNAMIC,
+                    SectionType::ProcedureLinkageTable => todo!(),
+                    SectionType::GlobalOffsetTable => todo!(),
+                    SectionType::FormatSpecific(_) => todo!(),
                 },
                 sh_flags: Class::Offset::from_usize(7),
                 sh_addr: Class::Addr::from_usize(0),
@@ -1017,6 +1069,98 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             });
             offset += section.content.len();
         }
+        let mut symbols: Vec<Class::Symbol> = Vec::new();
+        let mut strtab = (vec![0u8], HashMap::new());
+        symbols.push(Class::new_sym(
+            Class::Word::from_usize(add_to_strtab(&mut strtab, "")),
+            Class::Addr::from_usize(0),
+            Class::Size::from_usize(0),
+            0,
+            0,
+            Class::Half::from_usize(0),
+        ));
+        for sym in bfile.symbols() {
+            symbols.push(Class::new_sym(
+                Class::Word::from_usize(add_to_strtab(&mut strtab, sym.name())),
+                Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
+                Class::Size::from_usize(0usize),
+                (match sym.kind() {
+                    SymbolKind::Local => 0,
+                    SymbolKind::Global => 1,
+                    SymbolKind::Weak => 2,
+                    SymbolKind::FormatSpecific(x) => x as u8,
+                } << 4)
+                    | match sym.symbol_type() {
+                        SymbolType::Null => 0,
+                        SymbolType::Object => 1,
+                        SymbolType::Function => 2,
+                        SymbolType::Section => 3,
+                        SymbolType::File => 4,
+                        SymbolType::Common => 5,
+                        SymbolType::Tls => 6,
+                        SymbolType::FormatSpecific(x) => x as u8,
+                    },
+                0,
+                Class::Half::from_usize(sym.section().map_or(0, |x| x as usize)),
+            ));
+        }
+        let symbols_sec: Vec<u8> = Vec::from(bytemuck::cast_slice(&symbols));
+        shdrs.push(ElfSectionHeader::<Class> {
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".symtab")),
+            sh_type: consts::SHT_SYMTAB,
+            sh_flags: Class::Offset::from_usize(0),
+            sh_addr: Class::Addr::from_usize(0),
+            sh_offset: Class::Offset::from_usize(offset),
+            sh_size: Class::Size::from_usize(symbols_sec.len()),
+            sh_link: Class::Word::from_usize(0),
+            sh_info: Class::Word::from_usize(0),
+            sh_addralign: Class::Addr::from_usize(8),
+            sh_entsize: Class::Size::from_usize(0),
+        });
+        offset += symbols_sec.len();
+        shdrs.push(ElfSectionHeader::<Class> {
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".strtab")),
+            sh_type: consts::SHT_STRTAB,
+            sh_flags: Class::Offset::from_usize(0),
+            sh_addr: Class::Addr::from_usize(0),
+            sh_offset: Class::Offset::from_usize(offset),
+            sh_size: Class::Size::from_usize(strtab.0.len()),
+            sh_link: Class::Word::from_usize(0),
+            sh_info: Class::Word::from_usize(0),
+            sh_addralign: Class::Addr::from_usize(1),
+            sh_entsize: Class::Size::from_usize(0),
+        });
+        offset += shstrtab.0.len();
+        shdrs.push(ElfSectionHeader::<Class> {
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".shstrtab")),
+            sh_type: consts::SHT_STRTAB,
+            sh_flags: Class::Offset::from_usize(0),
+            sh_addr: Class::Addr::from_usize(0),
+            sh_offset: Class::Offset::from_usize(offset),
+            sh_size: Class::Size::from_usize(shstrtab.0.len()),
+            sh_link: Class::Word::from_usize(0),
+            sh_info: Class::Word::from_usize(0),
+            sh_addralign: Class::Addr::from_usize(1),
+            sh_entsize: Class::Size::from_usize(0),
+        });
+        offset += shstrtab.0.len();
+        let mut header = bfile
+            .data()
+            .downcast_ref::<ElfFileData<Class>>()
+            .unwrap()
+            .header
+            .clone();
+        header.e_shnum = Class::Half::from_usize(shdrs.len());
+        header.e_shoff = Class::Offset::from_usize(offset);
+        header.e_shstrndx = Class::Half::from_usize(shdrs.len() - 1);
+        file.write_all(bytemuck::bytes_of(&header))?;
+        for section in bfile.sections() {
+            file.write_all(&section.content)?;
+        }
+        file.write_all(&symbols_sec)?;
+        file.write_all(&strtab.0)?;
+        file.write_all(&shstrtab.0)?;
+        file.write_all(bytemuck::cast_slice(&shdrs))?;
         Ok(())
     }
 
