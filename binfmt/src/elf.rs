@@ -1115,7 +1115,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_addr: Class::Addr::from_usize(0),
             sh_offset: Class::Offset::from_usize(offset),
             sh_size: Class::Size::from_usize(symbols_sec.len()),
-            sh_link: Class::Word::from_usize(shdrs.len()+1),
+            sh_link: Class::Word::from_usize(shdrs.len() + 1),
             sh_info: Class::Word::from_usize(local_syms),
             sh_addralign: Class::Addr::from_usize(8),
             sh_entsize: Class::Size::from_usize(24),
