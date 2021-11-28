@@ -1012,7 +1012,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         file: &mut (dyn std::io::Write + '_),
         bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
-        let mut shstrtab = (vec![0u8], HashMap::new());
+        let mut shstrtab = (Vec::new(), HashMap::new());
         fn add_to_strtab<'a>(
             strtab: &mut (Vec<u8>, HashMap<&'a str, usize>),
             string: &'a str,
@@ -1022,6 +1022,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             } else {
                 let addr = strtab.0.len();
                 strtab.0.append(&mut Vec::from(string.as_bytes()));
+                strtab.0.push(0);
                 strtab.1.insert(string, addr);
                 addr
             }
@@ -1070,7 +1071,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             offset += section.content.len();
         }
         let mut symbols: Vec<Class::Symbol> = Vec::new();
-        let mut strtab = (vec![0u8], HashMap::new());
+        let mut strtab = (Vec::new(), HashMap::new());
         symbols.push(Class::new_sym(
             Class::Word::from_usize(add_to_strtab(&mut strtab, "")),
             Class::Addr::from_usize(0),
