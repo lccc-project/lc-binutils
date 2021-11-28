@@ -1080,6 +1080,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             0,
             Class::Half::from_usize(0),
         ));
+        let mut local_syms = 1; // Includes null symbol
         for sym in bfile.symbols() {
             symbols.push(Class::new_sym(
                 Class::Word::from_usize(add_to_strtab(&mut strtab, sym.name())),
@@ -1104,6 +1105,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 0,
                 Class::Half::from_usize(sym.section().map_or(0, |x| x as usize)),
             ));
+            local_syms += 1;
         }
         let symbols_sec: Vec<u8> = Vec::from(bytemuck::cast_slice(&symbols));
         shdrs.push(ElfSectionHeader::<Class> {
@@ -1113,10 +1115,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_addr: Class::Addr::from_usize(0),
             sh_offset: Class::Offset::from_usize(offset),
             sh_size: Class::Size::from_usize(symbols_sec.len()),
-            sh_link: Class::Word::from_usize(0),
-            sh_info: Class::Word::from_usize(0),
+            sh_link: Class::Word::from_usize(shdrs.len()+1),
+            sh_info: Class::Word::from_usize(local_syms),
             sh_addralign: Class::Addr::from_usize(8),
-            sh_entsize: Class::Size::from_usize(0),
+            sh_entsize: Class::Size::from_usize(24),
         });
         offset += symbols_sec.len();
         shdrs.push(ElfSectionHeader::<Class> {
@@ -1131,7 +1133,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_addralign: Class::Addr::from_usize(1),
             sh_entsize: Class::Size::from_usize(0),
         });
-        offset += shstrtab.0.len();
+        offset += strtab.0.len();
         shdrs.push(ElfSectionHeader::<Class> {
             sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".shstrtab")),
             sh_type: consts::SHT_STRTAB,
