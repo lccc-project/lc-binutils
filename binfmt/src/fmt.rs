@@ -262,3 +262,58 @@ impl Write for Section {
         self.content.flush()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Binfmt, FileType};
+
+    pub struct TestBinfmt;
+
+    impl super::Binfmt for TestBinfmt {
+        fn relnum_to_howto(&self, _: u32) -> Option<&dyn crate::howto::HowTo> {
+            None
+        }
+
+        fn code_to_howto(&self, _: crate::howto::RelocCode) -> Option<&dyn crate::howto::HowTo> {
+            None
+        }
+
+        fn name(&self) -> &'static str {
+            "test"
+        }
+
+        fn create_file(&self, ty: super::FileType) -> super::BinaryFile {
+            super::BinaryFile::create(self, Box::new(()), ty)
+        }
+
+        fn read_file(
+            &self,
+            _: &mut (dyn std::io::Read + '_),
+        ) -> std::io::Result<Option<super::BinaryFile>> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Can't Read/write Test Binfmts",
+            ))
+        }
+
+        fn write_file(
+            &self,
+            _: &mut (dyn std::io::Write + '_),
+            _: &super::BinaryFile,
+        ) -> std::io::Result<()> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "Can't Read/write Test Binfmts",
+            ))
+        }
+
+        fn has_sections(&self) -> bool {
+            true
+        }
+    }
+    #[test]
+    pub fn test_data_type() {
+        let fmt = TestBinfmt.create_file(FileType::Exec);
+        fmt.data().downcast_ref::<()>();
+    }
+}
