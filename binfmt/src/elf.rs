@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::ErrorKind;
 use std::marker::PhantomData;
@@ -5,7 +6,7 @@ use std::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::fmt::{BinaryFile, Binfmt, FileType};
+use crate::fmt::{BinaryFile, Binfmt, FileType, SectionType};
 use crate::howto::HowTo;
 use crate::traits::private::Sealed;
 use crate::traits::Numeric;
@@ -887,9 +888,9 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             e_shoff: Numeric::from_usize(0),
             e_flags: Numeric::from_usize(0),
             e_ehsize: Numeric::from_usize(0),
-            e_phentsize: Numeric::from_usize(0),
+            e_phentsize: Numeric::from_usize(size_of::<Class::ProgramHeader>()),
             e_phnum: Numeric::from_usize(0),
-            e_shentsize: Numeric::from_usize(0),
+            e_shentsize: Numeric::from_usize(size_of::<ElfSectionHeader<Class>>()),
             e_shnum: Numeric::from_usize(0),
             e_shsnidx: Numeric::from_usize(0),
         };
@@ -963,9 +964,60 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
     fn write_file(
         &self,
         _file: &mut (dyn std::io::Write + '_),
-        _bfile: &crate::fmt::BinaryFile,
+        bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
-        todo!()
+        let mut shstrtab = (vec![0u8], HashMap::new());
+        fn add_to_strtab<'a>(
+            strtab: &mut (Vec<u8>, HashMap<&'a str, usize>),
+            string: &'a str,
+        ) -> usize {
+            if strtab.1.contains_key(string) {
+                strtab.1[string]
+            } else {
+                let addr = strtab.0.len();
+                strtab.0.append(&mut Vec::from(string.as_bytes()));
+                strtab.1.insert(string, addr);
+                addr
+            }
+        }
+        let mut shdrs = Vec::new();
+        let mut offset = size_of::<ElfHeader<Class>>()
+            + size_of::<Class::ProgramHeader>()
+                * (bfile.data().downcast_ref::<ElfFileData<Class>>())
+                    .unwrap()
+                    .phdrs
+                    .len();
+        shdrs.push(ElfSectionHeader::<Class> {
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, "")),
+            sh_type: consts::SHT_NULL,
+            sh_flags: Class::Offset::from_usize(0),
+            sh_addr: Class::Addr::from_usize(0),
+            sh_offset: Class::Offset::from_usize(0),
+            sh_size: Class::Size::from_usize(0),
+            sh_link: Class::Word::from_usize(0),
+            sh_info: Class::Word::from_usize(0),
+            sh_addralign: Class::Addr::from_usize(0),
+            sh_entsize: Class::Size::from_usize(0),
+        });
+        for section in bfile.sections() {
+            shdrs.push(ElfSectionHeader::<Class> {
+                sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, &section.name)),
+                sh_type: match section.ty {
+                    SectionType::NoBits => consts::SHT_NOBITS,
+                    _ => todo!(),
+                },
+                sh_flags: Class::Offset::from_usize(7),
+                sh_addr: Class::Addr::from_usize(0),
+                sh_offset: Class::Offset::from_usize(offset),
+                sh_size: Class::Size::from_usize(section.content.len()),
+                sh_link: Class::Word::from_usize(0),
+                sh_info: Class::Word::from_usize(0),
+                sh_addralign: Class::Addr::from_usize(section.align),
+                sh_entsize: Class::Size::from_usize(0),
+            });
+            offset += section.content.len();
+        }
+        Ok(())
     }
 
     fn has_sections(&self) -> bool {
