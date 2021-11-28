@@ -74,11 +74,11 @@ impl<'a> BinaryFile<'a> {
     }
 
     pub fn data(&self) -> &dyn Any {
-        &self.data
+        &*self.data
     }
 
     pub fn data_mut(&mut self) -> &mut dyn Any {
-        &mut self.data
+        &mut *self.data
     }
 
     pub fn add_section(&mut self, mut sect: Section) -> Result<u32, Section> {
