@@ -1029,7 +1029,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         let mut shdrs = Vec::new();
         let mut offset = size_of::<ElfHeader<Class>>()
             + size_of::<Class::ProgramHeader>()
-                * (bfile.data().downcast_ref::<ElfFileData<Class>>())
+                * (bfile.data().downcast_ref::<Box<ElfFileData<Class>>>())
                     .unwrap()
                     .phdrs
                     .len();
@@ -1146,7 +1146,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         offset += shstrtab.0.len();
         let mut header = bfile
             .data()
-            .downcast_ref::<ElfFileData<Class>>()
+            .downcast_ref::<Box<ElfFileData<Class>>>()
             .unwrap()
             .header;
         header.e_shnum = Class::Half::from_usize(shdrs.len());
