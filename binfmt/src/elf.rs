@@ -1148,8 +1148,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             .data()
             .downcast_ref::<ElfFileData<Class>>()
             .unwrap()
-            .header
-            .clone();
+            .header;
         header.e_shnum = Class::Half::from_usize(shdrs.len());
         header.e_shoff = Class::Offset::from_usize(offset);
         header.e_shstrndx = Class::Half::from_usize(shdrs.len() - 1);
