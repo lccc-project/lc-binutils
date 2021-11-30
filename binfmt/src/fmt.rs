@@ -228,6 +228,7 @@ impl<'a> Iterator for Relocs<'a> {
     }
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum SectionType {
     NoBits,
     ProgBits,
@@ -239,6 +240,13 @@ pub enum SectionType {
     FormatSpecific(u32),
 }
 
+impl Default for SectionType {
+    fn default() -> SectionType {
+        SectionType::NoBits
+    }
+}
+
+#[derive(Clone, Debug, Hash, Default)]
 pub struct Section {
     pub name: String,
     pub align: usize,
