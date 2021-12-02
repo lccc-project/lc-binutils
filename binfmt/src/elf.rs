@@ -1103,7 +1103,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                         SymbolType::FormatSpecific(x) => x as u8,
                     },
                 0,
-                Class::Half::from_usize(sym.section().map_or(0, |x| x as usize)),
+                Class::Half::from_usize(sym.section().map_or(0, |x| x as usize + 1)),
             ));
             local_syms += 1;
         }
