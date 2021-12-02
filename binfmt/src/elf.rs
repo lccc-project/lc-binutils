@@ -1087,7 +1087,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
                 Class::Size::from_usize(0usize),
                 (match sym.kind() {
-                    SymbolKind::Local => { local_syms += 1; 0 },
+                    SymbolKind::Local => {
+                        local_syms += 1;
+                        0
+                    }
                     SymbolKind::Global => 1,
                     SymbolKind::Weak => 2,
                     SymbolKind::FormatSpecific(x) => x as u8,
