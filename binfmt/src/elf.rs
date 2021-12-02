@@ -1087,7 +1087,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
                 Class::Size::from_usize(0usize),
                 (match sym.kind() {
-                    SymbolKind::Local => 0,
+                    SymbolKind::Local => { local_syms += 1; 0 },
                     SymbolKind::Global => 1,
                     SymbolKind::Weak => 2,
                     SymbolKind::FormatSpecific(x) => x as u8,
@@ -1105,7 +1105,6 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 0,
                 Class::Half::from_usize(sym.section().map_or(0, |x| x as usize + 1)),
             ));
-            local_syms += 1;
         }
         let symbols_sec: Vec<u8> = Vec::from(bytemuck::cast_slice(&symbols));
         shdrs.push(ElfSectionHeader::<Class> {
