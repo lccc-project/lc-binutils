@@ -509,6 +509,47 @@ impl<W: InsnWrite> X86Encoder<W> {
                     _ => todo!(),
                 }
             }
+            [ModRMGeneral, RegGeneral] => {
+                assert_eq!(insn.operands.len(), 2);
+                let mut short = false;
+                let (b, w) = match insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(reg)) => {
+                        if matches!(reg.class(), X86RegisterClass::Word) {
+                            short = true;
+                        }
+                        (
+                            reg.regnum() >= 8,
+                            matches!(reg.class(), X86RegisterClass::Quad),
+                        )
+                    }
+                    _ => todo!(),
+                };
+                let mut rex = b || w;
+                let (r, reg) = match insn.operands()[1] {
+                    X86Operand::Register(reg) => (reg.regnum() >= 8, reg.regnum() % 7),
+                    _ => todo!(),
+                };
+                if r {
+                    rex = true;
+                }
+                if short {
+                    self.writer.write_all(&[0x66])?;
+                }
+                if rex {
+                    let rex = 0x40
+                        | if b { 0x01 } else { 0x00 }
+                        | if r { 0x04 } else { 0x00 }
+                        | if w { 0x08 } else { 0x00 };
+                    self.writer.write_all(&[rex])?;
+                }
+                self.writer.write_all(&opcode)?;
+                match insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
+                        self.writer.write_all(&[0xC0 + (reg << 3) + regrm.regnum()])
+                    }
+                    _ => todo!(),
+                }
+            }
             [OpRegMode] => {
                 assert_eq!(insn.operands.len(), 1);
                 let reg = match insn.operands()[0] {
