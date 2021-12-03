@@ -78,6 +78,10 @@ pub enum X86OperandType {
 
     DRegGeneral,
 
+    Flags(X86RegisterClass),
+
+    FlagsMode,
+
     /// A trailing Instruciton (prefix opcode other than 0x0F or VEX)
     Insn,
     /// Vector Instruction (VEX prefix)
@@ -85,8 +89,11 @@ pub enum X86OperandType {
     /// Immediate value
     Imm(usize),
 
-    /// Immediate value depending on prefix and mode (no REX)
+    /// Immediate value depending on prefix and mode (no REX.W)
     ImmGeneral,
+
+    /// Immediate value depending on prefix and mode (respects REX.W in 64-bit mode)
+    ImmGeneralWide,
 
     /// A relative Word with a given Instruction Instruction size
     Rel(usize),
@@ -99,6 +106,20 @@ pub enum X86OperandType {
 
     /// m128/256/512 depending on prefixes and control bits in prefixes
     AvxMem,
+
+    Moff(X86RegisterClass),
+    MoffGeneral,
+
+    /// Memory Reference referring to the destination address, which is always es:eDI or rDI depending on mode.
+    /// In legacy mode, es is not controlled by any segment override prefix
+    MemDest(X86RegisterClass),
+    /// m16/32/64, which is always es:eDI or rDI depending on mode. In legacy mode, es is not controlled by any segment override prefix
+    MemDestGeneral,
+    /// Memory Reference referring to the source address, which is always ds:eSI or rSI depending on mode.
+    /// In legacy mode, ds is controlled by the segment override prefix.
+    MemSrc(X86RegisterClass),
+    // m16/32/64, which is always ds:eSI or rSI depending on mode. In legacy mode, ds is controlled by the segment override prefix
+    MemSrcGeneral,
 }
 
 macro_rules! define_x86_instructions{
@@ -268,7 +289,57 @@ define_x86_instructions! {
     (Cwd, "cwd", 0x99, [DReg(Word), AReg(Word)]),
     (Cdq, "cdq", 0x99, [DReg(Double), DReg(Double)]),
     (Cdo, "cqo", 0x99, [DReg(Quad),DReg(Quad)]),
-    (Fwait, "fwait", 0x9B, [])
+    (Fwait, "fwait", 0x9B, []),
+    (Pushf, "pushf", 0x9C, [FlagsMode]),
+    (Popf, "popf", 0x9D, [FlagsMode]),
+    (Sahf,"sahf",0x9E, []),
+    (Lahf, "lahf", 0x9F, []),
+    (MovAlM, "mov", 0xA0, [AReg(Byte), Moff(Byte)]),
+    (MovAregM, "mov", 0xA1, [ARegGeneral, MoffGeneral]),
+    (MovMAl, "mov", 0xA2, [Moff(Byte), AReg(Byte)]),
+    (MovMAreg, "mov", 0xA3, [MoffGeneral, ARegGeneral]),
+    (Movsb,"movs", 0xA4, [MemDest(Byte),MemSrc(Byte)]),
+    (Movs, "movs", 0xA5, [MemDestGeneral, MemSrcGeneral]),
+    (Cmpsb, "cmps", 0xA6, [MemDest(Byte),MemSrc(Byte)]),
+    (Cmps, "cmps", 0xA7, [MemDestGeneral, MemSrcGeneral]),
+    (TestAreg8, "test", 0xA8, [AReg(Byte),Imm(8)]),
+    (TestAreg, "test", 0xA9, [ARegGeneral,ImmGeneral]),
+    (Stosb, "stos", 0xAA, [MemDest(Byte),AReg(Byte)]),
+    (Stos, "stos", 0xAB,[MemDestGeneral,ARegGeneral]),
+    (Lodsb, "lods",0xAC, [AReg(Byte),MemSrc(Byte)]),
+    (Lods, "lods", 0xAD, [ARegGeneral, MemSrcGeneral]),
+    (Scasb, "scas", 0xAE, [MemDest(Byte), AReg(Byte)]),
+    (Scas, "scas", 0xAF, [MemDestGeneral, ARegGeneral]),
+    (MovImm8, "mov", 0xB0, [OpReg(Byte),Imm(8)]),
+    (MovImm, "mov", 0xB8, [OpRegGeneral, ImmGeneralWide]),
+    (RolImm8, "rol", 0xC0, [RControlBits(0),ModRM(Byte),Imm(8)]),
+    (RorImm8, "ror", 0xC0, [RControlBits(1),ModRM(Byte),Imm(8)]),
+    (RclImm8, "rcl", 0xC0, [RControlBits(2),ModRM(Byte),Imm(8)]),
+    (RcrImm8, "rcr", 0xC0, [RControlBits(3),ModRM(Byte), Imm(8)]),
+    (ShlImm8, "shl", 0xC0, [RControlBits(4), ModRM(Byte), Imm(8)]),
+    (ShrImm8, "shr", 0xC0, [RControlBits(5),ModRM(Byte),Imm(8)]),
+    (Shl2Imm8, "shl", 0xC0, [RControlBits(6), ModRM(Byte), Imm(8)]),
+    (SarImm8, "sar", 0xC0, [RControlBits(7), ModRM(Byte), Imm(8)]),
+    (RolImm, "rol", 0xC1, [RControlBits(0), ModRMGeneral,Imm(8)]),
+    (RorImm, "ror", 0xC1, [RControlBits(1), ModRMGeneral,Imm(8)]),
+    (RclImm, "rcl", 0xC1, [RControlBits(2), ModRMGeneral,Imm(8)]),
+    (RcrImm, "rcr", 0xC1, [RControlBits(3), ModRMGeneral, Imm(8)]),
+    (ShlImm, "shl", 0xC1, [RControlBits(4), ModRMGeneral, Imm(8)]),
+    (ShrImm, "shr", 0xC1, [RControlBits(5), ModRMGeneral,Imm(8)]),
+    (Shl2Imm, "shl", 0xC1, [RControlBits(6), ModRMGeneral, Imm(8)]),
+    (SarImm, "sar", 0xC1, [RControlBits(7), ModRMGeneral, Imm(8)]),
+    (RetnPop, "retn", 0xC2, [Imm(16)]),
+    (Retn, "retn", 0xC3, []),
+    (MovImmM8, "mov", 0xC6, [RControlBits(0),ModRM(Byte), Imm(8)]),
+    (MovImmM, "mov", 0xC7, [RControlBits(0),ModRMGeneral, ImmGeneral]),
+    (Enter, "enter", 0xC8, [Imm(16),Imm(8)]),
+    (Leave,"leave", 0xC9, []),
+    (RetfPop, "retf", 0xCA, [Imm(16)]),
+    (Retf, "retf", 0xCB, []),
+    (Int3, "int3", 0xCC, []),
+    (Int,"int", 0xCD, [Imm(8)]),
+    (IntO, "into",0xCE,[]),
+    (IRet,"iret",0xCF, [])
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
