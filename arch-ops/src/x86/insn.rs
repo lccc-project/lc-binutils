@@ -24,8 +24,17 @@ pub enum Prefix {
         size_prefix: u8,
         src2: u8,
     },
-    DoublePrecision,
-    SinglePrecision,
+    EVex {
+        rex: u8,
+        next: u16,
+        len: u8,
+        size_prefix: u8,
+        src2: u8,
+        mask: u8,
+    },
+    PackedDouble,
+    ScalarSingle,
+    ScalarDouble,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -42,6 +51,8 @@ pub enum X86OperandType {
     /// The Mod and R/M portions of a ModR/M byte (potentially with a trailing SIB byte)
     /// If an 1-byte register is used, use the class Byte. REX prefix will correctly shift it to ByteRex
     ModRM(X86RegisterClass),
+    /// The Mod and R/M portions of a ModR/M Byte, except that no registers cannot be used and size checking should not be performed
+    ModRMMem,
     /// The R portion of a ModR/M byte
     /// If an 1-byte register is used, use the class Byte. REX prefix will correctly shift it to ByteRex
     Reg(X86RegisterClass),
@@ -54,6 +65,9 @@ pub enum X86OperandType {
 
     /// m/r16/32/64 depending on mode and 66h prefix
     ModRMMode,
+
+    // Either STi or a memory reference with a given size
+    ModRMReal(X86RegisterClass),
 
     /// r16/32/64 depending on mode and prefixes
     RegGeneral,
@@ -77,6 +91,8 @@ pub enum X86OperandType {
     DReg(X86RegisterClass),
 
     DRegGeneral,
+
+    CReg(X86RegisterClass),
 
     Flags(X86RegisterClass),
 
@@ -339,7 +355,86 @@ define_x86_instructions! {
     (Int3, "int3", 0xCC, []),
     (Int,"int", 0xCD, [Imm(8)]),
     (IntO, "into",0xCE,[]),
-    (IRet,"iret",0xCF, [])
+    (IRet,"iret",0xCF, []),
+    (Rol8, "rol", 0xD0, [RControlBits(0),ModRM(Byte)]),
+    (Ror8, "ror", 0xD0, [RControlBits(1),ModRM(Byte)]),
+    (Rcl8, "rcl", 0xD0, [RControlBits(2),ModRM(Byte)]),
+    (Rcr8, "rcr", 0xD0, [RControlBits(3),ModRM(Byte)]),
+    (Shl8, "shl", 0xD0, [RControlBits(4), ModRM(Byte)]),
+    (Shr8, "shr", 0xD0, [RControlBits(5),ModRM(Byte)]),
+    (Shl2_8, "shl", 0xD0, [RControlBits(6), ModRM(Byte)]),
+    (Sar8, "sar", 0xD0, [RControlBits(7), ModRM(Byte)]),
+    (Rol, "rol", 0xD1, [RControlBits(0), ModRMGeneral]),
+    (Ror, "ror", 0xD1, [RControlBits(1), ModRMGeneral]),
+    (Rcl, "rcl", 0xD1, [RControlBits(2), ModRMGeneral]),
+    (Rcr, "rcr", 0xD1, [RControlBits(3), ModRMGeneral]),
+    (Shl, "shl", 0xD1, [RControlBits(4), ModRMGeneral]),
+    (Shr, "shr", 0xD1, [RControlBits(5), ModRMGeneral]),
+    (Shl2, "shl", 0xD1, [RControlBits(6), ModRMGeneral]),
+    (Sar, "sar", 0xD1, [RControlBits(7), ModRMGeneral]),
+    (RolCL8, "rol", 0xD2, [RControlBits(0),  ModRM(Byte) , CReg(Byte)]),
+    (RorCL8, "ror", 0xD2, [RControlBits(1),  ModRM(Byte) , CReg(Byte)]),
+    (RclCL8, "rcl", 0xD2, [RControlBits(2),  ModRM(Byte) , CReg(Byte)]),
+    (RcrCL8, "rcr", 0xD2, [RControlBits(3),  ModRM(Byte) , CReg(Byte)]),
+    (ShlCL8, "shl", 0xD2, [RControlBits(4),  ModRM(Byte) , CReg(Byte)]),
+    (ShrCL8, "shr", 0xD2, [RControlBits(5),  ModRM(Byte) , CReg(Byte)]),
+    (Shl2CL8, "shl", 0xD2, [RControlBits(6), ModRM(Byte) , CReg(Byte)]),
+    (SarCL8, "sar", 0xD2, [RControlBits(7),  ModRM(Byte) , CReg(Byte)]),
+    (RolCL, "rol", 0xD3, [RControlBits(0),   ModRMGeneral, CReg(Byte)]),
+    (RorCL, "ror", 0xD3, [RControlBits(1),   ModRMGeneral, CReg(Byte)]),
+    (RclCL, "rcl", 0xD3, [RControlBits(2),   ModRMGeneral, CReg(Byte)]),
+    (RcrCL, "rcr", 0xD3, [RControlBits(3),   ModRMGeneral, CReg(Byte)]),
+    (ShlCL, "shl", 0xD3, [RControlBits(4),   ModRMGeneral, CReg(Byte)]),
+    (ShrCL, "shr", 0xD3, [RControlBits(5),   ModRMGeneral, CReg(Byte)]),
+    (Shl2CL, "shl", 0xD3, [RControlBits(6),  ModRMGeneral, CReg(Byte)]),
+    (SarCL, "sar", 0xD3, [RControlBits(7),   ModRMGeneral, CReg(Byte)]),
+    (Xlat, "xlat", 0xD7, [ModRM(Byte)]),
+    // Note: Double here is still X86RegisterClass::Double (dword), as in a 32-byte memory reference (m32real), not a double precision floating-point value
+    (Fadd, "fadd", 0xD8, [RControlBits(0), ModRMReal(Double)]),
+    (Fmul, "fmul", 0xD8, [RControlBits(1), ModRMReal(Double)]),
+    (Fcom, "fcom", 0xD8, [RControlBits(2),ModRMReal(Double)]),
+    (Fcomp, "fcomp",0xD8, [RControlBits(3), ModRMReal(Double)]),
+    (Fsub, "fsub", 0xD8, [RControlBits(4), ModRMReal(Double)]),
+    (Fsubr, "fsubr", 0xD8, [RControlBits(5), ModRMReal(Double)]),
+    (Fdiv, "fdiv", 0xD8, [RControlBits(6), ModRMReal(Double)]),
+    (Fdivr, "fdivr", 0xD8, [RControlBits(7), ModRMReal(Double)]),
+    (Fld, "fld", 0xD9, [RControlBits(0), ModRMReal(Double)]),
+    (Fxch, "fxch", 0xD9, [RControlBits(1),ModRM(St)]),
+    (Fst, "fst",0xD9, [RControlBits(2),ModRMReal(Double)]),
+    (Fstp, "fstp", 0xD9, [RControlBits(3), ModRMReal(Double)]),
+    (Fldenv, "fldenv",0xD9, [RControlBits(4),ModRMMem]),
+    (Fchs, "fchs", 0xD9E0, []),
+    (Fabs, "fabs", 0xD9E1, []),
+    (Ftst, "ftst", 0xD9E4, []),
+    (Fxam, "fxam", 0xD9E5, []),
+    (Fldcw, "fldcw", 0xD9, [RControlBits(5),ModRMMem]),
+    (Fld1, "fld1", 0xD9E8,[]),
+    (FldL2T, "fldl2t", 0xD9E9, []),
+    (FldL2E, "fldl2e", 0xD9EA, []),
+    (FldPi, "fldpi", 0xD9EB, []),
+    (Fldlg2, "fldlg2", 0xD9EC, []),
+    (Fldln2, "fldln2", 0xD9ED, []),
+    (Fldz, "fldz", 0xD9EE, []),
+    (Fnstenv, "fnstenv", 0xD9, [RControlBits(6), ModRMMem]),
+    (Fstenv, "fstenv", 0x9BD9, [RControlBits(6), ModRMMem]),
+    (F2Xm1, "f2xm1", 0xD9F0, []),
+    (FYl2x, "fyl2x", 0xD9F1, []),
+    (Fptan, "fptan", 0xD9F2, []),
+    (Fpatan, "fpatan", 0xD9F3, []),
+    (Fxtract, "fxtract", 0xD9F4, []),
+    (Fprem1, "fprem1", 0xD9F5, []),
+    (FDecStp, "fdecstp", 0xD9F6, []),
+    (FIncStp, "fincstp", 0xD9F7, []),
+    (Fnstcw, "fnstcw", 0xD9, [RControlBits(6), ModRMMem]),
+    (Fstcw, "fstcw", 0x9BD9, [RControlBits(6), ModRMMem]),
+    (Fprem, "fprem", 0xD9F8, []),
+    (FYl2Xp1, "fyl2xp1", 0xD9F9, []),
+    (Fsqrt, "fsqrt", 0xD9FA, []),
+    (Fsincos, "fsincos", 0xD9FB, []),
+    (Frndint, "frndint", 0xD9FC, []),
+    (Fscale, "fscale", 0xD9FD, []),
+    (Fsin, "fsin", 0xD9FE, []),
+    (Fcos, "fcos", 0xD9FF, []),
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
