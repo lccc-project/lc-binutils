@@ -66,8 +66,11 @@ pub enum X86OperandType {
     /// m/r16/32/64 depending on mode and 66h prefix
     ModRMMode,
 
-    // Either STi or a memory reference with a given size
+    /// Either STi or a memory reference with a given size
     ModRMReal(X86RegisterClass),
+
+    /// A register encoded in the r/m field of the ModRM byte
+    ModRMReg(X86RegisterClass),
 
     /// r16/32/64 depending on mode and prefixes
     RegGeneral,
@@ -94,6 +97,8 @@ pub enum X86OperandType {
 
     CReg(X86RegisterClass),
 
+    CRegGeneral,
+
     Flags(X86RegisterClass),
 
     FlagsMode,
@@ -111,11 +116,17 @@ pub enum X86OperandType {
     /// Immediate value depending on prefix and mode (respects REX.W in 64-bit mode)
     ImmGeneralWide,
 
-    /// A relative Word with a given Instruction Instruction size
+    /// A relative Word with a given Instruction Address size
     Rel(usize),
+
+    /// A relative address with size given by mode and 66h prefix
+    RelGeneral,
 
     /// Sets bits in the R field of the ModR/M byte.
     RControlBits(u8),
+
+    // 16-bit segment value or GDT offset
+    Seg,
 
     /// xmm/ymm/zmm depending on prefixes and control bits in prefixes
     AvxReg,
@@ -435,6 +446,96 @@ define_x86_instructions! {
     (Fscale, "fscale", 0xD9FD, []),
     (Fsin, "fsin", 0xD9FE, []),
     (Fcos, "fcos", 0xD9FF, []),
+    (FCmovB, "fcmovb", 0xDA, [RControlBits(0),ModRMReg(St)]),
+    (FIadd, "fiadd", 0xDA, [RControlBits(0),ModRMReal(Double)]),
+    (FCmovE, "fcmove", 0xDA, [RControlBits(1), ModRMReg(St)]),
+    (FImul, "fimul", 0xDA, [RControlBits(1), ModRMReal(Double)]),
+    (FCmovBE, "fcmovbe", 0xDA, [RControlBits(2),ModRMReg(St)]),
+    (FIcom, "ficom", 0xDA, [RControlBits(2), ModRMReal(Double)]),
+    (FCmovU, "fcmovu", 0xDA, [RControlBits(3), ModRMReg(St)]),
+    (FIcomp, "ficomp", 0xDA, [RControlBits(3), ModRMReal(Double)]),
+    (FISub, "fisub", 0xDA, [RControlBits(4), ModRMReal(Double)]),
+    (FUcompp, "fucompp", 0xDA, [RControlBits(5), ModRMReg(St)]),
+    (FISubr, "fisubr", 0xDA, [RControlBits(5), ModRMReal(Double)]),
+    (FIdiv, "fidiv", 0xDA, [RControlBits(6), ModRMReal(Double)]),
+    (FIdivr, "fidivr", 0xDA, [RControlBits(7), ModRMReal(Double)]),
+    (FCmovNb, "fcmovnb", 0xDA, [RControlBits(0), ModRMReg(St)]),
+    (FIld, "fild", 0xDB, [RControlBits(0), ModRMReal(Double)]),
+    (FCmovNe, "fcmovne", 0xDB, [RControlBits(1), ModRMReg(St)]),
+    (FISttp, "fisttp", 0xDB, [RControlBits(1), ModRMReal(Double)]),
+    (FCmovNbe, "fcmovnbe", 0xDB, [RControlBits(2), ModRMReg(St)]),
+    (FIst, "fist", 0xDB, [RControlBits(2), ModRMReal(Double)]),
+    (FCMovNu, "fcmovnu", 0xDB, [RControlBits(3), ModRMReg(St)]),
+    (FIstp, "fistp", 0xDB, [RControlBits(3), ModRMReal(Double)]),
+    (Fneni, "fneni", 0xDBE0, []),
+    (Fndisi, "fndisi", 0xDBE1, []),
+    (Fnclex, "fnclex", 0xDBE2, []),
+    (Fclex, "fclex", 0x9BDBE2, []),
+    (Fninit, "fninit", 0xDBE3, []),
+    (Finit, "finit", 0x9BDBE3, []),
+    (Fnsetpm, "fnsetpm", 0xDBE4, []),
+    (Fld80, "fld", 0xDB, [RControlBits(5), ModRMReal(St)]),
+    (Fucmpi, "fucmpi", 0xDB, [RControlBits(6), ModRMReg(St)]),
+    (Fcmpi, "fcmpi", 0xDB, [RControlBits(7), ModRMReg(St)]),
+    (Fadd64, "fadd", 0xDC, [RControlBits(0), ModRMReal(Quad)]),
+    (Fmul64, "fmul", 0xDC, [RControlBits(1), ModRMReal(Quad)]),
+    (Fcom64, "fcom", 0xDC, [RControlBits(2), ModRMReal(Quad)]),
+    (Fcomp64, "fcomp", 0xDC, [RControlBits(3), ModRMReal(Quad)]),
+    (Fsub64, "fsub", 0xDC, [RControlBits(4), ModRMReal(Quad)]),
+    (Fsubr64, "fsubr", 0xDC, [RControlBits(5), ModRMReal(Quad)]),
+    (Fdiv64, "fdiv", 0xDC, [RControlBits(6), ModRMReal(Quad)]),
+    (Fdivr64, "fdivr",0xDC, [RControlBits(7), ModRMReal(Quad)]),
+    (LoopNz, "loopnz", 0xE0, [CRegGeneral, Rel(8)]),
+    (LoopZ, "loopz", 0xE1, [CRegGeneral, Rel(8)]),
+    (Loop, "loop", 0xE2, [CRegGeneral, Rel(8)]),
+    (Jcxz, "jcxz", 0xE3, [CRegGeneral, Rel(8)]),
+    (InImm8, "in", 0xE4, [AReg(Byte), Imm(8)]),
+    (InImm, "in", 0xE5, [ARegGeneral, Imm(8)]),
+    (OutImm8, "out", 0xE6, [AReg(Byte),Imm(8)]),
+    (OutImm, "out", 0xE7, [ARegGeneral, Imm(8)]),
+    (Call, "call", 0xE8, [RelGeneral]),
+    (Jmp, "jmp", 0xE9, [RelGeneral]),
+    (Jmpf, "jmpf", 0xEA, [Seg, RelGeneral]),
+    (Jmp8, "jmp", 0xEB, [Rel(8)]),
+    (In8, "in", 0xEC, [AReg(Byte), DReg(Word)]),
+    (In, "in", 0xED, [ARegGeneral, DReg(Word)]),
+    (Out8, "out", 0xEE, [AReg(Byte), DReg(Word)]),
+    (Out, "out", 0xEF, [ARegGeneral, DReg(Word)]),
+    (Int1, "int1", 0xF1, []),
+    (Hlt, "hlt", 0xF4, []),
+    (Cmc, "cmc", 0xF5, []),
+    (TestImm8, "test", 0xF6, [RControlBits(0), ModRM(Byte), Imm(8)]),
+    (TestImm82, "test", 0xF6, [RControlBits(0), ModRM(Byte), Imm(8)]),
+    (Not8, "not", 0xF6, [RControlBits(2), ModRM(Byte)]),
+    (Neg8, "neg", 0xF6, [RControlBits(3), ModRM(Byte)]),
+    (MulAl8, "mul",0xF6, [RControlBits(4), ModRM(Byte)]),
+    (IMulAl8, "imul", 0xF6, [RControlBits(5), ModRM(Byte)]),
+    (DivAx8, "div", 0xF6, [RControlBits(6), ModRM(Byte)]),
+    (IDivAx8, "idiv", 0xF6, [RControlBits(7), ModRM(Byte)]),
+    (TestImm, "test", 0xF7, [RControlBits(0), ModRMGeneral, ImmGeneral]),
+    (TestImm2, "test", 0xF7, [RControlBits(0), ModRMGeneral, ImmGeneral]),
+    (Not, "not", 0xF7, [RControlBits(2), ModRMGeneral]),
+    (Neg, "neg", 0xF7, [RControlBits(3), ModRMGeneral]),
+    (MulAreg, "mul",0xF7, [RControlBits(4), ARegGeneral, DRegGeneral, ModRMGeneral]),
+    (IMulAreg, "imul", 0xF7, [RControlBits(5), ARegGeneral, DRegGeneral, ModRMGeneral]),
+    (Div, "div", 0xF7, [RControlBits(6), ARegGeneral, DRegGeneral, ModRMGeneral]),
+    (IDiv, "idiv", 0xF7, [RControlBits(7), ARegGeneral, DRegGeneral, ModRMGeneral]),
+    (Clc, "clc", 0xF8, []),
+    (Stc, "stc", 0xF9, []),
+    (Cli, "cli", 0xFA, []),
+    (Sti, "sti", 0xFB, []),
+    (Cld, "cld", 0xFC, []),
+    (Std, "std", 0xFD, []),
+    (Inc8, "inc", 0xFE, [RControlBits(0), ModRM(Byte)]),
+    (Dec8, "dec", 0xFE, [RControlBits(1), ModRM(Byte)]),
+    (Inc, "inc", 0xFF, [RControlBits(0), ModRMGeneral]),
+    (Dec, "dec", 0xFF, [RControlBits(1), ModRMGeneral]),
+    (CallInd, "call", 0xFF, [RControlBits(2), ModRMGeneral]),
+    (Callf, "callf", 0xFF, [RControlBits(3), ModRMMem]),
+    (JmpInd, "jmp", 0xFF, [RControlBits(4), ModRMGeneral]),
+    (JmpfInd, "jmp", 0xFF, [RControlBits(5), ModRMMem]),
+    (PushRM, "push", 0xFF, [RControlBits(6), ModRMMode])
+
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
