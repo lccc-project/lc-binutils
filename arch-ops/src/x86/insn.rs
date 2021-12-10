@@ -534,7 +534,8 @@ define_x86_instructions! {
     (Callf, "callf", 0xFF, [RControlBits(3), ModRMMem]),
     (JmpInd, "jmp", 0xFF, [RControlBits(4), ModRMGeneral]),
     (JmpfInd, "jmp", 0xFF, [RControlBits(5), ModRMMem]),
-    (PushRM, "push", 0xFF, [RControlBits(6), ModRMMode])
+    (PushRM, "push", 0xFF, [RControlBits(6), ModRMMode]),
+    (Ud2, "ud2", 0x0F0B, []),
 
 }
 
@@ -587,17 +588,45 @@ pub struct X86Instruction {
 }
 
 impl X86Instruction {
-    pub fn new(opc: X86Opcode, operands: Vec<X86Operand>) -> Self {
+    pub const fn new(opc: X86Opcode, operands: Vec<X86Operand>) -> Self {
         Self { opc, operands }
     }
 
-    pub fn opcode(&self) -> X86Opcode {
+    pub const fn opcode(&self) -> X86Opcode {
         self.opc
     }
 
     pub fn operands(&self) -> &[X86Operand] {
         &self.operands
     }
+}
+
+macro_rules! zop_insns{
+    [$($name:ident),* $(,)?] => {
+        #[allow(non_upper_case_globals)]
+        impl X86Instruction{
+            $(pub const $name: X86Instruction = X86Instruction::new(X86Opcode:: $name, Vec::new());)*
+        }
+    }
+}
+
+zop_insns! {
+    Nop90,
+    Retn,
+    Leave,
+    Retf,
+    IRet,
+    Fneni,
+    Fndisi,
+    Hlt,
+    Cmc,
+    Clc,
+    Stc,
+    Cli,
+    Sti,
+    Cld,
+    Std,
+    Ud2,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
