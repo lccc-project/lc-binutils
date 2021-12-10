@@ -762,7 +762,84 @@ impl<W: InsnWrite> X86Encoder<W> {
                 opcode[len - 1] += reg.regnum() % 7;
                 self.writer.write_all(&opcode)
             }
-            _ => panic!(),
+            [OpRegGeneral, ImmGeneral] => {
+                assert_eq!(insn.operands.len(), 2);
+                let reg = match insn.operands()[0] {
+                    X86Operand::Register(reg) => reg,
+                    _ => panic!(),
+                };
+
+                let imm = match insn.operands()[0] {
+                    X86Operand::Immediate(val) => val,
+                    _ => panic!(), // TODO: We should support addresses here as well
+                };
+
+                let mut rex = None;
+                let mut immsz = 4;
+                if matches!(reg.class(), X86RegisterClass::Word) {
+                    immsz = 2;
+                    if matches!(reg.class(), X86RegisterClass::Word) {
+                        self.writer.write_all(&[0x66])?; // 16-bit operand override
+                    }
+                } else if matches!(reg.class(), X86RegisterClass::Quad) {
+                    rex = Some(0x48); // rex.w
+                }
+                if reg.regnum() >= 8 {
+                    rex = if let Some(rex) = rex {
+                        Some(rex | 0x01)
+                    } else {
+                        Some(0x41)
+                    }
+                }
+                if let Some(rex) = rex {
+                    self.writer.write_all(&[rex])?;
+                }
+                let len = opcode.len();
+                opcode[len - 1] += reg.regnum() % 7;
+                self.writer.write_all(&opcode)?;
+                let bytes = imm.to_le_bytes();
+                self.writer.write_all(&bytes[..immsz])
+            }
+            [OpRegGeneral, ImmGeneralWide] => {
+                assert_eq!(insn.operands.len(), 2);
+                let reg = match insn.operands()[0] {
+                    X86Operand::Register(reg) => reg,
+                    _ => panic!(),
+                };
+
+                let imm = match insn.operands()[1] {
+                    X86Operand::Immediate(val) => val,
+                    _ => panic!(), // TODO: We should support addresses here as well
+                };
+
+                let mut rex = None;
+                let mut immsz = 4;
+                if matches!(reg.class(), X86RegisterClass::Word) {
+                    immsz = 2;
+                    if matches!(reg.class(), X86RegisterClass::Word) {
+                        self.writer.write_all(&[0x66])?; // 16-bit operand override
+                    }
+                } else if matches!(reg.class(), X86RegisterClass::Quad) {
+                    immsz = 8;
+                    rex = Some(0x48); // rex.w
+                }
+                if reg.regnum() >= 8 {
+                    rex = if let Some(rex) = rex {
+                        Some(rex | 0x01)
+                    } else {
+                        Some(0x41)
+                    }
+                }
+                if let Some(rex) = rex {
+                    self.writer.write_all(&[rex])?;
+                }
+                let len = opcode.len();
+                opcode[len - 1] += reg.regnum() % 7;
+                self.writer.write_all(&opcode)?;
+                let bytes = imm.to_le_bytes();
+                self.writer.write_all(&bytes[..immsz])
+            }
+            m => panic!("Unsupported Addressing Mode {:?}", m),
         }
     }
 }
