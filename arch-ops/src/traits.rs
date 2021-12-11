@@ -5,6 +5,7 @@ pub enum Address {
     Abs(u128),
     Disp(i64),
     Symbol { name: String, disp: i64 },
+    PltSym { name: String },
 }
 
 pub trait InsnRead: Read {

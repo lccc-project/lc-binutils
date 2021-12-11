@@ -579,6 +579,8 @@ pub enum X86Operand {
     Register(X86Register),
     ModRM(ModRM),
     Immediate(u64),
+    RelAddr(Address),
+    AbsAddr(Address),
 }
 
 #[derive(Clone, Debug)]
