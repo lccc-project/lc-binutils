@@ -35,6 +35,7 @@ impl Binfmt for Binary {
             content: vec,
             name: ".data".to_string(),
             ty: SectionType::ProgBits,
+            relocs: Vec::new(),
             __private: (),
         });
 

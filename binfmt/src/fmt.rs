@@ -252,12 +252,56 @@ pub struct Section {
     pub align: usize,
     pub ty: SectionType,
     pub content: Vec<u8>,
+    pub relocs: Vec<Reloc>,
     pub __private: (),
 }
 
 impl InsnWrite for Section {
-    fn write_addr(&mut self, _size: usize, _addr: Address, _rel: bool) -> std::io::Result<()> {
-        todo!()
+    fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
+        match (addr, rel) {
+            (Address::Abs(_), true) => todo!(),
+            (Address::Abs(val), false) => {
+                let bytes = val.to_le_bytes();
+                self.content.extend_from_slice(&bytes[..size]);
+                Ok(())
+            }
+            (Address::Disp(disp), true) => {
+                let bytes = disp.to_le_bytes();
+                self.content.extend_from_slice(&bytes[..size]);
+                Ok(())
+            }
+            (Address::Disp(_), false) => todo!(),
+            (Address::Symbol { name, disp }, true) => {
+                let bytes = disp.to_le_bytes();
+                let code = RelocCode::Rel { addr_width: size };
+                let offset = self.content.len() as u64;
+                self.content.extend_from_slice(&bytes[..size]);
+                self.relocs.push(Reloc {
+                    code,
+                    symbol: name,
+                    addend: Some(disp as u64),
+                    segno: None, // fill this when collecting this into the BinaryFile
+                    offset,
+                });
+                Ok(())
+            }
+            (Address::Symbol { name: _, disp: _ }, false) => todo!(),
+            (Address::PltSym { name }, true) => {
+                let bytes = 0u64.to_le_bytes();
+                let code = RelocCode::RelPlt { addr_width: size };
+                let offset = self.content.len() as u64;
+                self.content.extend_from_slice(&bytes[..size]);
+                self.relocs.push(Reloc {
+                    code,
+                    symbol: name,
+                    addend: None,
+                    segno: None, // fill this when collecting this into the BinaryFile
+                    offset,
+                });
+                Ok(())
+            }
+            (Address::PltSym { name: _ }, false) => todo!(),
+        }
     }
 }
 

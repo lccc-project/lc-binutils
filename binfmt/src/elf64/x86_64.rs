@@ -77,11 +77,30 @@ impl HowTo for Elf64X86_64HowTo {
             .unwrap_or(None)
     }
 
-    fn from_reloc_code<'a>(_code: RelocCode) -> Option<&'a Self>
+    fn from_reloc_code<'a>(code: RelocCode) -> Option<&'a Self>
     where
         Self: Sized + 'a,
     {
-        todo!()
+        match code {
+            RelocCode::None => howtos::RELOCS[0].as_ref(),
+            RelocCode::Abs { addr_width: _ } => todo!(),
+            RelocCode::BaseRel { addr_width: _ } => todo!(),
+            RelocCode::Rel { addr_width: 32 } => howtos::RELOCS[2].as_ref(),
+            RelocCode::AbsShifted {
+                addr_width: _,
+                shift: _,
+            } => todo!(),
+            RelocCode::RelShifted {
+                addr_width: _,
+                shift: _,
+            } => todo!(),
+            RelocCode::Got { addr_width: _ } => todo!(),
+            RelocCode::RelGot { addr_wdith: _ } => todo!(),
+            RelocCode::Plt { addr_width: _ } => todo!(),
+            RelocCode::RelPlt { addr_width: 32 } => howtos::RELOCS[4].as_ref(),
+            RelocCode::DynSymEntry { width: _ } => todo!(),
+            _ => None,
+        }
     }
 
     fn reloc_num(&self) -> u32 {

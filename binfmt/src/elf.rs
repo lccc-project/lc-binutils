@@ -1046,7 +1046,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_addralign: Class::Addr::from_usize(0),
             sh_entsize: Class::Size::from_usize(0),
         });
-        for section in bfile.sections() {
+        for (_i, section) in bfile.sections().enumerate() {
             shdrs.push(ElfSectionHeader::<Class> {
                 sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, &section.name)),
                 sh_type: match section.ty {
@@ -1068,6 +1068,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 sh_addralign: Class::Addr::from_usize(section.align),
                 sh_entsize: Class::Size::from_usize(0),
             });
+
+            for _rels in &section.relocs {
+                // TODO
+            }
             offset += section.content.len();
         }
         let mut symbols: Vec<Class::Symbol> = Vec::new();

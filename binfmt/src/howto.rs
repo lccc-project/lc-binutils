@@ -21,6 +21,7 @@ pub trait HowTo {
     fn apply(&self, addr: u128, at_addr: u128, region: &mut [u8]) -> Result<bool, HowToError>;
 }
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum RelocCode {
     None,
     Abs { addr_width: usize },
@@ -42,6 +43,7 @@ pub enum RelocCode {
     W65RelaxJmp,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Reloc {
     pub code: RelocCode,
     pub symbol: String,
