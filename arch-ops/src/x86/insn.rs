@@ -557,20 +557,9 @@ pub enum ModRMRegOrSib {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ModRM {
-    Indirect {
-        reg: u8,
-        mode: ModRMRegOrSib,
-    },
-    IndirectDisp8 {
-        reg: u8,
-        mode: ModRMRegOrSib,
-        disp8: i8,
-    },
-    IndirectDisp32 {
-        reg: u8,
-        mode: ModRMRegOrSib,
-        disp32: i32,
-    },
+    Indirect { mode: ModRMRegOrSib },
+    IndirectDisp8 { mode: ModRMRegOrSib, disp8: i8 },
+    IndirectDisp32 { mode: ModRMRegOrSib, disp32: i32 },
     Direct(X86Register),
 }
 
@@ -869,6 +858,55 @@ impl<W: InsnWrite> X86Encoder<W> {
                 self.writer.write_all(&opcode)?;
                 let bytes = imm.to_le_bytes();
                 self.writer.write_all(&bytes[..immsz])
+            }
+            [RegGeneral, ModRMGeneral] => {
+                assert_eq!(insn.operands.len(), 2);
+                let mut short = false;
+                let b = match insn.operands()[1] {
+                    X86Operand::ModRM(ModRM::Direct(reg)) => reg.regnum() >= 8,
+                    X86Operand::ModRM(ModRM::Indirect { .. }) => false,
+                    _ => todo!(),
+                };
+                let mut rex = b;
+                let (r, w, reg) = match insn.operands()[0] {
+                    X86Operand::Register(reg) => {
+                        if matches!(reg.class(), X86RegisterClass::Word) {
+                            short = true;
+                        }
+                        (
+                            reg.regnum() >= 8,
+                            matches!(reg.class(), X86RegisterClass::Quad),
+                            reg.regnum() % 7,
+                        )
+                    }
+                    _ => todo!(),
+                };
+                if r || w {
+                    rex = true;
+                }
+                if short {
+                    self.writer.write_all(&[0x66])?;
+                }
+                if rex {
+                    let rex = 0x40
+                        | if b { 0x01 } else { 0x00 }
+                        | if r { 0x04 } else { 0x00 }
+                        | if w { 0x08 } else { 0x00 };
+                    self.writer.write_all(&[rex])?;
+                }
+                self.writer.write_all(&opcode)?;
+                match &insn.operands()[1] {
+                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
+                        self.writer.write_all(&[0xC0 + (reg << 3) + regrm.regnum()])
+                    }
+                    X86Operand::ModRM(ModRM::Indirect {
+                        mode: ModRMRegOrSib::RipRel(addr),
+                    }) => {
+                        self.writer.write_all(&[(reg << 3) + 0x05])?;
+                        self.writer.write_addr(4, addr.clone(), true)
+                    }
+                    _ => todo!(),
+                }
             }
             m => panic!("Unsupported Addressing Mode {:?}", m),
         }
