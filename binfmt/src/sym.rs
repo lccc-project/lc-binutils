@@ -69,7 +69,7 @@ pub enum SymbolType {
     FormatSpecific(u32),
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SymbolKind {
     Local,
     Global,

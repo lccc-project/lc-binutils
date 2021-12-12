@@ -1075,6 +1075,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             offset += section.content.len();
         }
         let mut new_symbol_list: Vec<_> = bfile.symbols().cloned().collect();
+        new_symbol_list.sort_by(|s1, s2| s1.kind().cmp(&s2.kind()));
         let mut num_reloc_sections = 0;
         for section in bfile.sections() {
             if section.relocs.len() != 0 {
