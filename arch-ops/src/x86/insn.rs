@@ -908,6 +908,14 @@ impl<W: InsnWrite> X86Encoder<W> {
                     _ => todo!(),
                 }
             }
+            [RelGeneral] => {
+                assert!(insn.operands().len() == 1);
+                self.writer.write_all(&opcode)?;
+                match &insn.operands()[0] {
+                    X86Operand::RelAddr(addr) => self.writer.write_addr(4, addr.clone(), true),
+                    _ => todo!(),
+                }
+            }
             m => panic!("Unsupported Addressing Mode {:?}", m),
         }
     }

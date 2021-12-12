@@ -279,8 +279,7 @@ impl InsnWrite for Section {
                 self.relocs.push(Reloc {
                     code,
                     symbol: name,
-                    addend: Some(disp as u64),
-                    segno: None, // fill this when collecting this into the BinaryFile
+                    addend: Some(disp as i64),
                     offset,
                 });
                 Ok(())
@@ -295,7 +294,6 @@ impl InsnWrite for Section {
                     code,
                     symbol: name,
                     addend: None,
-                    segno: None, // fill this when collecting this into the BinaryFile
                     offset,
                 });
                 Ok(())

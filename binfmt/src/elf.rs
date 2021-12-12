@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::ErrorKind;
@@ -1014,11 +1015,11 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
     ) -> std::io::Result<()> {
         let mut shstrtab = (Vec::new(), HashMap::new());
         fn add_to_strtab<'a>(
-            strtab: &mut (Vec<u8>, HashMap<&'a str, usize>),
-            string: &'a str,
+            strtab: &mut (Vec<u8>, HashMap<Cow<'a, str>, usize>),
+            string: Cow<'a, str>,
         ) -> usize {
-            if strtab.1.contains_key(string) {
-                strtab.1[string]
+            if strtab.1.contains_key(&string) {
+                strtab.1[&string]
             } else {
                 let addr = strtab.0.len();
                 strtab.0.append(&mut Vec::from(string.as_bytes()));
@@ -1035,7 +1036,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                     .phdrs
                     .len();
         shdrs.push(ElfSectionHeader::<Class> {
-            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, "")),
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, "".into())),
             sh_type: consts::SHT_NULL,
             sh_flags: Class::Offset::from_usize(0),
             sh_addr: Class::Addr::from_usize(0),
@@ -1046,9 +1047,12 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_addralign: Class::Addr::from_usize(0),
             sh_entsize: Class::Size::from_usize(0),
         });
-        for (_i, section) in bfile.sections().enumerate() {
+        for section in bfile.sections() {
             shdrs.push(ElfSectionHeader::<Class> {
-                sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, &section.name)),
+                sh_name: Class::Word::from_usize(add_to_strtab(
+                    &mut shstrtab,
+                    (&section.name).into(),
+                )),
                 sh_type: match section.ty {
                     SectionType::NoBits => consts::SHT_NOBITS,
                     SectionType::ProgBits => consts::SHT_PROGBITS,
@@ -1068,16 +1072,12 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 sh_addralign: Class::Addr::from_usize(section.align),
                 sh_entsize: Class::Size::from_usize(0),
             });
-
-            for _rels in &section.relocs {
-                // TODO
-            }
             offset += section.content.len();
         }
         let mut symbols: Vec<Class::Symbol> = Vec::new();
         let mut strtab = (Vec::new(), HashMap::new());
         symbols.push(Class::new_sym(
-            Class::Word::from_usize(add_to_strtab(&mut strtab, "")),
+            Class::Word::from_usize(add_to_strtab(&mut strtab, "".into())),
             Class::Addr::from_usize(0),
             Class::Size::from_usize(0),
             0,
@@ -1087,7 +1087,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         let mut local_syms = 1; // Includes null symbol
         for sym in bfile.symbols() {
             symbols.push(Class::new_sym(
-                Class::Word::from_usize(add_to_strtab(&mut strtab, sym.name())),
+                Class::Word::from_usize(add_to_strtab(&mut strtab, sym.name().into())),
                 Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
                 Class::Size::from_usize(0usize),
                 (match sym.kind() {
@@ -1113,22 +1113,68 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 Class::Half::from_usize(sym.section().map_or(0, |x| x as usize + 1)),
             ));
         }
+        let mut num_reloc_sections = 0;
+        for section in bfile.sections() {
+            if section.relocs.len() != 0 {
+                num_reloc_sections += 1;
+            }
+        }
         let symbols_sec: Vec<u8> = Vec::from(bytemuck::cast_slice(&symbols));
+        let symbols_sec_id = shdrs.len();
         shdrs.push(ElfSectionHeader::<Class> {
-            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".symtab")),
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".symtab".into())),
             sh_type: consts::SHT_SYMTAB,
             sh_flags: Class::Offset::from_usize(0),
             sh_addr: Class::Addr::from_usize(0),
             sh_offset: Class::Offset::from_usize(offset),
             sh_size: Class::Size::from_usize(symbols_sec.len()),
-            sh_link: Class::Word::from_usize(shdrs.len() + 1),
+            sh_link: Class::Word::from_usize(shdrs.len() + 1 + num_reloc_sections),
             sh_info: Class::Word::from_usize(local_syms),
             sh_addralign: Class::Addr::from_usize(8),
             sh_entsize: Class::Size::from_usize(24),
         });
         offset += symbols_sec.len();
+        let mut all_relocs: Vec<u8> = Vec::new();
+        for (i, section) in bfile.sections().enumerate() {
+            if section.relocs.len() != 0 {
+                let mut relocs = Vec::new();
+                for reloc in &section.relocs {
+                    relocs.push(ElfRela::<Class> {
+                        r_offset: Class::Addr::from_usize(reloc.offset as usize),
+                        r_info: Class::Size::from_usize(
+                            (bfile
+                                .symbols()
+                                .position(|x| x.name() == reloc.symbol)
+                                .unwrap()
+                                << 8)
+                                + Howto::from_reloc_code(reloc.code).unwrap().reloc_num() as usize,
+                        ),
+                        r_addend: Class::Offset::from_usize(reloc.addend.map_or(0, |x| x as usize)),
+                    });
+                }
+                let mut relocs = Vec::from(bytemuck::cast_slice(&relocs));
+                let target_section = i + 1;
+                shdrs.push(ElfSectionHeader::<Class> {
+                    sh_name: Class::Word::from_usize(add_to_strtab(
+                        &mut shstrtab,
+                        (".rela".to_string() + &section.name).into(),
+                    )),
+                    sh_type: consts::SHT_RELA,
+                    sh_flags: Class::Offset::from_usize(7),
+                    sh_addr: Class::Addr::from_usize(0),
+                    sh_offset: Class::Offset::from_usize(offset),
+                    sh_size: Class::Size::from_usize(relocs.len()),
+                    sh_link: Class::Word::from_usize(symbols_sec_id),
+                    sh_info: Class::Word::from_usize(target_section),
+                    sh_addralign: Class::Addr::from_usize(8),
+                    sh_entsize: Class::Size::from_usize(24),
+                });
+                offset += relocs.len();
+                all_relocs.append(&mut relocs);
+            }
+        }
         shdrs.push(ElfSectionHeader::<Class> {
-            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".strtab")),
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".strtab".into())),
             sh_type: consts::SHT_STRTAB,
             sh_flags: Class::Offset::from_usize(0),
             sh_addr: Class::Addr::from_usize(0),
@@ -1141,7 +1187,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         });
         offset += strtab.0.len();
         shdrs.push(ElfSectionHeader::<Class> {
-            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".shstrtab")),
+            sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".shstrtab".into())),
             sh_type: consts::SHT_STRTAB,
             sh_flags: Class::Offset::from_usize(0),
             sh_addr: Class::Addr::from_usize(0),
@@ -1166,6 +1212,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             file.write_all(&section.content)?;
         }
         file.write_all(&symbols_sec)?;
+        file.write_all(&all_relocs)?;
         file.write_all(&strtab.0)?;
         file.write_all(&shstrtab.0)?;
         file.write_all(bytemuck::cast_slice(&shdrs))?;

@@ -47,7 +47,6 @@ pub enum RelocCode {
 pub struct Reloc {
     pub code: RelocCode,
     pub symbol: String,
-    pub addend: Option<u64>,
-    pub segno: Option<u32>,
+    pub addend: Option<i64>,
     pub offset: u64,
 }
