@@ -1109,7 +1109,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         let mut local_syms = 1; // Includes null symbol
         for sym in &new_symbol_list {
             symbols.push(Class::new_sym(
-                Class::Word::from_usize(add_to_strtab(&mut strtab, String::from(sym.name()).into())),
+                Class::Word::from_usize(add_to_strtab(
+                    &mut strtab,
+                    String::from(sym.name()).into(),
+                )),
                 Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
                 Class::Size::from_usize(0usize),
                 (match sym.kind() {
