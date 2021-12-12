@@ -706,7 +706,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         if matches!(reg.class(), X86RegisterClass::ByteRex) {
                             rex = true;
                         }
-                        (reg.regnum() >= 8, reg.regnum() % 7)
+                        (reg.regnum() >= 8, reg.regnum() & 7)
                     }
                     _ => todo!(),
                 };
@@ -742,7 +742,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                 };
                 let mut rex = b || w;
                 let (r, reg) = match insn.operands()[1] {
-                    X86Operand::Register(reg) => (reg.regnum() >= 8, reg.regnum() % 7),
+                    X86Operand::Register(reg) => (reg.regnum() >= 8, reg.regnum() & 7),
                     _ => todo!(),
                 };
                 if r {
@@ -779,7 +779,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                     self.writer.write_all(&[0x41])?; // REX.B
                 }
                 let len = opcode.len();
-                opcode[len - 1] += reg.regnum() % 7;
+                opcode[len - 1] += reg.regnum() & 7;
                 self.writer.write_all(&opcode)
             }
             [OpRegGeneral, ImmGeneral] => {
@@ -815,7 +815,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                     self.writer.write_all(&[rex])?;
                 }
                 let len = opcode.len();
-                opcode[len - 1] += reg.regnum() % 7;
+                opcode[len - 1] += reg.regnum() & 7;
                 self.writer.write_all(&opcode)?;
                 let bytes = imm.to_le_bytes();
                 self.writer.write_all(&bytes[..immsz])
@@ -854,7 +854,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                     self.writer.write_all(&[rex])?;
                 }
                 let len = opcode.len();
-                opcode[len - 1] += reg.regnum() % 7;
+                opcode[len - 1] += reg.regnum() & 7;
                 self.writer.write_all(&opcode)?;
                 let bytes = imm.to_le_bytes();
                 self.writer.write_all(&bytes[..immsz])
@@ -876,7 +876,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         (
                             reg.regnum() >= 8,
                             matches!(reg.class(), X86RegisterClass::Quad),
-                            reg.regnum() % 7,
+                            reg.regnum() & 7,
                         )
                     }
                     _ => todo!(),
