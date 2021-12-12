@@ -1162,7 +1162,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                                 .iter()
                                 .position(|x| x.name() == reloc.symbol)
                                 .unwrap()
-                                << 8)
+                                << 32)
                                 + Howto::from_reloc_code(reloc.code).unwrap().reloc_num() as usize,
                         ),
                         r_addend: Class::Offset::from_usize(reloc.addend.map_or(0, |x| x as usize)),
