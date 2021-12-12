@@ -104,7 +104,35 @@ impl HowTo for Elf64X86_64HowTo {
     }
 
     fn reloc_num(&self) -> u32 {
-        todo!()
+        match self {
+            Elf64X86_64HowTo::None => 0,
+            Elf64X86_64HowTo::Abs64 => 1,
+            Elf64X86_64HowTo::Pc32 => 2,
+            Elf64X86_64HowTo::Got32 => 3,
+            Elf64X86_64HowTo::Plt32 => 4,
+            Elf64X86_64HowTo::Copy => 5,
+            Elf64X86_64HowTo::GlobDat => 6,
+            Elf64X86_64HowTo::JumpSlot => 7,
+            Elf64X86_64HowTo::Rel64 => 8,
+            Elf64X86_64HowTo::GotPcRel => 9,
+            Elf64X86_64HowTo::Abs32 => 10,
+            Elf64X86_64HowTo::Abs32S => 11,
+            Elf64X86_64HowTo::Abs16 => 12,
+            Elf64X86_64HowTo::Pc16 => 13,
+            Elf64X86_64HowTo::Abs8 => 14,
+            Elf64X86_64HowTo::Pc8 => 15,
+            Elf64X86_64HowTo::DptMod64 => todo!(),
+            Elf64X86_64HowTo::DtpOff64 => todo!(),
+            Elf64X86_64HowTo::TpOff64 => todo!(),
+            Elf64X86_64HowTo::TlsGd => todo!(),
+            Elf64X86_64HowTo::TlsLd => todo!(),
+            Elf64X86_64HowTo::DtpOff32 => todo!(),
+            Elf64X86_64HowTo::GotTpOff => todo!(),
+            Elf64X86_64HowTo::TpOff32 => todo!(),
+            Elf64X86_64HowTo::Pc64 => todo!(),
+            Elf64X86_64HowTo::GotOff64 => 24,
+            Elf64X86_64HowTo::GotPc32 => 25,
+        }
     }
 
     fn name(&self) -> &'static str {
