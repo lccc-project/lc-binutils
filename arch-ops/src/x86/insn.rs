@@ -903,7 +903,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         mode: ModRMRegOrSib::RipRel(addr),
                     }) => {
                         self.writer.write_all(&[(reg << 3) + 0x05])?;
-                        self.writer.write_addr(4, addr.clone(), true)
+                        self.writer.write_addr(32, addr.clone(), true)
                     }
                     _ => todo!(),
                 }
@@ -912,7 +912,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                 assert!(insn.operands().len() == 1);
                 self.writer.write_all(&opcode)?;
                 match &insn.operands()[0] {
-                    X86Operand::RelAddr(addr) => self.writer.write_addr(4, addr.clone(), true),
+                    X86Operand::RelAddr(addr) => self.writer.write_addr(32, addr.clone(), true),
                     _ => todo!(),
                 }
             }

@@ -262,12 +262,12 @@ impl InsnWrite for Section {
             (Address::Abs(_), true) => todo!(),
             (Address::Abs(val), false) => {
                 let bytes = val.to_le_bytes();
-                self.content.extend_from_slice(&bytes[..size]);
+                self.content.extend_from_slice(&bytes[..(size / 8)]);
                 Ok(())
             }
             (Address::Disp(disp), true) => {
                 let bytes = disp.to_le_bytes();
-                self.content.extend_from_slice(&bytes[..size]);
+                self.content.extend_from_slice(&bytes[..(size / 8)]);
                 Ok(())
             }
             (Address::Disp(_), false) => todo!(),
@@ -275,7 +275,7 @@ impl InsnWrite for Section {
                 let bytes = disp.to_le_bytes();
                 let code = RelocCode::Rel { addr_width: size };
                 let offset = self.content.len() as u64;
-                self.content.extend_from_slice(&bytes[..size]);
+                self.content.extend_from_slice(&bytes[..(size / 8)]);
                 self.relocs.push(Reloc {
                     code,
                     symbol: name,
@@ -289,7 +289,7 @@ impl InsnWrite for Section {
                 let bytes = 0u64.to_le_bytes();
                 let code = RelocCode::RelPlt { addr_width: size };
                 let offset = self.content.len() as u64;
-                self.content.extend_from_slice(&bytes[..size]);
+                self.content.extend_from_slice(&bytes[..(size / 8)]);
                 self.relocs.push(Reloc {
                     code,
                     symbol: name,
