@@ -1074,6 +1074,28 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             });
             offset += section.content.len();
         }
+        let mut new_symbol_list: Vec<_> = bfile.symbols().cloned().collect();
+        let mut num_reloc_sections = 0;
+        for section in bfile.sections() {
+            if section.relocs.len() != 0 {
+                num_reloc_sections += 1;
+                for reloc in &section.relocs {
+                    if new_symbol_list
+                        .iter()
+                        .position(|x| x.name() == reloc.symbol)
+                        .is_none()
+                    {
+                        new_symbol_list.push(crate::sym::Symbol::new(
+                            reloc.symbol.clone(),
+                            None,
+                            None,
+                            SymbolType::Null,
+                            SymbolKind::Global,
+                        ));
+                    }
+                }
+            }
+        }
         let mut symbols: Vec<Class::Symbol> = Vec::new();
         let mut strtab = (Vec::new(), HashMap::new());
         symbols.push(Class::new_sym(
@@ -1085,9 +1107,9 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             Class::Half::from_usize(0),
         ));
         let mut local_syms = 1; // Includes null symbol
-        for sym in bfile.symbols() {
+        for sym in &new_symbol_list {
             symbols.push(Class::new_sym(
-                Class::Word::from_usize(add_to_strtab(&mut strtab, sym.name().into())),
+                Class::Word::from_usize(add_to_strtab(&mut strtab, String::from(sym.name()).into())),
                 Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
                 Class::Size::from_usize(0usize),
                 (match sym.kind() {
@@ -1113,12 +1135,6 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 Class::Half::from_usize(sym.section().map_or(0, |x| x as usize + 1)),
             ));
         }
-        let mut num_reloc_sections = 0;
-        for section in bfile.sections() {
-            if section.relocs.len() != 0 {
-                num_reloc_sections += 1;
-            }
-        }
         let symbols_sec: Vec<u8> = Vec::from(bytemuck::cast_slice(&symbols));
         let symbols_sec_id = shdrs.len();
         shdrs.push(ElfSectionHeader::<Class> {
@@ -1142,8 +1158,8 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                     relocs.push(ElfRela::<Class> {
                         r_offset: Class::Addr::from_usize(reloc.offset as usize),
                         r_info: Class::Size::from_usize(
-                            (bfile
-                                .symbols()
+                            (new_symbol_list
+                                .iter()
                                 .position(|x| x.name() == reloc.symbol)
                                 .unwrap()
                                 << 8)
