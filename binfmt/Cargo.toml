@@ -10,7 +10,7 @@ edition = "2018"
 static_assertions = "1.1.0"
 bytemuck = {version="1.5.1",features=["derive"]}
 lazy_static = "1.4.0"
-target-tuples = "0.5"
+target-tuples = "0.5.2"
 fake-enum = "0.1.4"
 arch-ops = {path="../arch-ops"}
 
