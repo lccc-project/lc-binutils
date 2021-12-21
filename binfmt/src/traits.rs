@@ -41,7 +41,9 @@ pub trait Numeric:
     fn max() -> Self;
     fn as_usize(self) -> usize;
     fn from_usize(x: usize) -> Self;
+    #[must_use]
     fn from_be(self) -> Self;
+    #[must_use]
     fn from_le(self) -> Self;
 }
 
