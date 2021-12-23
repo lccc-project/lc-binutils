@@ -46,6 +46,24 @@ pub enum X86Mode {
     Long,
 }
 
+impl X86Mode {
+    pub fn default_mode_for(target: &Target) -> Option<X86Mode> {
+        match target.arch() {
+            target_tuples::Architecture::I86 => Some(X86Mode::Real),
+            target_tuples::Architecture::I8086 => Some(X86Mode::Real),
+            target_tuples::Architecture::I086 => Some(X86Mode::Real),
+            target_tuples::Architecture::I186 => Some(X86Mode::Real),
+            target_tuples::Architecture::I286 => Some(X86Mode::Real),
+            target_tuples::Architecture::I386 => Some(X86Mode::Protected),
+            target_tuples::Architecture::I486 => Some(X86Mode::Protected),
+            target_tuples::Architecture::I586 => Some(X86Mode::Protected),
+            target_tuples::Architecture::I686 => Some(X86Mode::Protected),
+            target_tuples::Architecture::X86_64 => Some(X86Mode::Long),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum X86OperandType {
     /// The Mod and R/M portions of a ModR/M byte (potentially with a trailing SIB byte)
@@ -176,6 +194,7 @@ macro_rules! define_x86_instructions{
     }
 }
 
+use target_tuples::Target;
 use X86OperandType::*;
 use X86RegisterClass::*;
 
