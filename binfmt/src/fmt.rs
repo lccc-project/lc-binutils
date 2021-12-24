@@ -12,6 +12,7 @@ use crate::{
 
 use arch_ops::traits::{Address, InsnWrite};
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CallbackError {
     InvalidType,
     NotAccepted,

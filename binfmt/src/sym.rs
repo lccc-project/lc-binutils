@@ -48,6 +48,10 @@ impl Symbol {
         self.symtype
     }
 
+    pub fn symbol_type_mut(&mut self) -> &mut SymbolType {
+        &mut self.symtype
+    }
+
     pub fn kind(&self) -> SymbolKind {
         self.kind
     }
