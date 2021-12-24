@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::ErrorKind;
@@ -1018,14 +1019,14 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             strtab: &mut (Vec<u8>, HashMap<Cow<'a, str>, usize>),
             string: Cow<'a, str>,
         ) -> usize {
-            if strtab.1.contains_key(&string) {
-                strtab.1[&string]
-            } else {
+            if let Entry::Vacant(e) = strtab.1.entry(string.clone()) {
                 let addr = strtab.0.len();
                 strtab.0.append(&mut Vec::from(string.as_bytes()));
                 strtab.0.push(0);
-                strtab.1.insert(string, addr);
+                e.insert(addr);
                 addr
+            } else {
+                strtab.1[&string]
             }
         }
         let mut shdrs = Vec::new();
@@ -1075,17 +1076,13 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             offset += section.content.len();
         }
         let mut new_symbol_list: Vec<_> = bfile.symbols().cloned().collect();
-        new_symbol_list.sort_by(|s1, s2| s1.kind().cmp(&s2.kind()));
+        new_symbol_list.sort_by_key(|s1| s1.kind());
         let mut num_reloc_sections = 0;
         for section in bfile.sections() {
-            if section.relocs.len() != 0 {
+            if !section.relocs.is_empty() {
                 num_reloc_sections += 1;
                 for reloc in &section.relocs {
-                    if new_symbol_list
-                        .iter()
-                        .position(|x| x.name() == reloc.symbol)
-                        .is_none()
-                    {
+                    if !new_symbol_list.iter().any(|x| x.name() == reloc.symbol) {
                         new_symbol_list.push(crate::sym::Symbol::new(
                             reloc.symbol.clone(),
                             None,
@@ -1156,7 +1153,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         offset += symbols_sec.len();
         let mut all_relocs: Vec<u8> = Vec::new();
         for (i, section) in bfile.sections().enumerate() {
-            if section.relocs.len() != 0 {
+            if !section.relocs.is_empty() {
                 let mut relocs = Vec::new();
                 for reloc in &section.relocs {
                     relocs.push(ElfRela::<Class> {
