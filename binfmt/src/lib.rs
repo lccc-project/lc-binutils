@@ -95,6 +95,8 @@ use target_tuples::Target;
 define_formats![
     #[cfg(all(feature = "elf32", feature = "w65"))]
     elf32-w65,
+    #[cfg(all(feature = "elf32", feature = "x86"))]
+    elf32-x86_64,
     #[cfg(all(feature = "elf64", feature = "x86"))]
     elf64-x86_64,
     binary
@@ -118,6 +120,7 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
             w65-*-snes-elf => &*BINARY_FORMATS_BY_NAME["elf32-w65"],
             x86_64-*-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-gnu => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
+            x86_64-*-*-gnux32 => &*BINARY_FORMATS_BY_NAME["elf32-x86_64"],
             x86_64-*-*-musl => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-newlib => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-uclibc => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
