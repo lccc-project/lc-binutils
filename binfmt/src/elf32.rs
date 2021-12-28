@@ -4,6 +4,3 @@ pub use crate::elf::{consts, Elf32};
 
 #[cfg(feature = "w65")]
 pub mod w65;
-
-#[cfg(feature = "x86")]
-pub mod x86_64;

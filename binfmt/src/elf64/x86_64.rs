@@ -164,7 +164,7 @@ pub fn create_format() -> super::Elf64Format<Elf64X86_64HowTo> {
     super::Elf64Format::new(
         super::consts::EM_X86_64,
         consts::ELFDATA2LSB,
-        "elf64-x86_64",
+        "elf32-w65",
         None,
     )
 }
