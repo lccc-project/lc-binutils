@@ -20,10 +20,14 @@ impl<R: InsnRead> InsnRead for &mut R {
 
 pub trait InsnWrite: Write {
     fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()>;
+    fn offset(&self) -> usize;
 }
 
 impl<W: InsnWrite> InsnWrite for &mut W {
     fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
         <W as InsnWrite>::write_addr(self, size, addr, rel)
+    }
+    fn offset(&self) -> usize {
+        <W as InsnWrite>::offset(self)
     }
 }

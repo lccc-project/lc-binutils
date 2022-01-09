@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use crate::traits::{Address, InsnWrite};
 
 use super::{X86Register, X86RegisterClass};
@@ -667,6 +669,26 @@ impl<W> X86Encoder<W> {
 
     pub fn set_mode(&mut self, mode: X86Mode) {
         self.mode = mode
+    }
+}
+
+impl<W: Write> Write for X86Encoder<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.writer.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+impl<W: InsnWrite> InsnWrite for X86Encoder<W> {
+    fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
+        self.writer.write_addr(size, addr, rel)
+    }
+
+    fn offset(&self) -> usize {
+        self.writer.offset()
     }
 }
 

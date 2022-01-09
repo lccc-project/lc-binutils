@@ -302,6 +302,10 @@ impl InsnWrite for Section {
             (Address::PltSym { name: _ }, false) => todo!(),
         }
     }
+
+    fn offset(&self) -> usize {
+        self.content.len()
+    }
 }
 
 impl Write for Section {
