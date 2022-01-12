@@ -1,0 +1,119 @@
+# Makefile.in for arch-ops
+
+# Variables
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+libdir = @libdir@
+includedir = @includedir@
+sbindir = @sbindir@
+libexecdir = @libexecdir@
+datarootdir = @datarootdir@
+datadir = @datadir@
+mandir = @mandir@
+docdir = @docdir@
+infodir = @infodir@
+localedir = @localedir@
+sysconfdir = @sysconfdir@
+localstatedir = @localstatedir@
+runstatedir = @runstatedir@
+sharedstatedir = @sharedstatedir@
+
+builddir = @builddir@
+abs_builddir = @abs_builddir@
+
+host = @host@
+build = @build@
+
+
+CC = @CC@
+RUSTC = @RUSTC@
+CC_FOR_BUILD = @CC_FOR_BUILD@
+RUSTC_FOR_BUILD = @RUSTC_FOR_BUILD@
+
+CFLAGS = @CFLAGS@
+RUSTFLAGS = @RUSTFLAGS@
+CFLAGS_FOR_BUILD = @CFLAGS_FOR_BUILD@
+RUSTFLAGS_FOR_BUILD = @RUSTFLAGS_FOR_BUILD@
+
+INSTALL = @INSTALL@
+INSTALL_SCRIPT = @INSTALL_SCRIPT@
+INSTALL_PROGRAM = @INSTALL_PROGRAM@
+MKDIR_P = @MKDIR_P@
+
+rust_host_target := @rust_host_target@
+
+rust_rlib_prefix := @rust_rlib_prefix@
+rust_rlib_suffix := @rust_rlib_suffix@
+rust_dylib_prefix := @rust_dylib_prefix@
+rust_dylib_suffix := @rust_dylib_suffix@
+rust_staticlib_prefix := @rust_staticlib_prefix@
+rust_staticlib_suffix := @rust_staticlib_suffix@
+rust_cdylib_prefix := @rust_cdylib_prefix@
+rust_cdylib_suffix := @rust_cdylib_suffix@
+rust_bin_prefix := @rust_bin_prefix@
+rust_bin_suffix := @rust_bin_suffix@
+
+rustc_name=@rustc_name@
+rust_major=@rust_major@
+rust_minor=@rust_minor@
+rust_patch=@rust_patch@
+rust_channel=@rust_channel@
+rust_version=@rust_version@
+rustc_is_lccc=@rustc_is_lccc@
+rustc_has_std=@rustc_has_std@
+
+build_rustc_name=@build_rustc_name@
+build_rust_major=@build_rust_major@
+build_rust_minor=@build_rust_minor@
+build_rust_patch=@build_rust_patch@
+build_rust_channel=@build_rust_channel@
+build_rust_version=@build_rust_version@
+build_rustc_is_lccc=@build_rustc_is_lccc@
+
+rust_build_rlib_prefix := @rust_build_rlib_prefix@
+rust_build_rlib_suffix := @rust_build_rlib_suffix@
+rust_build_dylib_prefix := @rust_build_dylib_prefix@
+rust_build_dylib_suffix := @rust_build_dylib_suffix@
+rust_build_staticlib_prefix := @rust_build_staticlib_prefix@
+rust_build_staticlib_suffix := @rust_staticlib_suffix@
+rust_build_cdylib_prefix := @rust_build_cdylib_prefix@
+rust_build_cdylib_suffix := @rust_build_cdylib_suffix@
+rust_build_bin_prefix := @rust_build_bin_prefix@
+rust_build_bin_suffix := @rust_build_bin_suffix@
+rust_build_proc_macro_prefix := @rust_build_proc_macro_prefix@
+rust_build_proc_macro_suffix := @rust_build_proc_macro_suffix@
+
+# Package Specific Configuration
+
+EXTRA_RUSTFLAGS =
+EXTRA_RUSTFLAGS_OR_BUILD = 
+
+vendor_BUILDDIR := @abs_builddir@/../vendor
+
+
+features := @features@
+
+library = arch-ops
+
+crate_type = rlib
+crate_name = arch_ops
+
+library_file = $(rust_$(crate_type)_prefix)$(subst -,_,$(library))$(rust_$(crate_type)_suffix)
+
+# Goals
+
+all: stamp
+
+
+stamp: $(library_file)
+    touch $(library_file)
+
+include $(library_file).d 
+
+$(library_file): $(library_file).d 
+    $(RUSTC) $(RUSTFLAGS) --crate-name $(crate_name) --crate-type=$(crate_type) --emit link=$(library_file) -L $(vendor_BUILDDIR)/lazy_static  -L $(vendor_BUILDDIR)/target-tuples --extern lazy_static --extern target_tuples
+
+$(library_file).d: $(vendor_BUILDDIR)/lazy_static/stamp $(vendor_BUILDDIR)/lazy_static/stamp
+    $(RUSTC) $(RUSTFLAGS) --crate-name $(crate_name) --crate-type=$(crate_type) -o$(library_file) --emit dep-info=$(library_file) -L $(vendor_BUILDDIR)/lazy_static  -L $(vendor_BUILDDIR)/target-tuples --extern lazy_static --extern target_tuples
