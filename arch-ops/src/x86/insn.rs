@@ -557,6 +557,7 @@ define_x86_instructions! {
     (JmpfInd, "jmp", 0xFF, [RControlBits(5), ModRMMem]),
     (PushRM, "push", 0xFF, [RControlBits(6), ModRMMode]),
     (Ud2, "ud2", 0x0F0B, []),
+    (MFence, "mfence", 0x0FAE, []),
 
 }
 
@@ -639,6 +640,8 @@ zop_insns! {
     Cld,
     Std,
     Ud2,
+    Int3,
+    MFence
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
