@@ -41,6 +41,27 @@ pub enum CleverOperand {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ConditionCode {
+    Parity,
+    Carry,
+    Overflow,
+    Zero,
+    LessThan,
+    LessEq,
+    BelowEq,
+    Minus,
+    Plus,
+    Above,
+    Greater,
+    GreaterEq,
+    NotZero,
+    NoOverflow,
+    NoCarry,
+    NoParity,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverIndex {
     Register(CleverRegister),
     Abs(u16),
@@ -87,6 +108,34 @@ impl HBits for CleverRegister {
 
     fn to_hbits(self) -> u16 {
         self.0 as u16
+    }
+}
+
+impl HBits for ConditionCode {
+    fn from_bits(bits: u16) -> Self {
+        match bits {
+            0 => ConditionCode::Parity,
+            1 => ConditionCode::Carry,
+            2 => ConditionCode::Overflow,
+            3 => ConditionCode::Zero,
+            4 => ConditionCode::LessThan,
+            5 => ConditionCode::LessEq,
+            6 => ConditionCode::BelowEq,
+            7 => ConditionCode::Minus,
+            8 => ConditionCode::Plus,
+            9 => ConditionCode::Above,
+            10 => ConditionCode::Greater,
+            11 => ConditionCode::GreaterEq,
+            12 => ConditionCode::NotZero,
+            13 => ConditionCode::NoOverflow,
+            14 => ConditionCode::NoCarry,
+            15 => ConditionCode::NoParity,
+            _ => unreachable!(),
+        }
+    }
+
+    fn to_hbits(self) -> u16 {
+        self as u8 as u16
     }
 }
 
@@ -220,5 +269,23 @@ clever_instructions! {
     [Popar  , "popar"  , 0x01F, 0],
 
     [Movsx, "movsx", 0x020, 2],
+    [Bswap, "bswap", 0x021, 2],
+    [Movsif, "movsif", 0x022, 2, {flags @ 0 => bool}],
+    [Movxf, "movxf", 0x023, 2, {flags @0 => bool}],
+    [Movfsi, "movfsi", 0x024, 2, {flags @ 0 => bool}],
+    [Movfx, "movfx", 0x025, 2, {flags @ 0 => bool}],
+    [Cvtf, "cvtf", 0x026, 2, {flags @ 0 => bool}],
+
+    [Repbi, "repbi", 0x028, 0],
+    [Repbc, "repbc", 0x029, 0, {cc @ .. => ConditionCode}],
+    [Bcpy, "bcpy", 0x02a, 0, {ss @ 0..2 => u16}],
+    [Bsto, "bsto", 0x02b, 0, {ss @ 0..2 => u16}],
+    [Bsca, "bsca", 0x02c, 0, {ss @ 0..2 => u16}],
+    [Bcmp, "bcmp", 0x02d, 0, {ss @ 0..2 => u16}],
+    [Btst, "btst", 0x02e, 0, {ss @ 0..2 => u16}],
+
+    [Lsh, "lsh", 0x030, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [Rsh, "rsh", 0x031, 2, {l @ 3 => bool, f @ 0 => bool}],
+
 
 }
