@@ -50,6 +50,7 @@ macro_rules! define_x86_features{
 }
 
 define_x86_features! {
+    (Sce, "sce"),
     (Mmx, "mmx"),
     (Sse, "sse"),
     (Sse2, "sse2"),
