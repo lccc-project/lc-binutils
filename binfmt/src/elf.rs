@@ -1049,6 +1049,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_entsize: Class::Size::from_usize(0),
         });
         for section in bfile.sections() {
+            #[allow(clippy::needless_borrow)]
             shdrs.push(ElfSectionHeader::<Class> {
                 sh_name: Class::Word::from_usize(add_to_strtab(
                     &mut shstrtab,

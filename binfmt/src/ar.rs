@@ -276,12 +276,12 @@ impl Archive {
                 strtab.set_name(STRTAB);
                 self.strtab = Some(strtab);
             }
-            let mut strtab = self.strtab.as_mut().unwrap();
+            let strtab = self.strtab.as_mut().unwrap();
             strtab.truncate();
             for (d, n) in names.into_iter() {
                 let str = n.into_string().unwrap();
                 let idx = strtab.bytes.len();
-                write!(&mut strtab, "{}\0", str).unwrap();
+                write!(strtab, "{}\0", str).unwrap();
                 let item = &mut self.members[d].header;
                 write!((&mut item.ar_name) as &mut [_], "/{:>15}", idx).unwrap();
             }
