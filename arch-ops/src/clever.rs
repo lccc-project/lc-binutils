@@ -8,8 +8,157 @@ pub enum CleverExtension {
     Vector,
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub struct CleverRegister(pub u8);
+
+pub struct RegisterFromStrError;
+
+macro_rules! clever_registers{
+    {
+        $($name:ident $(| $altnames:ident)* => $val:expr),* $(,)?
+    } => {
+        impl ::core::str::FromStr for CleverRegister{
+            type Err = RegisterFromStrError;
+            fn from_str(st: &str) -> Result<Self,Self::Err>{
+                match st{
+                    $(
+                        ::core::stringify!($name) $(| ::core::stringify!($altnames))* => Ok(Self($val)),
+                    )*
+                    _ => Err(RegisterFromStrError)
+                }
+            }
+        }
+        impl ::core::fmt::Display for CleverRegister{
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result{
+                match self{
+                    $(CleverRegister($val) => f.write_str(::core::stringify!($name)),)*
+                    CleverRegister(val) => f.write_fmt(::core::format_args!("r{}",val))
+                }
+            }
+        }
+
+        impl ::core::fmt::Debug for CleverRegister{
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> ::core::fmt::Result{
+                struct DontEscape(&'static str);
+                impl ::core::fmt::Debug for DontEscape{
+                    fn fmt(&self, f: &mut core::fmt::Formatter) -> ::core::fmt::Result{
+                        f.write_str(self.0)
+                    }
+                }
+
+                match self{
+                    $(CleverRegister($val) => {
+                        f.debug_tuple("CleverRegister")
+                            .field(&DontEscape(::core::stringify!($name))).finish()
+                    })*
+                    CleverRegister(val) => f.debug_tuple("CleverRegister").field(&val).finish()
+                }
+            }
+        }
+    }
+}
+
+clever_registers! {
+    r0 | racc => 0,
+    r1 | rsrc => 1,
+    r2 | rdst => 2,
+    r3 | rcnt => 3,
+    r4 => 4,
+    r5 => 5,
+    r6 | fbase => 6,
+    r7 | sptr => 7,
+    r8 => 8,
+    r9 => 9,
+    r10 => 10,
+    r11 => 11,
+    r12 => 12,
+    r13 => 13,
+    r14 => 14,
+    r15 | link => 15,
+    ip => 16,
+    flags => 17,
+    fpcw => 19,
+    f0 => 24,
+    f1 => 25,
+    f2 => 26,
+    f3 => 27,
+    f4 => 28,
+    f5 => 29,
+    f6 => 30,
+    f7 => 31,
+    v0l => 64,
+    v0h => 65,
+    v1l => 66,
+    v1h => 67,
+    v2l => 68,
+    v2h => 69,
+    v3l => 70,
+    v3h => 71,
+    v4l => 72,
+    v4h => 73,
+    v5l => 74,
+    v5h => 75,
+    v6l => 76,
+    v6h => 77,
+    v7l => 78,
+    v7h => 79,
+    v8l => 80,
+    v8h => 81,
+    v9l => 82,
+    v9h => 83,
+    v10l => 84,
+    v10h => 85,
+    v11l => 86,
+    v11h => 87,
+    v12l => 88,
+    v12h => 89,
+    v13l => 90,
+    v13h => 91,
+    v14l => 92,
+    v14h => 93,
+    v15l => 94,
+    v15h => 95,
+    v16l => 96,
+    v16h => 97,
+    v17l => 98,
+    v17h => 99,
+    v18l => 100,
+    v18h => 101,
+    v19l => 102,
+    v19h => 103,
+    v20l => 104,
+    v20h => 105,
+    v21l => 106,
+    v21h => 107,
+    v22l => 108,
+    v22h => 109,
+    v23l => 110,
+    v23h => 111,
+    v24l => 112,
+    v24h => 113,
+    v25l => 114,
+    v25h => 115,
+    v26l => 116,
+    v26h => 117,
+    v27l => 118,
+    v27h => 119,
+    v28l => 120,
+    v28h => 121,
+    v29l => 122,
+    v29h => 123,
+    v30l => 124,
+    v30h => 125,
+    v31l => 126,
+    v31h => 127,
+    cr0 => 128,
+    page | cr1 => 129,
+    flprotected | cr2 => 130,
+    scdp | cr3 => 131,
+    scsp | cr4 => 132,
+    sccr | cr5 => 133,
+    itabp | cr6 => 134,
+    ciread | cr7 => 135,
+}
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverOperand {
@@ -232,33 +381,39 @@ macro_rules! clever_instructions{
 }
 
 clever_instructions! {
-    [Ud0, "ud", 0x000, 0],
+    // Undefined Instruction 0
+    [Und0, "und", 0x000, 0],
+
+    // Arithmetic Instructions
     [Add, "add", 0x001, 2, {lock @ 3 => bool, flags @ 0 => bool}],
     [Sub, "sub", 0x002, 2, {lock @ 3 => bool, flags @ 0 => bool}],
     [And, "and", 0x003, 2, {lock @ 3 => bool, flags @ 0 => bool}],
     [Or , "or" , 0x004, 2, {lock @ 3 => bool, flags @ 0 => bool}],
     [Xor, "xor", 0x005, 2, {lock @ 3 => bool, flags @ 0 => bool}],
 
+    // Division and multiplication Instructions
     [Mul, "mul", 0x006, 0, {ss @ 2..4 => u16, flags @ 0 => bool}],
     [Div, "div", 0x007, 0, {ss @ 2..4 => u16, wide @ 1 => bool, flags @ 0 => bool}],
 
+    // Register Manipulation Instructions
     [Mov, "mov", 0x008, 2],
     [Lea, "lea", 0x009, 2],
-
     [MovRD, "mov", 0x00A, 1, {r @ .. => CleverRegister}],
     [MovRS, "mov", 0x00B, 1, {r @ .. => CleverRegister}],
     [LeaRD, "lea", 0x00C, 1, {r @ .. => CleverRegister}],
 
+    // Nops
     [Nop10, "nop", 0x010, 0],
     [Nop11, "nop", 0x011, 1],
     [Nop12, "nop", 0x012, 2],
 
+    // Stack Manipulation
     [Push, "push", 0x014, 1],
     [Pop , "pop" , 0x015, 1],
-
     [PushR, "push", 0x016, 0, {r @ .. => CleverRegister}],
     [PopR , "pop" , 0x017, 0, {r @ .. => CleverRegister}],
 
+    // Mass Register Storage
     [Stogpr , "stogpr" , 0x018, 1],
     [Stoar  , "stoar"  , 0x019, 1],
     [Rstogpr, "rstogpr", 0x01A, 1],
@@ -268,6 +423,7 @@ clever_instructions! {
     [Popgpr , "popgpr" , 0x01E, 0],
     [Popar  , "popar"  , 0x01F, 0],
 
+    // Converting Moves
     [Movsx, "movsx", 0x020, 2],
     [Bswap, "bswap", 0x021, 2],
     [Movsif, "movsif", 0x022, 2, {flags @ 0 => bool}],
@@ -276,6 +432,7 @@ clever_instructions! {
     [Movfx, "movfx", 0x025, 2, {flags @ 0 => bool}],
     [Cvtf, "cvtf", 0x026, 2, {flags @ 0 => bool}],
 
+    // Block Instructions
     [Repbi, "repbi", 0x028, 0],
     [Repbc, "repbc", 0x029, 0, {cc @ .. => ConditionCode}],
     [Bcpy, "bcpy", 0x02a, 0, {ss @ 0..2 => u16}],
@@ -284,8 +441,47 @@ clever_instructions! {
     [Bcmp, "bcmp", 0x02d, 0, {ss @ 0..2 => u16}],
     [Btst, "btst", 0x02e, 0, {ss @ 0..2 => u16}],
 
+    // Integer Shifts
     [Lsh, "lsh", 0x030, 2, {l @ 3 => bool, f @ 0 => bool}],
     [Rsh, "rsh", 0x031, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [Arsh, "arsh", 0x032, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [Lshc, "lshc", 0x033, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [Rshc, "rshc", 0x034, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [Lrot, "lrot", 0x035, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [Rrot, "rrot", 0x036, 2, {l @ 3 => bool, f @ 0 => bool}],
+    [LshR, "lsh", 0x038, 2, {r @ 0..4 => CleverRegister}],
+    [RshR, "rsh", 0x039, 2, {r @ 0..4 => CleverRegister}],
+    [ArshR, "arsh", 0x03A, 2, {r @ 0..4 => CleverRegister}],
+    [LshcR, "lshc", 0x03B, 2, {r @ 0..4 => CleverRegister}],
+    [RshcR, "rshc", 0x03C, 2, {r @ 0..4 => CleverRegister}],
+    [LrotR, "lrot", 0x03D, 2, {r @ 0..4 => CleverRegister}],
+    [RrotR, "rrot", 0x03E, 2, {r @ 0..4 => CleverRegister}],
 
+    // Arithmetic/Logic GPR Specifications
+    // Unary Operations
+    // Signed Multiplication/Division
+    [Imul, "imul", 0x040, 0, {ss @ 2..4 => u16, flags @ 0 => bool}],
+    [AddRD, "add", 0x041, 1, {r @ 0..4 => CleverRegister}],
+    [SubRD, "sub", 0x042, 1, {r @ 0..4 => CleverRegister}],
+    [AndRD, "and", 0x043, 1, {r @ 0..4 => CleverRegister}],
+    [OrRD, "or", 0x044, 1, {r @ 0..4 => CleverRegister}],
+    [XorRD, "xor", 0x045, 1, {r @ 0..4 => CleverRegister}],
+    [BNot, "bnot", 0x046, 1, {l @ 3 => bool, f @ 0 => bool}],
+    [Neg, "neg", 0x047, 1, {l @ 3 => bool, f @ 0 => bool}],
+    [Idiv, "idiv", 0x048, 0, {ss @ 2..4 => u16, wide @ 1 => bool, flags @ 0 => bool}],
+    [AddRS, "add", 0x049, 1, {r @ 0..4 => CleverRegister}],
+    [SubRS, "sub", 0x04A, 1, {r @ 0..4 => CleverRegister}],
+    [AndRS, "and", 0x04B, 1, {r @ 0..4 => CleverRegister}],
+    [OrRS, "or", 0x04C, 1, {r @ 0..4 => CleverRegister}],
+    [XorRS, "xor", 0x04D, 1, {r @ 0..4 => CleverRegister}],
+    [BNotR, "bnot", 0x046, 1, {r @ 0..4 => CleverRegister}],
+    [NegR, "neg", 0x047, 1, {r @ 0..4 => CleverRegister}],
 
+    // Floating-Point Operations
+    [Round, "round", 0x100, 1, {f @ 0 => bool}],
+    [Ceil, "ceil", 0x101, 1, {f @ 0 => bool}],
+    [Floor, "floor", 0x102, 1, {f @ 0 => bool}],
+    [FAbs, "fabs", 0x103, 1, {f @ 0 => bool}],
+    [FNeg, "fneg", 0x104, 1, {f @ 0 => bool}],
+    [FInv, "finv",0x105, 1, {f @ 0 => bool}],
 }
