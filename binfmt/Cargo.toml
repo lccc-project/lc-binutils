@@ -11,7 +11,7 @@ license = "BSD-2-Clause-Patent"
 static_assertions = "1.1.0"
 bytemuck = {version="1.5.1",features=["derive"]}
 lazy_static = "1.4.0"
-target-tuples = "0.5.2"
+target-tuples = "0.5.4"
 fake-enum = "0.1.4"
 arch-ops = {path="../arch-ops"}
 
@@ -42,5 +42,5 @@ m68k = []
 clever = []
 z80 = []
 m6502 = []
-default-archs = ["w65", "x86", "arm","riscv","m68k"]
-all-archs = ["default-archs", "z80", "m6502", "clever"]
+default-archs = ["w65", "x86", "arm","riscv","m68k", "clever"]
+all-archs = ["default-archs", "z80", "m6502"]

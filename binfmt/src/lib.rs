@@ -99,6 +99,8 @@ define_formats![
     elf32-x86_64,
     #[cfg(all(feature = "elf64", feature = "x86"))]
     elf64-x86_64,
+    #[cfg(all(feature = "elf64", feature = "clever"))]
+    elf64-clever,
     binary
 ];
 
@@ -118,12 +120,15 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
         match (targ){
             w65-*-elf => &*BINARY_FORMATS_BY_NAME["elf32-w65"],
             w65-*-snes-elf => &*BINARY_FORMATS_BY_NAME["elf32-w65"],
+            x86_64-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-gnu => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-gnux32 => &*BINARY_FORMATS_BY_NAME["elf32-x86_64"],
             x86_64-*-*-musl => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-newlib => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             x86_64-*-*-uclibc => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
+            clever-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
+            clever-*-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
             * => panic!("Unknown Target")
         }
     }

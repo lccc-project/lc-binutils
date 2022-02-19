@@ -71,10 +71,7 @@ impl HowTo for Elf64X86_64HowTo {
     where
         Self: Sized + 'a,
     {
-        howtos::RELOCS
-            .get(num as usize)
-            .map(|x| x.as_ref())
-            .unwrap_or(None)
+        howtos::RELOCS.get(num as usize).and_then(|x| x.as_ref())
     }
 
     fn from_reloc_code<'a>(code: RelocCode) -> Option<&'a Self>
