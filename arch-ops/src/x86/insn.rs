@@ -296,27 +296,30 @@ define_x86_instructions! {
     (Jge,     "jge", 0x7D, [Rel(8)]),
     (Jle,     "jle", 0x7E, [Rel(8)]),
     (Jg,      "jg",  0x7F, [Rel(8)]),
-    (AddImm8, "add", 0x80, [RControlBits(1), ModRM(Byte), Imm(8)]),
-    (OrImm8,  "or",  0x80, [RControlBits(2), ModRM(Byte), Imm(8)]),
-    (AdcImm8, "adc", 0x80, [RControlBits(3), ModRM(Byte), Imm(8)]),
-    (SbbImm8, "sbb", 0x80, [RControlBits(4), ModRM(Byte), Imm(8)]),
-    (AndImm8, "and", 0x80, [RControlBits(5), ModRM(Byte), Imm(8)]),
-    (SubImm8, "sub", 0x80, [RControlBits(6), ModRM(Byte), Imm(8)]),
-    (XorImm8, "xor", 0x80, [RControlBits(7), ModRM(Byte), Imm(8)]),
-    (AddImm,  "add", 0x81, [RControlBits(1), ModRMGeneral, ImmGeneral]),
-    (OrImm,   "or",  0x81, [RControlBits(2), ModRMGeneral, ImmGeneral]),
-    (AdcImm,  "adc", 0x81, [RControlBits(3), ModRMGeneral, ImmGeneral]),
-    (SbbImm,  "sbb", 0x81, [RControlBits(4), ModRMGeneral, ImmGeneral]),
-    (AndImm,  "and", 0x81, [RControlBits(5), ModRMGeneral, ImmGeneral]),
-    (SubImm,  "sub", 0x81, [RControlBits(6), ModRMGeneral, ImmGeneral]),
-    (XorImm,  "xor", 0x81, [RControlBits(7), ModRMGeneral, ImmGeneral]),
-    (AddGImm8,"add", 0x83, [RControlBits(1), ModRMGeneral, Imm(8)]),
-    (OrGImm8, "or",  0x83, [RControlBits(2), ModRMGeneral, Imm(8)]),
-    (AdcGImm8,"adc", 0x83, [RControlBits(3), ModRMGeneral, Imm(8)]),
-    (SbbGImm8,"sbb", 0x83, [RControlBits(4), ModRMGeneral, Imm(8)]),
-    (AndGImm8,"and", 0x83, [RControlBits(5), ModRMGeneral, Imm(8)]),
-    (SubGImm8,"sub", 0x83, [RControlBits(6), ModRMGeneral, Imm(8)]),
-    (XorGImm8,"xor", 0x83, [RControlBits(7), ModRMGeneral, Imm(8)]),
+    (AddImm8, "add", 0x80, [RControlBits(0), ModRM(Byte), Imm(8)]),
+    (OrImm8,  "or",  0x80, [RControlBits(1), ModRM(Byte), Imm(8)]),
+    (AdcImm8, "adc", 0x80, [RControlBits(2), ModRM(Byte), Imm(8)]),
+    (SbbImm8, "sbb", 0x80, [RControlBits(3), ModRM(Byte), Imm(8)]),
+    (AndImm8, "and", 0x80, [RControlBits(4), ModRM(Byte), Imm(8)]),
+    (SubImm8, "sub", 0x80, [RControlBits(5), ModRM(Byte), Imm(8)]),
+    (XorImm8, "xor", 0x80, [RControlBits(6), ModRM(Byte), Imm(8)]),
+    (CmpImm8, "cmp", 0x80, [RControlBits(6), ModRM(Byte), Imm(8)]),
+    (AddImm,  "add", 0x81, [RControlBits(0), ModRMGeneral, ImmGeneral]),
+    (OrImm,   "or",  0x81, [RControlBits(1), ModRMGeneral, ImmGeneral]),
+    (AdcImm,  "adc", 0x81, [RControlBits(2), ModRMGeneral, ImmGeneral]),
+    (SbbImm,  "sbb", 0x81, [RControlBits(3), ModRMGeneral, ImmGeneral]),
+    (AndImm,  "and", 0x81, [RControlBits(4), ModRMGeneral, ImmGeneral]),
+    (SubImm,  "sub", 0x81, [RControlBits(5), ModRMGeneral, ImmGeneral]),
+    (XorImm,  "xor", 0x81, [RControlBits(6), ModRMGeneral, ImmGeneral]),
+    (CmpImm,  "cmp", 0x81, [RControlBits(7), ModRMGeneral, ImmGeneral]),
+    (AddGImm8,"add", 0x83, [RControlBits(0), ModRMGeneral, Imm(8)]),
+    (OrGImm8, "or",  0x83, [RControlBits(1), ModRMGeneral, Imm(8)]),
+    (AdcGImm8,"adc", 0x83, [RControlBits(2), ModRMGeneral, Imm(8)]),
+    (SbbGImm8,"sbb", 0x83, [RControlBits(3), ModRMGeneral, Imm(8)]),
+    (AndGImm8,"and", 0x83, [RControlBits(4), ModRMGeneral, Imm(8)]),
+    (SubGImm8,"sub", 0x83, [RControlBits(5), ModRMGeneral, Imm(8)]),
+    (XorGImm8,"xor", 0x83, [RControlBits(6), ModRMGeneral, Imm(8)]),
+    (CmpGImm8,"cmp", 0x83, [RControlBits(7), ModRMGeneral, Imm(8)]),
     (Test8,   "test",0x84, [ModRM(Byte),Reg(Byte)]),
     (Test,    "test",0x85, [ModRMGeneral, RegGeneral]),
     (Xchg8,   "xchg",0x86, [Reg(Byte), ModRM(Byte)]),
@@ -957,6 +960,58 @@ impl<W: InsnWrite> X86Encoder<W> {
                 self.writer.write_all(&opcode)?;
                 match &insn.operands()[0] {
                     X86Operand::RelAddr(addr) => self.writer.write_addr(32, addr.clone(), true),
+                    _ => todo!(),
+                }
+            }
+            [RControlBits(n), ModRMGeneral, ImmGeneral] => {
+                let b = match insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(reg)) => reg.regnum() >= 8,
+                    X86Operand::ModRM(ModRM::Indirect { .. }) => false,
+                    _ => todo!(),
+                };
+                let mut short = false;
+                let mut rex = b;
+                let (r, w) = match insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(reg)) => {
+                        if matches!(reg.class(), X86RegisterClass::Word) {
+                            short = true;
+                        }
+                        (false, matches!(reg.class(), X86RegisterClass::Quad))
+                    }
+                    _ => todo!(),
+                };
+                if r || w {
+                    rex = true;
+                }
+                if short {
+                    self.writer.write_all(&[0x66])?;
+                }
+                if rex {
+                    let rex = 0x40
+                        | if b { 0x01 } else { 0x00 }
+                        | if r { 0x04 } else { 0x00 }
+                        | if w { 0x08 } else { 0x00 };
+                    self.writer.write_all(&[rex])?;
+                }
+                self.writer.write_all(&opcode)?;
+                match &insn.operands()[0] {
+                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
+                        self.writer
+                            .write_all(&[0xC0 + (*n << 3) + (regrm.regnum() & 0x7)])?;
+                    }
+                    X86Operand::ModRM(ModRM::Indirect {
+                        mode: ModRMRegOrSib::RipRel(addr),
+                    }) => {
+                        self.writer.write_all(&[(*n << 3) + 0x05])?;
+                        self.writer.write_addr(32, addr.clone(), true)?;
+                    }
+                    _ => todo!(),
+                }
+
+                match &insn.operands()[1] {
+                    X86Operand::Immediate(val) => self
+                        .writer
+                        .write_all(&(val.to_le_bytes()[..(2 << ((!short) as u32))])),
                     _ => todo!(),
                 }
             }

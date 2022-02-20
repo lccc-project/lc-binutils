@@ -36,6 +36,17 @@ impl X86RegisterClass {
             Self::AvxMask => 8,
         }
     }
+
+    pub fn gpr_size(size: usize, mode: X86Mode) -> Option<X86RegisterClass> {
+        match size {
+            1 if mode == X86Mode::Long => Some(X86RegisterClass::ByteRex),
+            1 => Some(X86RegisterClass::Byte),
+            2 => Some(X86RegisterClass::Word),
+            4 => Some(X86RegisterClass::Double),
+            8 => Some(X86RegisterClass::Quad),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
