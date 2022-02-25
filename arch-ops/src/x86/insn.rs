@@ -64,6 +64,14 @@ impl X86Mode {
             _ => None,
         }
     }
+
+    pub fn largest_gpr(&self) -> usize {
+        match self {
+            Self::Real | Self::Virtual8086 => 16,
+            Self::Protected | Self::Compatibility => 32,
+            Self::Long => 64,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -86,11 +94,28 @@ pub enum X86OperandType {
     /// m/r16/32/64 depending on mode and 66h prefix
     ModRMMode,
 
+    /// A memory operand that must be encoded in an SIB byte
+    ModRMSib(X86RegisterClass),
+
     /// Either STi or a memory reference with a given size
     ModRMReal(X86RegisterClass),
 
     /// A register encoded in the r/m field of the ModRM byte
     ModRMReg(X86RegisterClass),
+
+    // xmm/m32/64
+    ModRMScalar(X86RegisterClass),
+
+    // xmm/ymm/zmm
+    VexReg,
+    // xmm/ymm/zmm/m128/m256/m512
+    VexModRM,
+    // x/y/zmm/m32/64
+    VexModRMScalar(X86RegisterClass),
+
+    // Instruction uses VEX/EVEX encoding, even if no vector registers are present
+    // Class indicates the Size field for the VEX/EVEX prefix (EVEX forced if [`X86RegisterClass::Zmm`])
+    VexPrefix(X86RegisterClass),
 
     /// r16/32/64 depending on mode and prefixes
     RegGeneral,
@@ -560,7 +585,31 @@ define_x86_instructions! {
     (JmpfInd, "jmp", 0xFF, [RControlBits(5), ModRMMem]),
     (PushRM, "push", 0xFF, [RControlBits(6), ModRMMode]),
     (Ud2, "ud2", 0x0F0B, []),
-    (MFence, "mfence", 0x0FAE, []),
+    (MovUpsRM, "movups", 0x0F10, [Reg(Xmm),ModRM(Xmm)]),
+    (MovSsRM, "movss", 0xF30F10, [Reg(Xmm), ModRMScalar(Double)]),
+    (MovUpdRM, "movupd", 0x660F10, [Reg(Xmm), ModRM(Xmm)]),
+    (MovSdRM, "movsd", 0xF20F10, [Reg(Xmm), ModRMScalar(Quad)]),
+    (VMovUpsRM, "vmovups", 0x0F10, [VexReg,VexModRM]),
+    (VMovSsRM, "vmovss", 0xF30F10, [VexReg, VexModRMScalar(Double)]),
+    (VMovUpdRM, "vmovupd", 0x660F10, [VexReg, VexModRM]),
+    (VMovSdRM, "vmovsd", 0xF20F10, [VexReg, VexModRMScalar(Quad)]),
+    (MovUpsMR, "movups", 0x0F11, [ModRM(Xmm),Reg(Xmm)]),
+    (MovSsMR, "movss", 0xF30F11, [ModRMScalar(Double),Reg(Xmm)]),
+    (MovUpdMR, "movupd", 0x660F11, [ModRM(Xmm),Reg(Xmm)]),
+    (MovSdMR, "movsd", 0xF20F11, [ModRMScalar(Quad), Reg(Xmm)]),
+    (VMovUpsMR, "vmovups", 0x0F11, [VexModRM,VexReg]),
+    (VMovSsMR, "vmovss", 0xF30F11, [VexModRMScalar(Double),VexReg]),
+    (VMovUpdMR, "vmovupd", 0x660F11, [VexModRM,VexReg]),
+    (VMovSdMR, "vmovsd", 0xF20F11, [VexModRMScalar(Quad),VexReg]),
+    (MovDRM, "movd", 0x0F6E, [Reg(Mmx),ModRM(Double)]),
+    (MovQRM, "movq", 0x0F6F, [Reg(Mmx),ModRM(Quad)]),
+    (MovDMR, "movd", 0x0F7E, [Reg(Mmx),ModRM(Double)]),
+    (MovQMR, "movq", 0x0F7F, [ModRM(Quad),Reg(Mmx)]),
+    (MFence, "vmfence", 0x0FAE, []),
+
+    (TileLoadD, "tileloadd", 0xF20F384B,[VexPrefix(Xmm), Reg(Tmm), ModRMSib(Tmm)]),
+    (TileLoadDT1, "tileloaddt1", 0x660F384B,[VexPrefix(Xmm), Reg(Tmm), ModRMSib(Tmm)]),
+    (TileStoreD, "tilestored", 0xF30F384B, [VexPrefix(Xmm),ModRMSib(Tmm),Reg(Tmm)]),
 
 }
 
