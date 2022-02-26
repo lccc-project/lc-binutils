@@ -921,7 +921,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
             ..
         } => {
             output.modrm = match (base, index) {
-                (X86Register::Bx, X86Register::Si) => 0x00 | ((r & 0x7) << 3),
+                (X86Register::Bx, X86Register::Si) => ((r & 0x7) << 3),
                 (X86Register::Bx, X86Register::Di) => 0x01 | ((r & 0x7) << 3),
                 (X86Register::Bp, X86Register::Si) => 0x02 | ((r & 0x7) << 3),
                 (X86Register::Bp, X86Register::Di) => 0x03 | ((r & 0x7) << 3),
@@ -1010,7 +1010,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
                     output.modrm = 0x45 | ((r & 0x7) << 3);
                     output.disp = Some((1, 0));
                 }
-                n => output.modrm = 0x00 | ((r & 0x7) << 3) | n,
+                n => output.modrm = ((r & 0x7) << 3) | n,
             }
         }
         ModRM::Indirect {
@@ -1134,7 +1134,6 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
 
 impl<W: InsnWrite> X86Encoder<W> {
     pub fn write_insn(&mut self, insn: X86Instruction) -> std::io::Result<()> {
-        eprintln!("Encoding: {:?}", insn);
         let mode = insn.mode_override().unwrap_or(self.mode);
         let opcode_long = insn.opcode().opcode();
         let mut opcode = if opcode_long < 0x100 {
