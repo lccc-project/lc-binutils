@@ -65,11 +65,11 @@ impl X86Mode {
         }
     }
 
-    pub fn largest_gpr(&self) -> usize {
+    pub fn largest_gpr(&self) -> X86RegisterClass {
         match self {
-            Self::Real | Self::Virtual8086 => 16,
-            Self::Protected | Self::Compatibility => 32,
-            Self::Long => 64,
+            Self::Real | Self::Virtual8086 => X86RegisterClass::Word,
+            Self::Protected | Self::Compatibility => X86RegisterClass::Double,
+            Self::Long => X86RegisterClass::Quad,
         }
     }
 }
@@ -631,9 +631,20 @@ pub enum ModRMRegOrSib {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum ModRM {
-    Indirect { mode: ModRMRegOrSib },
-    IndirectDisp8 { mode: ModRMRegOrSib, disp8: i8 },
-    IndirectDisp32 { mode: ModRMRegOrSib, disp32: i32 },
+    Indirect {
+        size: X86RegisterClass,
+        mode: ModRMRegOrSib,
+    },
+    IndirectDisp8 {
+        size: X86RegisterClass,
+        mode: ModRMRegOrSib,
+        disp8: i8,
+    },
+    IndirectDisp32 {
+        size: X86RegisterClass,
+        mode: ModRMRegOrSib,
+        disp32: i32,
+    },
     Direct(X86Register),
 }
 
@@ -650,11 +661,24 @@ pub enum X86Operand {
 pub struct X86Instruction {
     opc: X86Opcode,
     operands: Vec<X86Operand>,
+    mode_override: Option<X86Mode>,
 }
 
 impl X86Instruction {
     pub const fn new(opc: X86Opcode, operands: Vec<X86Operand>) -> Self {
-        Self { opc, operands }
+        Self {
+            opc,
+            operands,
+            mode_override: None,
+        }
+    }
+
+    pub const fn new_in_mode(opc: X86Opcode, operands: Vec<X86Operand>, mode: X86Mode) -> Self {
+        Self {
+            opc,
+            operands,
+            mode_override: Some(mode),
+        }
     }
 
     pub const fn opcode(&self) -> X86Opcode {
@@ -663,6 +687,10 @@ impl X86Instruction {
 
     pub fn operands(&self) -> &[X86Operand] {
         &self.operands
+    }
+
+    pub fn mode_override(&self) -> Option<X86Mode> {
+        self.mode_override
     }
 }
 
@@ -747,8 +775,367 @@ impl<W: InsnWrite> InsnWrite for X86Encoder<W> {
     }
 }
 
+pub struct ModRMAndPrefixes {
+    pub rex: Option<u8>,
+    pub size_override: Option<u8>,
+    pub addr_override: Option<u8>,
+    pub modrm: u8,
+    pub sib: Option<u8>,
+    pub disp: Option<(usize, i64)>,
+    pub addr: Option<(usize, Address, bool)>,
+}
+
+pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
+    let mut output = ModRMAndPrefixes {
+        rex: None,
+        size_override: None,
+        addr_override: None,
+        modrm: 0,
+        sib: None,
+        disp: None,
+        addr: None,
+    };
+    if r > 8 {
+        *output.rex.get_or_insert(0x40) |= 0x04;
+    }
+
+    // Compute Size
+    // Gets REX.W and 66h prefix
+    let size = match modrm {
+        ModRM::Indirect { size, .. }
+        | ModRM::IndirectDisp8 { size, .. }
+        | ModRM::IndirectDisp32 { size, .. } => size,
+        ModRM::Direct(r) => r.class(),
+    };
+
+    // Compute REX.XB and Addr size
+    let addr_size = match modrm {
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Reg(r),
+            ..
+        }
+        | ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Reg(r),
+            ..
+        }
+        | ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Reg(r),
+            ..
+        }
+        | ModRM::Direct(r) => {
+            if r.regnum() >= 8 {
+                *output.rex.get_or_insert(0x40) |= 0x01;
+            }
+            r.class()
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Sib { index, base, .. },
+            ..
+        }
+        | ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Sib { index, base, .. },
+            ..
+        }
+        | ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Sib { index, base, .. },
+            ..
+        } => {
+            if base.regnum() >= 8 {
+                *output.rex.get_or_insert(0x40) |= 0x01;
+            }
+            if index.regnum() >= 8 {
+                *output.rex.get_or_insert(0x40) |= 0x02;
+            }
+            assert!(base.class() == index.class());
+            base.class()
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Index16 { .. },
+            ..
+        }
+        | ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Index16 { .. },
+            ..
+        }
+        | ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Index16 { .. },
+            ..
+        } => X86RegisterClass::Word,
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Abs(_),
+            ..
+        }
+        | ModRM::Indirect {
+            mode: ModRMRegOrSib::RipRel(_),
+            ..
+        } => mode.largest_gpr(),
+        mode => panic!("Invalid ModRM byte {:?}", mode),
+    };
+
+    // Compute 66h REX.W
+    match (size, mode) {
+        (X86RegisterClass::Word, X86Mode::Real | X86Mode::Virtual8086) => {}
+        (X86RegisterClass::Double, X86Mode::Real | X86Mode::Virtual8086)
+        | (X86RegisterClass::Word, _) => {
+            output.size_override = Some(0x66);
+        }
+        (X86RegisterClass::Double, _) => {}
+        (X86RegisterClass::Quad, X86Mode::Long) => {
+            *output.rex.get_or_insert(0x40) |= 0x08;
+        }
+        (
+            X86RegisterClass::Xmm
+            | X86RegisterClass::Ymm
+            | X86RegisterClass::Zmm
+            | X86RegisterClass::St
+            | X86RegisterClass::Mmx,
+            _,
+        )
+        | (X86RegisterClass::Tmm, X86Mode::Long) => {}
+        (size, mode) => panic!("Operand size {:?} not supported in mode {:?}", size, mode),
+    };
+
+    match (addr_size, mode) {
+        (X86RegisterClass::Word, X86Mode::Real | X86Mode::Virtual8086)
+        | (X86RegisterClass::Double, X86Mode::Protected | X86Mode::Compatibility)
+        | (X86RegisterClass::Quad, X86Mode::Long) => {}
+        (X86RegisterClass::Double, X86Mode::Real | X86Mode::Virtual8086 | X86Mode::Long)
+        | (X86RegisterClass::Word, X86Mode::Protected | X86Mode::Compatibility) => {
+            output.addr_override = Some(0x67)
+        }
+        (size, mode) => panic!("Operand size {:?} not supported in mode {:?}", size, mode),
+    }
+
+    // Finally, construct the ModRM (and possibly SIB) byte(s) + displacement
+    match modrm {
+        ModRM::Direct(reg) => {
+            if reg.class() == X86RegisterClass::Byte && reg.regnum() > 3 && output.rex != None {
+                panic!("Cannot encode register {:?} with a REX prefix", reg);
+            } else if reg.class() == X86RegisterClass::ByteRex {
+                output.rex.get_or_insert(0x40);
+            }
+            output.modrm = 0xC0 | ((r & 0x7) << 3) | (reg.regnum() & 0x7);
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Index16 { base, index },
+            ..
+        } => {
+            output.modrm = match (base, index) {
+                (X86Register::Bx, X86Register::Si) => 0x00 | ((r & 0x7) << 3),
+                (X86Register::Bx, X86Register::Di) => 0x01 | ((r & 0x7) << 3),
+                (X86Register::Bp, X86Register::Si) => 0x02 | ((r & 0x7) << 3),
+                (X86Register::Bp, X86Register::Di) => 0x03 | ((r & 0x7) << 3),
+                (base, index) => panic!("16-bit addresses cannot encode [{}+{}]", base, index),
+            };
+        }
+        ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Index16 { base, index },
+            disp8,
+            ..
+        } => {
+            output.disp = Some((1, disp8.into()));
+            output.modrm = match (base, index) {
+                (X86Register::Bx, X86Register::Si) => 0x40 | ((r & 0x7) << 3),
+                (X86Register::Bx, X86Register::Di) => 0x41 | ((r & 0x7) << 3),
+                (X86Register::Bp, X86Register::Si) => 0x42 | ((r & 0x7) << 3),
+                (X86Register::Bp, X86Register::Di) => 0x43 | ((r & 0x7) << 3),
+                (base, index) => panic!("16-bit addresses cannot encode [{}+{}]", base, index),
+            };
+        }
+        ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Index16 { base, index },
+            disp32,
+            ..
+        } => {
+            output.disp = Some((2, disp32.into()));
+            output.modrm = match (base, index) {
+                (X86Register::Bx, X86Register::Si) => 0x80 | ((r & 0x7) << 3),
+                (X86Register::Bx, X86Register::Di) => 0x81 | ((r & 0x7) << 3),
+                (X86Register::Bp, X86Register::Si) => 0x82 | ((r & 0x7) << 3),
+                (X86Register::Bp, X86Register::Di) => 0x83 | ((r & 0x7) << 3),
+                (base, index) => panic!("16-bit addresses cannot encode [{}+{}]", base, index),
+            };
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Reg(reg),
+            ..
+        } if addr_size == X86RegisterClass::Word => {
+            output.modrm = match reg {
+                X86Register::Si => 0x04 | ((r & 0x7) << 3),
+                X86Register::Di => 0x05 | ((r & 0x7) << 3),
+                X86Register::Bx => 0x07 | ((r & 0x7) << 3),
+                reg => panic!("16-bit addresses cannot encode [{}]", reg),
+            }
+        }
+        ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Reg(reg),
+            disp8,
+            ..
+        } if addr_size == X86RegisterClass::Word => {
+            output.disp = Some((1, disp8.into()));
+            output.modrm = match reg {
+                X86Register::Si => 0x44 | ((r & 0x7) << 3),
+                X86Register::Di => 0x45 | ((r & 0x7) << 3),
+                X86Register::Bp => 0x46 | ((r & 0x7) << 3),
+                X86Register::Bx => 0x47 | ((r & 0x7) << 3),
+                reg => panic!("16-bit addresses cannot encode [{}]", reg),
+            }
+        }
+        ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Reg(reg),
+            disp32,
+            ..
+        } if addr_size == X86RegisterClass::Word => {
+            output.disp = Some((2, disp32.into()));
+            output.modrm = match reg {
+                X86Register::Si => 0x84 | ((r & 0x7) << 3),
+                X86Register::Di => 0x85 | ((r & 0x7) << 3),
+                X86Register::Bp => 0x86 | ((r & 0x7) << 3),
+                X86Register::Bx => 0x87 | ((r & 0x7) << 3),
+                reg => panic!("16-bit addresses cannot encode [{}]", reg),
+            }
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Reg(reg),
+            ..
+        } => {
+            match reg.regnum() & 0x7 {
+                4 => {
+                    // r/m encoding 0x04 is always an SIB byte
+                    output.modrm = 0x04 | ((r & 0x7) << 3);
+                    output.sib = Some(0x24)
+                }
+                5 => {
+                    // r/m encoding 0x05 in mod 00
+                    output.modrm = 0x45 | ((r & 0x7) << 3);
+                    output.disp = Some((1, 0));
+                }
+                n => output.modrm = 0x00 | ((r & 0x7) << 3) | n,
+            }
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::RipRel(addr),
+            ..
+        } => {
+            if mode == X86Mode::Long {
+                output.modrm = 0x05 | ((r & 0x7) << 3);
+                output.addr = Some((4, addr, true));
+            } else {
+                panic!("[rip+{:?}] is not supported in this mode", addr)
+            }
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Abs(addr),
+            ..
+        } => {
+            if mode == X86Mode::Long {
+                // ModR/M can only encode [rip+disp32] in 64-bit mode
+                // Use an SIB byte instead
+                output.modrm = 0x04 | ((r & 0x7) << 3);
+                output.sib = Some(0x25);
+                output.addr = Some((4, addr, false));
+            } else if addr_size == X86RegisterClass::Word {
+                output.modrm = 0x06 | ((r & 0x7) << 3);
+                output.addr = Some((2, addr, false));
+            } else {
+                output.modrm = 0x05 | ((r & 0x7) << 3);
+                output.addr = Some((4, addr, false))
+            }
+        }
+        ModRM::Indirect {
+            mode: ModRMRegOrSib::Sib { scale, index, base },
+            ..
+        } => {
+            output.modrm = 0x04 | ((r & 0x7) << 3);
+            if index.regnum() == 4 {
+                panic!("Cannot encode SIB byte with {:?} as index", index);
+            }
+            if base.regnum() & 0x7 == 5 {
+                output.modrm |= 0x40;
+                output.sib = Some(
+                    ((scale.trailing_zeros() as u8 + 1) << 6)
+                        | ((index.regnum() & 0x7) << 3)
+                        | (0x05),
+                );
+                output.disp = Some((1, 0));
+            } else {
+                output.sib = Some(
+                    (((scale.trailing_zeros() as u8 + 1) as u8) << 6)
+                        | ((index.regnum() & 0x7) << 3)
+                        | (base.regnum()),
+                )
+            }
+        }
+        ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Sib { scale, index, base },
+            disp8,
+            ..
+        } => {
+            output.modrm = 0x44 | ((r & 0x7) << 3);
+            output.disp = Some((1, disp8.into()));
+            if index.regnum() == 4 {
+                panic!("Cannot encode SIB byte with {:?} as index", index);
+            }
+            output.sib = Some(
+                ((scale.trailing_zeros() as u8 + 1) << 6)
+                    | ((index.regnum() & 0x7) << 3)
+                    | (base.regnum()),
+            )
+        }
+        ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Sib { scale, index, base },
+            disp32,
+            ..
+        } => {
+            output.modrm = 0x84 | ((r & 0x7) << 3);
+            output.disp = Some((4, disp32.into()));
+            if index.regnum() == 4 {
+                panic!("Cannot encode SIB byte with {:?} as index", index);
+            }
+            output.sib = Some(
+                ((scale.trailing_zeros() as u8 + 1) << 6)
+                    | ((index.regnum() & 0x7) << 3)
+                    | (base.regnum()),
+            )
+        }
+        ModRM::IndirectDisp8 {
+            mode: ModRMRegOrSib::Reg(reg),
+            disp8,
+            ..
+        } => {
+            if reg.regnum() & 0x7 == 4 {
+                // r/m encoding 0x04 is always an SIB byte
+                output.modrm = 0x44 | ((r & 0x7) << 3);
+                output.sib = Some(0x24)
+            } else {
+                output.modrm = 0x40 | (reg.regnum() & 0x7) | ((r & 0x7) << 3)
+            }
+            output.disp = Some((1, disp8.into()))
+        }
+        ModRM::IndirectDisp32 {
+            mode: ModRMRegOrSib::Reg(reg),
+            disp32,
+            ..
+        } => {
+            if reg.regnum() & 0x7 == 4 {
+                // r/m encoding 0x04 is always an SIB byte
+                output.modrm = 0x84 | ((r & 0x7) << 3);
+                output.sib = Some(0x24)
+            } else {
+                output.modrm = 0x80 | (reg.regnum() & 0x7) | ((r & 0x7) << 3)
+            }
+            output.disp = Some((4, disp32.into()))
+        }
+        modrm => todo!("{:?}", modrm),
+    }
+
+    output
+}
+
 impl<W: InsnWrite> X86Encoder<W> {
     pub fn write_insn(&mut self, insn: X86Instruction) -> std::io::Result<()> {
+        eprintln!("Encoding: {:?}", insn);
+        let mode = insn.mode_override().unwrap_or(self.mode);
         let opcode_long = insn.opcode().opcode();
         let mut opcode = if opcode_long < 0x100 {
             vec![opcode_long as u8]
@@ -773,295 +1160,492 @@ impl<W: InsnWrite> X86Encoder<W> {
                 assert!(insn.operands.is_empty());
                 self.writer.write_all(&opcode)
             }
-            [Imm(1)] | [Rel(8)] => {
+            [Imm(n)] => {
                 assert_eq!(insn.operands.len(), 1);
+
                 self.writer.write_all(&opcode)?;
-                self.writer.write_all(&[match insn.operands()[0] {
-                    X86Operand::Immediate(x) => x as u8,
-                    _ => panic!(),
-                }])
+
+                match &insn.operands[0] {
+                    X86Operand::Immediate(imm) => self.writer.write_all(&imm.to_ne_bytes()[..*n]),
+                    X86Operand::AbsAddr(addr) => self.writer.write_addr(*n, addr.clone(), false),
+                    op => panic!("Invalid operand {:?} for Immediate", op),
+                }
+            }
+            [Rel(n)] => {
+                let n = (*n) / 8;
+                assert_eq!(insn.operands.len(), 1);
+
+                self.writer.write_all(&opcode)?;
+
+                match &insn.operands[0] {
+                    X86Operand::Immediate(imm) => self.writer.write_all(&imm.to_ne_bytes()[..n]),
+                    X86Operand::AbsAddr(addr) => self.writer.write_addr(n, addr.clone(), true),
+                    op => panic!("Invalid operand {:?} for Immediate", op),
+                }
             }
             [Insn] => todo!(),
-            [ModRM(Byte), Reg(Byte)] => {
-                assert_eq!(insn.operands.len(), 2);
-                let mut rex = false;
-                let b = match insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(reg)) => {
-                        if matches!(reg.class(), X86RegisterClass::ByteRex) {
-                            rex = true;
-                        }
-                        reg.regnum() >= 8
-                    }
-                    _ => todo!(),
+            [OpRegMode] => {
+                let reg = match &insn.operands[0] {
+                    X86Operand::Register(r) => r,
+                    op => panic!("Invalid operand {:?} for OpRegMode", op),
                 };
-                if b {
-                    rex = true;
-                }
-                let (r, reg) = match insn.operands()[1] {
-                    X86Operand::Register(reg) => {
-                        if matches!(reg.class(), X86RegisterClass::ByteRex) {
-                            rex = true;
-                        }
-                        (reg.regnum() >= 8, reg.regnum() & 7)
+
+                match (reg.class(), mode) {
+                    (X86RegisterClass::Word, X86Mode::Real | X86Mode::Virtual8086)
+                    | (X86RegisterClass::Double, X86Mode::Protected | X86Mode::Compatibility)
+                    | (X86RegisterClass::Quad, X86Mode::Long) => {}
+                    (X86RegisterClass::Word, _)
+                    | (X86RegisterClass::Double, X86Mode::Real | X86Mode::Virtual8086) => {
+                        self.writer.write_all(&[0x66])?;
                     }
-                    _ => todo!(),
+                    (_, mode) => panic!("Register {} is not valid in mode {:?}", reg, mode),
+                }
+
+                *opcode.last_mut().unwrap() += reg.regnum() & 0x7;
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
+                    }
+                    _ => {}
+                }
+
+                if reg.regnum() > 8 {
+                    self.writer.write_all(&[0x41])?;
+                }
+
+                self.writer.write_all(opcode)
+            }
+            [ModRM(cl1), Reg(cl2)] if cl1 == cl2 => {
+                let reg = match &insn.operands[1] {
+                    X86Operand::Register(r) => *r,
+                    op => panic!("Invalid operand {:?} for Reg({:?})", op, cl2),
                 };
-                if r {
-                    rex = true;
+
+                let modrm = match &insn.operands[0] {
+                    X86Operand::Register(r) => ModRM::Direct(*r),
+                    X86Operand::ModRM(modrm) => modrm.clone(),
+                    X86Operand::RelAddr(addr) => ModRM::Indirect {
+                        size: *cl1,
+                        mode: ModRMRegOrSib::RipRel(addr.clone()),
+                    },
+                    X86Operand::AbsAddr(addr) => ModRM::Indirect {
+                        size: *cl1,
+                        mode: ModRMRegOrSib::Abs(addr.clone()),
+                    },
+                    op => panic!("Invalid operand {:?} for ModRM({:?})", op, cl1),
+                };
+
+                let mut encoding = encode_modrm(modrm, reg.regnum(), mode);
+
+                if reg.class() == X86RegisterClass::Byte
+                    && encoding.rex.is_some()
+                    && reg.regnum() > 3
+                {
+                    panic!("Cannot encode {} with a rex prefix", reg);
+                } else if reg.class() == X86RegisterClass::ByteRex {
+                    encoding.rex.get_or_insert(0x40); // Put in a null REX prefix if we have spl/bpl/sil/dil
                 }
-                if rex {
-                    let rex = 0x40 | if b { 0x01 } else { 0x00 } | if r { 0x04 } else { 0x00 };
-                    self.writer.write_all(&[rex])?;
-                }
-                self.writer.write_all(&opcode)?;
-                match insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
-                        self.writer.write_all(&[0xC0 + (reg << 3) + regrm.regnum()])
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                self.writer.write_all(
+                    encoding
+                        .size_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                self.writer.write_all(
+                    encoding
+                        .addr_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
                     }
-                    _ => todo!(),
+                    _ => {}
                 }
+
+                self.writer.write_all(
+                    encoding
+                        .rex
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                self.writer.write_all(opcode)?;
+                self.writer
+                    .write_all(core::slice::from_ref(&encoding.modrm))?;
+                self.writer.write_all(
+                    encoding
+                        .sib
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                match (encoding.disp, encoding.addr) {
+                    (Some((size, disp)), None) => {
+                        self.writer.write_all(&disp.to_ne_bytes()[..size])?
+                    }
+                    (None, Some((size, addr, pcrel))) => {
+                        self.writer.write_addr(size, addr, pcrel)?
+                    }
+                    (None, None) => {}
+                    (Some(_), Some(_)) => {
+                        panic!("Cannot encode both an address and a displacement")
+                    }
+                }
+                Ok(())
+            }
+            [Reg(cl2), ModRM(cl1)] if cl1 == cl2 => {
+                let reg = match &insn.operands[0] {
+                    X86Operand::Register(r) => *r,
+                    op => panic!("Invalid operand {:?} for Reg({:?})", op, cl2),
+                };
+
+                let modrm = match &insn.operands[1] {
+                    X86Operand::Register(r) => ModRM::Direct(*r),
+                    X86Operand::ModRM(modrm) => modrm.clone(),
+                    X86Operand::RelAddr(addr) => ModRM::Indirect {
+                        size: *cl1,
+                        mode: ModRMRegOrSib::RipRel(addr.clone()),
+                    },
+                    X86Operand::AbsAddr(addr) => ModRM::Indirect {
+                        size: *cl1,
+                        mode: ModRMRegOrSib::Abs(addr.clone()),
+                    },
+                    op => panic!("Invalid operand {:?} for ModRM({:?})", op, cl1),
+                };
+
+                let mut encoding = encode_modrm(modrm, reg.regnum(), mode);
+
+                if reg.class() == X86RegisterClass::Byte
+                    && encoding.rex.is_some()
+                    && reg.regnum() > 3
+                {
+                    panic!("Cannot encode {} with a rex prefix", reg);
+                } else if reg.class() == X86RegisterClass::ByteRex {
+                    encoding.rex.get_or_insert(0x40); // Put in a null REX prefix if we have spl/bpl/sil/dil
+                }
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                self.writer.write_all(
+                    encoding
+                        .size_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                self.writer.write_all(
+                    encoding
+                        .addr_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
+                    }
+                    _ => {}
+                }
+
+                self.writer.write_all(
+                    encoding
+                        .rex
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                self.writer.write_all(opcode)?;
+                self.writer
+                    .write_all(core::slice::from_ref(&encoding.modrm))?;
+                self.writer.write_all(
+                    encoding
+                        .sib
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                match (encoding.disp, encoding.addr) {
+                    (Some((size, disp)), None) => {
+                        self.writer.write_all(&disp.to_ne_bytes()[..size])?
+                    }
+                    (None, Some((size, addr, pcrel))) => {
+                        self.writer.write_addr(size, addr, pcrel)?
+                    }
+                    (None, None) => {}
+                    (Some(_), Some(_)) => {
+                        panic!("Cannot encode both an address and a displacement")
+                    }
+                }
+                Ok(())
             }
             [ModRMGeneral, RegGeneral] => {
-                assert_eq!(insn.operands.len(), 2);
-                let mut short = false;
-                let (b, w) = match insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(reg)) => {
-                        if matches!(reg.class(), X86RegisterClass::Word) {
-                            short = true;
-                        }
-                        (
-                            reg.regnum() >= 8,
-                            matches!(reg.class(), X86RegisterClass::Quad),
-                        )
-                    }
-                    _ => todo!(),
-                };
-                let mut rex = b || w;
-                let (r, reg) = match insn.operands()[1] {
-                    X86Operand::Register(reg) => (reg.regnum() >= 8, reg.regnum() & 7),
-                    _ => todo!(),
-                };
-                if r {
-                    rex = true;
-                }
-                if short {
-                    self.writer.write_all(&[0x66])?;
-                }
-                if rex {
-                    let rex = 0x40
-                        | if b { 0x01 } else { 0x00 }
-                        | if r { 0x04 } else { 0x00 }
-                        | if w { 0x08 } else { 0x00 };
-                    self.writer.write_all(&[rex])?;
-                }
-                self.writer.write_all(&opcode)?;
-                match insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
-                        self.writer.write_all(&[0xC0 + (reg << 3) + regrm.regnum()])
-                    }
-                    _ => todo!(),
-                }
-            }
-            [OpRegMode] => {
-                assert_eq!(insn.operands.len(), 1);
-                let reg = match insn.operands()[0] {
-                    X86Operand::Register(reg) => reg,
-                    _ => panic!(),
-                };
-                if matches!(reg.class(), X86RegisterClass::Word) {
-                    self.writer.write_all(&[0x66])?; // 16-bit operand override
-                }
-                if reg.regnum() >= 8 {
-                    self.writer.write_all(&[0x41])?; // REX.B
-                }
-                let len = opcode.len();
-                opcode[len - 1] += reg.regnum() & 7;
-                self.writer.write_all(&opcode)
-            }
-            [OpRegGeneral, ImmGeneral] => {
-                assert_eq!(insn.operands.len(), 2);
-                let reg = match insn.operands()[0] {
-                    X86Operand::Register(reg) => reg,
-                    _ => panic!(),
+                let reg = match &insn.operands[1] {
+                    X86Operand::Register(r) => *r,
+                    op => panic!("Invalid operand {:?} for RegGeneral", op),
                 };
 
-                let imm = match insn.operands()[0] {
-                    X86Operand::Immediate(val) => val,
-                    _ => panic!(), // TODO: We should support addresses here as well
+                let modrm = match &insn.operands[0] {
+                    X86Operand::Register(r) => ModRM::Direct(*r),
+                    X86Operand::ModRM(modrm) => modrm.clone(),
+                    X86Operand::RelAddr(addr) => ModRM::Indirect {
+                        size: reg.class(),
+                        mode: ModRMRegOrSib::RipRel(addr.clone()),
+                    },
+                    X86Operand::AbsAddr(addr) => ModRM::Indirect {
+                        size: reg.class(),
+                        mode: ModRMRegOrSib::Abs(addr.clone()),
+                    },
+                    op => panic!("Invalid operand {:?} for ModRMGeneral", op),
                 };
 
-                let mut rex = None;
-                let mut immsz = 4;
-                if matches!(reg.class(), X86RegisterClass::Word) {
-                    immsz = 2;
-                    if matches!(reg.class(), X86RegisterClass::Word) {
-                        self.writer.write_all(&[0x66])?; // 16-bit operand override
-                    }
-                } else if matches!(reg.class(), X86RegisterClass::Quad) {
-                    rex = Some(0x48); // rex.w
-                }
-                if reg.regnum() >= 8 {
-                    rex = if let Some(rex) = rex {
-                        Some(rex | 0x01)
-                    } else {
-                        Some(0x41)
-                    }
-                }
-                if let Some(rex) = rex {
-                    self.writer.write_all(&[rex])?;
-                }
-                let len = opcode.len();
-                opcode[len - 1] += reg.regnum() & 7;
-                self.writer.write_all(&opcode)?;
-                let bytes = imm.to_le_bytes();
-                self.writer.write_all(&bytes[..immsz])
-            }
-            [OpRegGeneral, ImmGeneralWide] => {
-                assert_eq!(insn.operands.len(), 2);
-                let reg = match insn.operands()[0] {
-                    X86Operand::Register(reg) => reg,
-                    _ => panic!(),
-                };
+                let encoding = encode_modrm(modrm, reg.regnum(), mode);
 
-                let imm = match insn.operands()[1] {
-                    X86Operand::Immediate(val) => val,
-                    _ => panic!(), // TODO: We should support addresses here as well
-                };
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
 
-                let mut rex = None;
-                let mut immsz = 4;
-                if matches!(reg.class(), X86RegisterClass::Word) {
-                    immsz = 2;
-                    if matches!(reg.class(), X86RegisterClass::Word) {
-                        self.writer.write_all(&[0x66])?; // 16-bit operand override
+                self.writer.write_all(
+                    encoding
+                        .size_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                self.writer.write_all(
+                    encoding
+                        .addr_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
                     }
-                } else if matches!(reg.class(), X86RegisterClass::Quad) {
-                    immsz = 8;
-                    rex = Some(0x48); // rex.w
+                    _ => {}
                 }
-                if reg.regnum() >= 8 {
-                    rex = if let Some(rex) = rex {
-                        Some(rex | 0x01)
-                    } else {
-                        Some(0x41)
+
+                self.writer.write_all(
+                    encoding
+                        .rex
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                self.writer.write_all(opcode)?;
+                self.writer
+                    .write_all(core::slice::from_ref(&encoding.modrm))?;
+                self.writer.write_all(
+                    encoding
+                        .sib
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                match (encoding.disp, encoding.addr) {
+                    (Some((size, disp)), None) => {
+                        self.writer.write_all(&disp.to_ne_bytes()[..size])?
+                    }
+                    (None, Some((size, addr, pcrel))) => {
+                        self.writer.write_addr(size, addr, pcrel)?
+                    }
+                    (None, None) => {}
+                    (Some(_), Some(_)) => {
+                        panic!("Cannot encode both an address and a displacement")
                     }
                 }
-                if let Some(rex) = rex {
-                    self.writer.write_all(&[rex])?;
-                }
-                let len = opcode.len();
-                opcode[len - 1] += reg.regnum() & 7;
-                self.writer.write_all(&opcode)?;
-                let bytes = imm.to_le_bytes();
-                self.writer.write_all(&bytes[..immsz])
+                Ok(())
             }
             [RegGeneral, ModRMGeneral] => {
-                assert_eq!(insn.operands.len(), 2);
-                let mut short = false;
-                let b = match insn.operands()[1] {
-                    X86Operand::ModRM(ModRM::Direct(reg)) => reg.regnum() >= 8,
-                    X86Operand::ModRM(ModRM::Indirect { .. }) => false,
-                    _ => todo!(),
+                let reg = match &insn.operands[0] {
+                    X86Operand::Register(r) => *r,
+                    op => panic!("Invalid operand {:?} for RegGeneral", op),
                 };
-                let mut rex = b;
-                let (r, w, reg) = match insn.operands()[0] {
-                    X86Operand::Register(reg) => {
-                        if matches!(reg.class(), X86RegisterClass::Word) {
-                            short = true;
-                        }
-                        (
-                            reg.regnum() >= 8,
-                            matches!(reg.class(), X86RegisterClass::Quad),
-                            reg.regnum() & 7,
-                        )
-                    }
-                    _ => todo!(),
+
+                let modrm = match &insn.operands[1] {
+                    X86Operand::Register(r) => ModRM::Direct(*r),
+                    X86Operand::ModRM(modrm) => modrm.clone(),
+                    X86Operand::RelAddr(addr) => ModRM::Indirect {
+                        size: reg.class(),
+                        mode: ModRMRegOrSib::RipRel(addr.clone()),
+                    },
+                    X86Operand::AbsAddr(addr) => ModRM::Indirect {
+                        size: reg.class(),
+                        mode: ModRMRegOrSib::Abs(addr.clone()),
+                    },
+                    op => panic!("Invalid operand {:?} for ModRMGeneral", op),
                 };
-                if r || w {
-                    rex = true;
-                }
-                if short {
-                    self.writer.write_all(&[0x66])?;
-                }
-                if rex {
-                    let rex = 0x40
-                        | if b { 0x01 } else { 0x00 }
-                        | if r { 0x04 } else { 0x00 }
-                        | if w { 0x08 } else { 0x00 };
-                    self.writer.write_all(&[rex])?;
-                }
-                self.writer.write_all(&opcode)?;
-                match &insn.operands()[1] {
-                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
-                        self.writer.write_all(&[0xC0 + (reg << 3) + regrm.regnum()])
+
+                let encoding = encode_modrm(modrm, reg.regnum(), mode);
+
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                self.writer.write_all(
+                    encoding
+                        .size_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                self.writer.write_all(
+                    encoding
+                        .addr_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
                     }
-                    X86Operand::ModRM(ModRM::Indirect {
-                        mode: ModRMRegOrSib::RipRel(addr),
-                    }) => {
-                        self.writer.write_all(&[(reg << 3) + 0x05])?;
-                        self.writer.write_addr(32, addr.clone(), true)
-                    }
-                    _ => todo!(),
-                }
-            }
-            [RelGeneral] => {
-                assert!(insn.operands().len() == 1);
-                self.writer.write_all(&opcode)?;
-                match &insn.operands()[0] {
-                    X86Operand::RelAddr(addr) => self.writer.write_addr(32, addr.clone(), true),
-                    _ => todo!(),
-                }
-            }
-            [RControlBits(n), ModRMGeneral, ImmGeneral] => {
-                let b = match insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(reg)) => reg.regnum() >= 8,
-                    X86Operand::ModRM(ModRM::Indirect { .. }) => false,
-                    _ => todo!(),
-                };
-                let mut short = false;
-                let mut rex = b;
-                let (r, w) = match insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(reg)) => {
-                        if matches!(reg.class(), X86RegisterClass::Word) {
-                            short = true;
-                        }
-                        (false, matches!(reg.class(), X86RegisterClass::Quad))
-                    }
-                    _ => todo!(),
-                };
-                if r || w {
-                    rex = true;
-                }
-                if short {
-                    self.writer.write_all(&[0x66])?;
-                }
-                if rex {
-                    let rex = 0x40
-                        | if b { 0x01 } else { 0x00 }
-                        | if r { 0x04 } else { 0x00 }
-                        | if w { 0x08 } else { 0x00 };
-                    self.writer.write_all(&[rex])?;
-                }
-                self.writer.write_all(&opcode)?;
-                match &insn.operands()[0] {
-                    X86Operand::ModRM(ModRM::Direct(regrm)) => {
-                        self.writer
-                            .write_all(&[0xC0 + (*n << 3) + (regrm.regnum() & 0x7)])?;
-                    }
-                    X86Operand::ModRM(ModRM::Indirect {
-                        mode: ModRMRegOrSib::RipRel(addr),
-                    }) => {
-                        self.writer.write_all(&[(*n << 3) + 0x05])?;
-                        self.writer.write_addr(32, addr.clone(), true)?;
-                    }
-                    _ => todo!(),
+                    _ => {}
                 }
 
-                match &insn.operands()[1] {
-                    X86Operand::Immediate(val) => self
-                        .writer
-                        .write_all(&(val.to_le_bytes()[..(2 << ((!short) as u32))])),
-                    _ => todo!(),
+                self.writer.write_all(
+                    encoding
+                        .rex
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                self.writer.write_all(opcode)?;
+                self.writer
+                    .write_all(core::slice::from_ref(&encoding.modrm))?;
+                self.writer.write_all(
+                    encoding
+                        .sib
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                match (encoding.disp, encoding.addr) {
+                    (Some((size, disp)), None) => {
+                        self.writer.write_all(&disp.to_ne_bytes()[..size])?
+                    }
+                    (None, Some((size, addr, pcrel))) => {
+                        self.writer.write_addr(size, addr, pcrel)?
+                    }
+                    (None, None) => {}
+                    (Some(_), Some(_)) => {
+                        panic!("Cannot encode both an address and a displacement")
+                    }
+                }
+                Ok(())
+            }
+            [RControlBits(b), ModRMGeneral, ImmGeneral] => {
+                let modrm = match &insn.operands[0] {
+                    X86Operand::Register(r) => ModRM::Direct(*r),
+                    X86Operand::ModRM(modrm) => modrm.clone(),
+                    X86Operand::RelAddr(addr) => ModRM::Indirect {
+                        size: mode.largest_gpr(),
+                        mode: ModRMRegOrSib::RipRel(addr.clone()),
+                    },
+                    X86Operand::AbsAddr(addr) => ModRM::Indirect {
+                        size: mode.largest_gpr(),
+                        mode: ModRMRegOrSib::Abs(addr.clone()),
+                    },
+                    op => panic!("Invalid operand {:?} for ModRMGeneral", op),
+                };
+
+                let size = match modrm {
+                    ModRM::Indirect { size, .. } => size,
+                    ModRM::IndirectDisp8 { size, .. } => size,
+                    ModRM::IndirectDisp32 { size, .. } => size,
+                    ModRM::Direct(r) => r.class(),
+                };
+
+                let encoding = encode_modrm(modrm, *b, mode);
+
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                self.writer.write_all(
+                    encoding
+                        .size_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                self.writer.write_all(
+                    encoding
+                        .addr_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
+                    }
+                    _ => {}
+                }
+
+                self.writer.write_all(
+                    encoding
+                        .rex
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                self.writer.write_all(opcode)?;
+                self.writer
+                    .write_all(core::slice::from_ref(&encoding.modrm))?;
+                self.writer.write_all(
+                    encoding
+                        .sib
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match (encoding.disp, encoding.addr) {
+                    (Some((size, disp)), None) => {
+                        self.writer.write_all(&disp.to_ne_bytes()[..size])?;
+                    }
+                    (None, Some((size, addr, pcrel))) => {
+                        self.writer.write_addr(size, addr, pcrel)?;
+                    }
+                    (None, None) => {}
+                    (Some(_), Some(_)) => {
+                        panic!("Cannot encode both an address and a displacement")
+                    }
+                }
+
+                let n = match size {
+                    X86RegisterClass::Word => 2,
+                    _ => 4,
+                };
+
+                match &insn.operands[1] {
+                    X86Operand::Immediate(imm) => self.writer.write_all(&imm.to_ne_bytes()[..n]),
+                    X86Operand::AbsAddr(addr) => self.writer.write_addr(n, addr.clone(), false),
+                    op => panic!("Invalid operand {:?} for Immediate", op),
                 }
             }
             m => panic!("Unsupported Addressing Mode {:?}", m),
