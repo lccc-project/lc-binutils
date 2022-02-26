@@ -876,6 +876,8 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
 
     // Compute 66h REX.W
     match (size, mode) {
+        (X86RegisterClass::Byte, _) => {}
+        (X86RegisterClass::ByteRex, X86Mode::Long) => {}
         (X86RegisterClass::Word, X86Mode::Real | X86Mode::Virtual8086) => {}
         (X86RegisterClass::Double, X86Mode::Real | X86Mode::Virtual8086)
         | (X86RegisterClass::Word, _) => {
@@ -1168,12 +1170,14 @@ impl<W: InsnWrite> X86Encoder<W> {
 
                 match &insn.operands[0] {
                     X86Operand::Immediate(imm) => self.writer.write_all(&imm.to_ne_bytes()[..*n]),
-                    X86Operand::AbsAddr(addr) => self.writer.write_addr(*n, addr.clone(), false),
+                    X86Operand::AbsAddr(addr) => {
+                        self.writer.write_addr(*n / 8, addr.clone(), false)
+                    }
                     op => panic!("Invalid operand {:?} for Immediate", op),
                 }
             }
             [Rel(n)] => {
-                let n = (*n) / 8;
+                let n = *n;
                 assert_eq!(insn.operands.len(), 1);
 
                 self.writer.write_all(&opcode)?;
@@ -1299,7 +1303,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         self.writer.write_all(&disp.to_ne_bytes()[..size])?
                     }
                     (None, Some((size, addr, pcrel))) => {
-                        self.writer.write_addr(size, addr, pcrel)?
+                        self.writer.write_addr(size * 8, addr, pcrel)?
                     }
                     (None, None) => {}
                     (Some(_), Some(_)) => {
@@ -1547,7 +1551,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         self.writer.write_all(&disp.to_ne_bytes()[..size])?
                     }
                     (None, Some((size, addr, pcrel))) => {
-                        self.writer.write_addr(size, addr, pcrel)?
+                        self.writer.write_addr(size * 8, addr, pcrel)?
                     }
                     (None, None) => {}
                     (Some(_), Some(_)) => {
@@ -1630,7 +1634,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         self.writer.write_all(&disp.to_ne_bytes()[..size])?;
                     }
                     (None, Some((size, addr, pcrel))) => {
-                        self.writer.write_addr(size, addr, pcrel)?;
+                        self.writer.write_addr(size * 8, addr, pcrel)?;
                     }
                     (None, None) => {}
                     (Some(_), Some(_)) => {
@@ -1645,8 +1649,34 @@ impl<W: InsnWrite> X86Encoder<W> {
 
                 match &insn.operands[1] {
                     X86Operand::Immediate(imm) => self.writer.write_all(&imm.to_ne_bytes()[..n]),
-                    X86Operand::AbsAddr(addr) => self.writer.write_addr(n, addr.clone(), false),
+                    X86Operand::AbsAddr(addr) => self.writer.write_addr(n * 8, addr.clone(), false),
                     op => panic!("Invalid operand {:?} for Immediate", op),
+                }
+            }
+            [RelGeneral] => {
+                let size = match mode {
+                    X86Mode::Virtual8086 | X86Mode::Real => 2,
+                    _ => 4,
+                };
+
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
+                    }
+                    _ => {}
+                }
+
+                self.writer.write_all(opcode)?;
+
+                match &insn.operands[0] {
+                    X86Operand::RelAddr(addr) => {
+                        self.writer.write_addr(size * 8, addr.clone(), true)
+                    }
+                    op => panic!("Invalid Operand for RelGeneral {:?}", op),
                 }
             }
             m => panic!("Unsupported Addressing Mode {:?}", m),
