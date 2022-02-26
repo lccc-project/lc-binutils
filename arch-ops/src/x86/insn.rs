@@ -810,6 +810,9 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
 
     // Compute REX.XB and Addr size
     let addr_size = match modrm {
+        ModRM::Direct(_) => {
+            mode.largest_gpr() // doesn't matter, don't insert anything extra
+        }
         ModRM::Indirect {
             mode: ModRMRegOrSib::Reg(r),
             ..
@@ -821,8 +824,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
         | ModRM::IndirectDisp32 {
             mode: ModRMRegOrSib::Reg(r),
             ..
-        }
-        | ModRM::Direct(r) => {
+        } => {
             if r.regnum() >= 8 {
                 *output.rex.get_or_insert(0x40) |= 0x01;
             }
