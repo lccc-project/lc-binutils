@@ -1679,6 +1679,62 @@ impl<W: InsnWrite> X86Encoder<W> {
                     op => panic!("Invalid Operand for RelGeneral {:?}", op),
                 }
             }
+            [OpRegGeneral, ImmGeneralWide] => {
+                let reg = match &insn.operands[0] {
+                    X86Operand::Register(r) => r,
+                    op => panic!("Invalid Operand for {:?}", op),
+                };
+
+                let mut rex = None;
+                if reg.regnum() > 7 {
+                    *rex.get_or_insert(0x40) |= 0x1;
+                }
+
+                let opsize = match (reg.class(), mode) {
+                    (X86RegisterClass::Word, X86Mode::Real | X86Mode::Virtual8086)
+                    | (
+                        X86RegisterClass::Double,
+                        X86Mode::Protected | X86Mode::Compatibility | X86Mode::Long,
+                    ) => None,
+                    (X86RegisterClass::Word, _)
+                    | (X86RegisterClass::Double, X86Mode::Real | X86Mode::Virtual8086) => {
+                        Some(0x66)
+                    }
+                    (X86RegisterClass::Quad, X86Mode::Long) => None,
+                    (class, mode) => {
+                        panic!("Unsupported register class {:?} in mode {:?}", class, mode)
+                    }
+                };
+
+                let immsize = reg.class().size(mode);
+
+                self.writer
+                    .write_all(opsize.as_ref().map(core::slice::from_ref).unwrap_or(&[]))?;
+
+                *opcode.last_mut().unwrap() += reg.regnum() & 0x7;
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
+                    }
+                    _ => {}
+                }
+
+                self.writer
+                    .write_all(rex.as_ref().map(core::slice::from_ref).unwrap_or(&[]))?;
+
+                self.writer.write_all(opcode)?;
+                match &insn.operands[1] {
+                    X86Operand::Immediate(i) => self.writer.write_all(&i.to_le_bytes()[0..immsize]),
+                    X86Operand::AbsAddr(addr) => {
+                        self.writer.write_addr(immsize * 8, addr.clone(), false)
+                    }
+                    op => panic!("Invalid operand {:?} for ImmGeneralWide", op),
+                }
+            }
             m => panic!("Unsupported Addressing Mode {:?}", m),
         }
     }
