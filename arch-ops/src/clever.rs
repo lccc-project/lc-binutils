@@ -176,35 +176,6 @@ clever_registers! {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub enum CleverOperand {
-    Register {
-        reg: CleverRegister,
-        ss: u16,
-    },
-    VectorRegister {
-        reg: CleverRegister,
-        vss: u16,
-    },
-    IndirectRegister {
-        base: CleverRegister,
-        scale: u16,
-        ss: u16,
-        index: CleverIndex,
-    },
-    ShortImmediate {
-        val: u16,
-        pcrel: bool,
-    },
-    LongImmediate {
-        val: u64,
-        ss: u16,
-        pcrel: bool,
-        mref: bool,
-        zz: u16,
-    },
-}
-
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[repr(u8)]
 pub enum ConditionCode {
     Parity,
@@ -483,8 +454,6 @@ clever_instructions! {
     [Cvtf, "cvtf", 0x026, CleverOperandKind::Normal(2), {flags @ 0 => bool}],
 
     // Block Instructions
-    [Repbi, "repbi", 0x028, CleverOperandKind::Insn],
-    [Repbc, "repbc", 0x029, CleverOperandKind::Insn, {cc @ .. => ConditionCode}],
     [Bcpy, "bcpy", 0x02a, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
     [Bsto, "bsto", 0x02b, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
     [Bsca, "bsca", 0x02c, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
@@ -578,7 +547,6 @@ clever_instructions! {
     [Fence, "fence", 0x203, CleverOperandKind::Normal(0), {}],
 
     // Vector Instructions
-    [Vec,"vec", 0x400, CleverOperandKind::Insn, {ss @ 0..2 => u16} ],
     [Vmov, "vmov",0x401, CleverOperandKind::Normal(2), {}],
 
     // conditional Branches
@@ -779,4 +747,26 @@ impl CleverOpcode {
 
         Self::from_opcode(0x7000 | width | pcrel | cc | weight).unwrap()
     }
+}
+pub enum CleverOperand {
+    Register {
+        size: u16,
+        reg: CleverRegister,
+    },
+    Indirect {
+        size: u16,
+        base: CleverRegister,
+        index: CleverIndex,
+    },
+    AbsImmediate {
+        size: u32,
+        val: u64,
+    },
+    VecImmediate {
+        val: u128,
+    },
+    RelImmediate {
+        size: u32,
+        val: i64,
+    },
 }
