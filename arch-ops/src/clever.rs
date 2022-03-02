@@ -756,6 +756,7 @@ pub enum CleverOperand {
     Indirect {
         size: u16,
         base: CleverRegister,
+        scale: u8,
         index: CleverIndex,
     },
     AbsImmediate {
