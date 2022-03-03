@@ -1,7 +1,8 @@
 [package]
 name = "binfmt"
 version = "0.1.0"
-authors = ["Connor Horman <chorman64@gmail.com>"]
+authors = ["Connor Horman <chorman64@gmail.com>", "Ray Redondo <rdrpenguin04@gmail.com>"]
+description = "A library for reading and writing binaries"
 edition = "2018"
 license = "BSD-2-Clause-Patent"
 
@@ -13,7 +14,7 @@ bytemuck = {version="1.5.1",features=["derive"]}
 lazy_static = "1.4.0"
 target-tuples = "0.5.4"
 fake-enum = "0.1.4"
-arch-ops = {path="../arch-ops"}
+arch-ops = {path="../arch-ops", version = "0.1.0"}
 
 [lib]
 name = "binfmt"

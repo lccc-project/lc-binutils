@@ -2,6 +2,7 @@
 name = "arch-ops"
 version = "0.1.0"
 authors = ["chorm", "rdrpenguin"]
+description = "A library to encode and decode instructions for several architectures"
 edition = "2018"
 rust-version = "1.56"
 license = "BSD-2-Clause-Patent"
