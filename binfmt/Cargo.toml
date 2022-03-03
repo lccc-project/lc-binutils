@@ -1,7 +1,8 @@
 [package]
 name = "binfmt"
 version = "0.1.0"
-authors = ["Connor Horman <chorman64@gmail.com>"]
+authors = ["Connor Horman <chorman64@gmail.com>", "Ray Redondo <rdrpenguin04@gmail.com>"]
+description = "A library for reading and writing binaries"
 edition = "2018"
 license = "BSD-2-Clause-Patent"
 
