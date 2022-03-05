@@ -490,3 +490,4 @@ pub mod cpu;
 pub mod features;
 
 pub mod insn;
+pub mod printer;

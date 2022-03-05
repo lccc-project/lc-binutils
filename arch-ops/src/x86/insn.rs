@@ -196,7 +196,7 @@ pub enum X86OperandType {
 
 macro_rules! define_x86_instructions{
     {
-        $(($enum:ident, $mneomic:literal, $opcode:literal, [$($operand:expr),*] $(, [$($mode:ident),*] $(, [$($feature:ident),*])?)?)),* $(,)?
+        $(($enum:ident, $mnemonic:literal, $opcode:literal, [$($operand:expr),*] $(, [$($mode:ident),*] $(, [$($feature:ident),*])?)?)),* $(,)?
     } => {
         #[derive(Copy,Clone,Debug,Hash,PartialEq,Eq)]
         #[non_exhaustive]
@@ -217,6 +217,20 @@ macro_rules! define_x86_instructions{
                 }
             }
 
+            pub fn mnemonic(&self) -> &'static str{
+                match self{
+                    $(Self:: $enum => $mnemonic,)*
+                }
+            }
+
+        }
+
+        impl std::fmt::Display for X86Opcode{
+            fn fmt(&self, f: &mut std::fmt::Formatter)->std::fmt::Result{
+                match self{
+                    $(Self::$enum => f.write_str($mnemonic),)*
+                }
+            }
         }
     }
 }
@@ -655,6 +669,9 @@ pub enum X86Operand {
     Immediate(u64),
     RelAddr(Address),
     AbsAddr(Address),
+    FarAddr { sreg: X86Register, addr: Address },
+    FarRelAddr { sreg: X86Register, addr: Address },
+    FarModRM { sreg: X86Register, modrm: ModRM },
 }
 
 #[derive(Clone, Debug)]
