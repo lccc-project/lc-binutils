@@ -1881,10 +1881,3 @@ impl<W: InsnWrite> X86Encoder<W> {
         }
     }
 }
-
-
-pub struct X86Decoder<R>{
-    inner: R,
-    mode: X86Mode,
-}
-
