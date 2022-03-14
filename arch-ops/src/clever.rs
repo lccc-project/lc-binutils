@@ -770,7 +770,5 @@ pub enum CleverOperand {
         size: u32,
         val: i64,
     },
-    AbsAddr {
-        
-    }
+    AbsAddr {},
 }
