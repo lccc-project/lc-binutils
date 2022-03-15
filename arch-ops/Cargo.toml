@@ -11,7 +11,7 @@ license = "BSD-2-Clause-Patent"
 
 [dependencies]
 lazy_static = "1"
-target-tuples = "0.5.2"
+target-tuples = "0.5.5"
 
 [features]
 x86 = []
