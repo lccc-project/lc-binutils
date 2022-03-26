@@ -10,33 +10,6 @@ pub enum Prefix {
     Rep,
     Repnz,
     Repz,
-    OpSizeOverride,
-    AddrSizeOverride,
-    Rex(u8),
-    EsOverride,
-    CsOverride,
-    SsOverride,
-    DsOverride,
-    FsOverride,
-    GsOverride,
-    Vex {
-        rex: u8,
-        next: u16,
-        len: bool,
-        size_prefix: u8,
-        src2: u8,
-    },
-    EVex {
-        rex: u8,
-        next: u16,
-        len: u8,
-        size_prefix: u8,
-        src2: u8,
-        mask: u8,
-    },
-    PackedDouble,
-    ScalarSingle,
-    ScalarDouble,
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -220,6 +193,16 @@ macro_rules! define_x86_instructions{
             pub fn mnemonic(&self) -> &'static str{
                 match self{
                     $(Self:: $enum => $mnemonic,)*
+                }
+            }
+
+            pub fn valid_in_mode(&self, modes: &X86Mode) -> bool {
+                #[allow(unreachable_code)] // it's not unreachable in all expansions, and we want the default expansion to return true
+                match self{
+                    $(Self:: $enum =>{ $(return match modes {
+                        $(X86Mode:: $mode => true,)*
+                        _ => false
+                    };)? true}),*
                 }
             }
 
@@ -2066,5 +2049,70 @@ mod test {
         .unwrap();
 
         assert_eq!(&*enc.writer_mut().inner, &[0x48, 0x31, 0xC0]);
+    }
+
+    #[test]
+    fn test_encoder_opreg_mode() {
+        let mut enc = X86Encoder::new(TestWriter { inner: Vec::new() }, X86Mode::Protected);
+        enc.write_insn(X86Instruction::new(
+            X86Opcode::Push,
+            vec![X86Operand::Register(X86Register::Eax)],
+        ))
+        .unwrap();
+        assert_eq!(&*enc.writer_mut().inner, &[0x50]);
+    }
+
+    #[test]
+    fn test_encoder_opreg_mode_long() {
+        let mut enc = X86Encoder::new(TestWriter { inner: Vec::new() }, X86Mode::Long);
+        enc.write_insn(X86Instruction::new(
+            X86Opcode::Push,
+            vec![X86Operand::Register(X86Register::Rax)],
+        ))
+        .unwrap();
+        assert_eq!(&*enc.writer_mut().inner, &[0x50]);
+    }
+
+    #[test]
+    fn test_encoder_opreg_mode_protected_r16() {
+        let mut enc = X86Encoder::new(TestWriter { inner: Vec::new() }, X86Mode::Protected);
+        enc.write_insn(X86Instruction::new(
+            X86Opcode::Push,
+            vec![X86Operand::Register(X86Register::Ax)],
+        ))
+        .unwrap();
+        assert_eq!(&*enc.writer_mut().inner, &[0x66, 0x50]);
+    }
+
+    #[test]
+    fn test_encoder_opreg_mode_long_r16() {
+        let mut enc = X86Encoder::new(TestWriter { inner: Vec::new() }, X86Mode::Long);
+        enc.write_insn(X86Instruction::new(
+            X86Opcode::Push,
+            vec![X86Operand::Register(X86Register::Ax)],
+        ))
+        .unwrap();
+        assert_eq!(&*enc.writer_mut().inner, &[0x66, 0x50]);
+    }
+
+    #[test]
+    fn test_encoder_opreg_mode_real_r32() {
+        let mut enc = X86Encoder::new(TestWriter { inner: Vec::new() }, X86Mode::Real);
+        enc.write_insn(X86Instruction::new(
+            X86Opcode::Push,
+            vec![X86Operand::Register(X86Register::Eax)],
+        ))
+        .unwrap();
+        assert_eq!(&*enc.writer_mut().inner, &[0x66, 0x50]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_encoder_opreg_mode_long_r32() {
+        let mut enc = X86Encoder::new(TestWriter { inner: Vec::new() }, X86Mode::Long);
+        let _ = enc.write_insn(X86Instruction::new(
+            X86Opcode::Push,
+            vec![X86Operand::Register(X86Register::Eax)],
+        ));
     }
 }
