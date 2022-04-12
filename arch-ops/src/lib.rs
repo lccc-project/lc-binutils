@@ -10,3 +10,6 @@ pub mod x86;
 
 #[cfg(feature = "clever")]
 pub mod clever;
+
+#[cfg(test)]
+pub(crate) mod test;

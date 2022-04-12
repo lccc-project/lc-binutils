@@ -24,6 +24,10 @@ macro_rules! clever_registers{
     {
         $($name:ident $(| $altnames:ident)* => $val:expr),* $(,)?
     } => {
+        #[allow(non_upper_case_globals)]
+        impl CleverRegister{
+            $(pub const $name: Self = Self($val); $(pub const $altnames: Self = Self($val);)*)*
+        }
         impl ::core::str::FromStr for CleverRegister{
             type Err = RegisterFromStrError;
             fn from_str(st: &str) -> Result<Self,Self::Err>{
@@ -749,11 +753,11 @@ impl CleverOpcode {
 
     pub fn branch_width(&self) -> Option<u16> {
         if self.opcode() & 0xFFF0 == 0x7C40 {
-            return None
+            return None;
         }
         match self.opcode() & 0xFE00 {
             0x7000 | 0x7400 | 0x7800 => Some(((self.opcode() & 0xC00) >> 10) + 1),
-            0x7C00 => Some((self.opcode() & 0x2)+1),
+            0x7C00 => Some((self.opcode() & 0x2) + 1),
             _ => None,
         }
     }
@@ -804,21 +808,30 @@ pub enum CleverImmediate {
     Vec(u128),
 }
 
-impl CleverImmediate{
-    pub fn addr(&self) -> Option<(u64, &Address, bool)>{
-        match self{
-            CleverImmediate::ShortAddr(addr) => Some((12,addr, false)),
-            CleverImmediate::ShortAddrRel(addr) => Some((12,addr, true)),
-            CleverImmediate::LongAddr(addrsize, addr) => Some((u64::from(*addrsize),addr,false)),
-            CleverImmediate::LongAddrRel(addrsize, addr) => Some((u64::from(*addrsize),addr,false)),
-            CleverImmediate::LongMem(addrsize, addr, _) => Some((u64::from(*addrsize),addr,false)),
-            CleverImmediate::LongMemRel(addrsize, addr, _) => Some((u64::from(*addrsize),addr,false)),
-            _ => None
+impl CleverImmediate {
+    pub fn addr(&self) -> Option<(u64, &Address, bool)> {
+        match self {
+            CleverImmediate::ShortAddr(addr) => Some((12, addr, false)),
+            CleverImmediate::ShortAddrRel(addr) => Some((12, addr, true)),
+            CleverImmediate::LongAddr(addrsize, addr) => Some((u64::from(*addrsize), addr, false)),
+            CleverImmediate::LongAddrRel(addrsize, addr) => {
+                Some((u64::from(*addrsize), addr, false))
+            }
+            CleverImmediate::LongMem(addrsize, addr, _) => {
+                Some((u64::from(*addrsize), addr, false))
+            }
+            CleverImmediate::LongMemRel(addrsize, addr, _) => {
+                Some((u64::from(*addrsize), addr, false))
+            }
+            _ => None,
         }
     }
 
-    pub fn is_short(&self) -> bool{
-        matches!(self, Self::Short(_)|Self::ShortRel(_)|Self::ShortAddr(_)|Self::ShortAddrRel(_))
+    pub fn is_short(&self) -> bool {
+        matches!(
+            self,
+            Self::Short(_) | Self::ShortRel(_) | Self::ShortAddr(_) | Self::ShortAddrRel(_)
+        )
     }
 }
 
@@ -987,14 +1000,14 @@ pub struct CleverInstruction {
 }
 
 impl CleverInstruction {
-    pub fn new(opcode: CleverOpcode, operands: Vec<CleverOperand>) -> Self {
+    pub const fn new(opcode: CleverOpcode, operands: Vec<CleverOperand>) -> Self {
         Self {
             prefix: None,
             opcode,
             operands,
         }
     }
-    pub fn new_prefixed(
+    pub const fn new_prefixed(
         prefix: CleverOpcode,
         opcode: CleverOpcode,
         operands: Vec<CleverOperand>,
@@ -1021,6 +1034,24 @@ impl CleverInstruction {
 
 pub struct CleverEncoder<W> {
     inner: W,
+}
+
+impl<W> CleverEncoder<W> {
+    pub const fn new(inner: W) -> Self {
+        Self { inner }
+    }
+
+    pub fn into_inner(self) -> W {
+        self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut W {
+        &mut self.inner
+    }
+
+    pub fn inner(&self) -> &W {
+        &self.inner
+    }
 }
 
 impl<W: Write> Write for CleverEncoder<W> {
@@ -1081,7 +1112,7 @@ impl<W: InsnWrite> CleverEncoder<W> {
                             CleverImmediate::LongAddr(size, addr) | CleverImmediate::LongMem(size,addr,_) => {
                                 self.write_all(&operand.to_be_bytes())?;
                                 self.write_addr(*size as usize, addr.clone(), false)?;
-                            } 
+                            }
                             CleverImmediate::LongAddrRel(size, addr) | CleverImmediate::LongMemRel(size,addr,_) => {
                                 self.write_all(&operand.to_be_bytes())?;
                                 self.write_addr(*size as usize, addr.clone(), true)?;
@@ -1092,6 +1123,8 @@ impl<W: InsnWrite> CleverEncoder<W> {
                             }
                             _ => self.write_all(&operand.to_be_bytes())?
                         }
+                    }else{
+                        self.write_all(&operand.to_be_bytes())?;
                     }
                 }
             },
@@ -1103,7 +1136,7 @@ impl<W: InsnWrite> CleverEncoder<W> {
 
                 let width = insn.opcode().branch_width().unwrap();
 
-                self.write_addr(1<<(width as u32),addr.clone(),false)?;
+                self.write_addr(8<<(width as u32),addr.clone(),false)?;
             },
             CleverOperandKind::RelAddr => {
                 assert_eq!(insn.operands().len(),1);
@@ -1113,10 +1146,99 @@ impl<W: InsnWrite> CleverEncoder<W> {
 
                 let width = insn.opcode().branch_width().unwrap();
 
-                self.write_addr(1<<(width as u32),addr.clone(),true)?;
+                self.write_addr(8<<(width as u32),addr.clone(),true)?;
             },
             CleverOperandKind::Insn => panic!("Cannot write a prefix as a primary instruction, use `CleverInstruction::new_with_prefix` instead"),
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::test::TestWriter;
+
+    use super::*;
+    #[test]
+    pub fn test_encode_nop() {
+        let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
+        encoder
+            .write_instruction(CleverInstruction::new(CleverOpcode::Nop10, vec![]))
+            .unwrap();
+
+        assert_eq!(&*encoder.inner_mut().inner, &[0x01, 0x00]);
+    }
+
+    #[test]
+    pub fn test_encode_nop1() {
+        let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
+        encoder
+            .write_instruction(CleverInstruction::new(
+                CleverOpcode::Nop11,
+                vec![CleverOperand::Register {
+                    size: 64,
+                    reg: CleverRegister::r0,
+                }],
+            ))
+            .unwrap();
+
+        assert_eq!(&*encoder.inner_mut().inner, &[0x01, 0x10, 0x03, 0x00]);
+    }
+
+    #[test]
+    pub fn test_encode_nop1_simm() {
+        let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
+        encoder
+            .write_instruction(CleverInstruction::new(
+                CleverOpcode::Nop11,
+                vec![CleverOperand::Immediate(CleverImmediate::Short(1337))],
+            ))
+            .unwrap();
+
+        assert_eq!(&*encoder.inner_mut().inner, &[0x01, 0x10, 0x85, 0x39]);
+    }
+
+    #[test]
+    pub fn test_encode_nop2() {
+        let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
+        encoder
+            .write_instruction(CleverInstruction::new(
+                CleverOpcode::Nop12,
+                vec![
+                    CleverOperand::Register {
+                        size: 64,
+                        reg: CleverRegister::flags,
+                    },
+                    CleverOperand::Immediate(CleverImmediate::Long(16, 1337)),
+                ],
+            ))
+            .unwrap();
+
+        assert_eq!(
+            &*encoder.inner_mut().inner,
+            &[0x01, 0x20, 0x03, 0x11, 0x60, 0x00, 0x39, 0x05]
+        );
+    }
+
+    #[test]
+    pub fn test_encode_branch() {
+        let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
+        encoder
+            .write_instruction(CleverInstruction::new(
+                CleverOpcode::cbranch(ConditionCode::Zero, 1, true, 0),
+                vec![CleverOperand::Immediate(CleverImmediate::LongAddrRel(
+                    16,
+                    Address::Disp(-32),
+                ))],
+            ))
+            .unwrap();
+
+        assert_eq!(
+            &*encoder.inner().inner,
+            &[0x71, 0x30, 0xe0, 0xff],
+            "{:x?} != {:x?}",
+            encoder.inner().inner,
+            [0x71, 0x30, 0xe0, 0xff]
+        );
     }
 }
