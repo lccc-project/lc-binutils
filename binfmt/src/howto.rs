@@ -21,32 +21,4 @@ pub trait HowTo {
     fn apply(&self, addr: u128, at_addr: u128, region: &mut [u8]) -> Result<bool, HowToError>;
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub enum RelocCode {
-    None,
-    Abs { addr_width: usize },
-    BaseRel { addr_width: usize },
-    Rel { addr_width: usize },
-    AbsShifted { addr_width: usize, shift: usize },
-    RelShifted { addr_width: usize, shift: usize },
-    Got { addr_width: usize },
-    RelGot { addr_wdith: usize },
-    Plt { addr_width: usize },
-    RelPlt { addr_width: usize },
-    DynSymEntry { width: usize },
-    W65Direct,
-    W65RelaxJsl,
-    W65RelaxJml,
-    W65RelaxBrl,
-    W65RelaxDirect,
-    W65RelaxAbs,
-    W65RelaxJmp,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Reloc {
-    pub code: RelocCode,
-    pub symbol: String,
-    pub addend: Option<i64>,
-    pub offset: u64,
-}
+pub use arch_ops::traits::{Reloc, RelocCode};

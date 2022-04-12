@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::traits::{Address, InsnWrite};
+use crate::traits::{Address, InsnWrite, Reloc};
 
 use super::{X86Register, X86RegisterClass};
 
@@ -816,6 +816,10 @@ impl<W: InsnWrite> InsnWrite for X86Encoder<W> {
 
     fn offset(&self) -> usize {
         self.writer.offset()
+    }
+
+    fn write_reloc(&mut self, reloc: Reloc) -> std::io::Result<()> {
+        self.writer.write_reloc(reloc)
     }
 }
 
@@ -1870,7 +1874,7 @@ mod test {
     use std::io::Write;
 
     use crate::{
-        traits::{Address, InsnWrite},
+        traits::{Address, InsnWrite, Reloc},
         x86::X86Register,
     };
 
@@ -1901,6 +1905,10 @@ mod test {
 
         fn offset(&self) -> usize {
             self.inner.len()
+        }
+
+        fn write_reloc(&mut self, _: Reloc) -> std::io::Result<()> {
+            panic!("Cannot write Reloc to TestWriter")
         }
     }
 

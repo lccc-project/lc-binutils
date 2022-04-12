@@ -306,6 +306,11 @@ impl InsnWrite for Section {
     fn offset(&self) -> usize {
         self.content.len()
     }
+
+    fn write_reloc(&mut self, reloc: Reloc) -> io::Result<()> {
+        self.relocs.push(reloc);
+        Ok(())
+    }
 }
 
 impl Write for Section {
