@@ -6,13 +6,62 @@ use std::{
 
 use crate::traits::{Address, InsnWrite};
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum CleverExtension {
-    Base,
-    Float,
-    FloatExtended,
-    Vector,
+#[derive(Debug)]
+pub struct CleverExtensionFromStrError;
+
+impl core::fmt::Display for CleverExtensionFromStrError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.write_str("Unknown clever")
+    }
+}
+
+impl std::error::Error for CleverExtensionFromStrError {}
+
+macro_rules! define_clever_features{
+    {
+        $(($enum:ident, $feature:literal)),* $(,)?
+    } => {
+        #[derive(Copy,Clone,Debug,Hash,PartialEq,Eq)]
+        #[non_exhaustive]
+        #[repr(i32)]
+        pub enum CleverExtension{
+            $($enum,)*
+        }
+
+        impl CleverExtension{
+            pub fn extension_name(&self) -> &'static str{
+                match self{
+                    $(#[allow(unreachable_patterns)] Self::$enum => $feature,)*
+                }
+            }
+        }
+
+        impl core::str::FromStr for CleverExtension{
+            type Err = CleverExtensionFromStrError;
+            fn from_str(x: &str) -> Result<Self,Self::Err>{
+                match x{
+
+                    $(#[allow(unreachable_patterns)] $feature => Ok(Self::$enum),)*
+                    _ => Err(CleverExtensionFromStrError)
+                }
+            }
+        }
+
+        impl core::fmt::Display for CleverExtension{
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result{
+                match self{
+                    $(Self::$enum => f.write_str($feature),)*
+                }
+            }
+        }
+    }
+}
+
+define_clever_features! {
+    (Main, "main"),
+    (Float, "float"),
+    (FloatExt, "float-ext"),
+    (Vec, "vec"),
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -211,7 +260,7 @@ pub enum ConditionCode {
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverIndex {
     Register(CleverRegister),
-    Abs(u16),
+    Abs(i16),
 }
 
 trait HBits {
@@ -469,7 +518,7 @@ clever_instructions! {
 
     // Block Instructions
     [Repbi, "repbi", 0x028, CleverOperandKind::Insn, {cc @ 0..4 => ConditionCode}],
-    [Repbc, "repbc", 0x029, CleverOperandKind::Insn, {}],
+    [Repbc, "repbc", 0x029, CleverOperandKind::Insn],
     [Bcpy, "bcpy", 0x02a, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
     [Bsto, "bsto", 0x02b, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
     [Bsca, "bsca", 0x02c, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
@@ -513,8 +562,8 @@ clever_instructions! {
     [NegR, "neg", 0x047, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
 
     // Comparison operations
-    [Cmp, "cmp", 0x06C, CleverOperandKind::Normal(2), {}],
-    [Test, "test", 0x06D, CleverOperandKind::Normal(2), {}],
+    [Cmp, "cmp", 0x06C, CleverOperandKind::Normal(2)],
+    [Test, "test", 0x06D, CleverOperandKind::Normal(2)],
     [CmpR, "cmp", 0x06C, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
     [TestR, "test", 0x06D, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
 
@@ -533,38 +582,38 @@ clever_instructions! {
     [FFma, "ffma", 0x10B, CleverOperandKind::Normal(3), {f @ 0 => bool}],
 
     // Floating-point comparions
-    [FCmpz, "fcmpz", 0x118, CleverOperandKind::Normal(1), {}],
-    [FCmp, "fcmp", 0x119, CleverOperandKind::Normal(2), {}],
+    [FCmpz, "fcmpz", 0x118, CleverOperandKind::Normal(1)],
+    [FCmp, "fcmp", 0x119, CleverOperandKind::Normal(2)],
 
     // Floating-point extra instructions
-    [Exp, "exp", 0x120, CleverOperandKind::Normal(1), {}],
-    [Ln, "ln", 0x121, CleverOperandKind::Normal(1), {}],
-    [Lg, "lg", 0x122, CleverOperandKind::Normal(1), {}],
-    [Sin, "sin", 0x123, CleverOperandKind::Normal(1), {}],
-    [Cos, "cos", 0x124, CleverOperandKind::Normal(1), {}],
-    [Tan, "tan", 0x125, CleverOperandKind::Normal(1), {}],
-    [Asin, "asin", 0x126, CleverOperandKind::Normal(1), {}],
-    [Acos, "acos", 0x127, CleverOperandKind::Normal(1), {}],
-    [Atan, "atan", 0x128, CleverOperandKind::Normal(1), {}],
+    [Exp, "exp", 0x120, CleverOperandKind::Normal(1)],
+    [Ln, "ln", 0x121, CleverOperandKind::Normal(1)],
+    [Lg, "lg", 0x122, CleverOperandKind::Normal(1)],
+    [Sin, "sin", 0x123, CleverOperandKind::Normal(1)],
+    [Cos, "cos", 0x124, CleverOperandKind::Normal(1)],
+    [Tan, "tan", 0x125, CleverOperandKind::Normal(1)],
+    [Asin, "asin", 0x126, CleverOperandKind::Normal(1)],
+    [Acos, "acos", 0x127, CleverOperandKind::Normal(1)],
+    [Atan, "atan", 0x128, CleverOperandKind::Normal(1)],
     [Exp2,"exp2", 0x129, CleverOperandKind::Normal(1),{}],
-    [Log10, "log10", 0x12A, CleverOperandKind::Normal(1), {}],
-    [Lnp1, "lnp1", 0x12B, CleverOperandKind::Normal(1), {}],
-    [Expm1, "expm1", 0x12C, CleverOperandKind::Normal(1), {}],
-    [Sqrt, "sqrt", 0x12D, CleverOperandKind::Normal(1), {}],
+    [Log10, "log10", 0x12A, CleverOperandKind::Normal(1)],
+    [Lnp1, "lnp1", 0x12B, CleverOperandKind::Normal(1)],
+    [Expm1, "expm1", 0x12C, CleverOperandKind::Normal(1)],
+    [Sqrt, "sqrt", 0x12D, CleverOperandKind::Normal(1)],
 
     // Floating-point exception control
-    [FRaiseExcept, "fraiseexcept", 0x130, CleverOperandKind::Normal(0), {}],
-    [FTriggerExcept, "ftriggerexcept", 0x130, CleverOperandKind::Normal(0), {}],
+    [FRaiseExcept, "fraiseexcept", 0x130, CleverOperandKind::Normal(0)],
+    [FTriggerExcept, "ftriggerexcept", 0x130, CleverOperandKind::Normal(0)],
 
     // Atomic Operations
-    [Xchg, "xchg", 0x200, CleverOperandKind::Normal(2), {}],
-    [Cmpxchg, "cmpxchg", 0x201, CleverOperandKind::Normal(3), {}],
-    [Wcmpxchg, "wcmpxchg", 0x202, CleverOperandKind::Normal(3), {}],
-    [Fence, "fence", 0x203, CleverOperandKind::Normal(0), {}],
+    [Xchg, "xchg", 0x200, CleverOperandKind::Normal(2)],
+    [Cmpxchg, "cmpxchg", 0x201, CleverOperandKind::Normal(3)],
+    [Wcmpxchg, "wcmpxchg", 0x202, CleverOperandKind::Normal(3)],
+    [Fence, "fence", 0x203, CleverOperandKind::Normal(0)],
 
     // Vector Instructions
-    [Vec, "vec", 0x400, CleverOperandKind::Insn, {}],
-    [Vmov, "vmov",0x401, CleverOperandKind::Normal(2), {}],
+    [Vec, "vec", 0x400, CleverOperandKind::Insn],
+    [Vmov, "vmov",0x401, CleverOperandKind::Normal(2)],
 
     // conditional Branches
     [CBP0A , "jp" , 0x700, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
@@ -673,51 +722,51 @@ clever_instructions! {
     [JmpA, "jmp", 0x7C0, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [CallA, "call", 0x7C1, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [FcallA, "fcall", 0x7C2, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [Ret, "ret", 0x7C3, CleverOperandKind::Normal(0), {}],
-    [Scall, "scall", 0x7C4, CleverOperandKind::Normal(0), {}],
+    [Ret, "ret", 0x7C3, CleverOperandKind::Normal(0)],
+    [Scall, "scall", 0x7C4, CleverOperandKind::Normal(0)],
     [Int, "int", 0x7C5, CleverOperandKind::Normal(0), {i @ 0..4 => u16}],
     [IjmpA, "ijmp", 0x7C8, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
     [IcallA, "icall", 0x7C9, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
-    [IfcallA, "ifcall", 0x7CA, CleverOperandKind::Normal(0), {}],
+    [IfcallA, "ifcall", 0x7CA, CleverOperandKind::Normal(0)],
     [JmpSM, "jsm", 0x7CB, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [CallSM, "callsm", 0x7CC, CleverOperandKind::AbsAddr, {v @ 3 => bool, ss @ 0..2 => u16}],
-    [RetRSM, "retrsm", 0x7CD, CleverOperandKind::Normal(0), {}],
+    [RetRSM, "retrsm", 0x7CD, CleverOperandKind::Normal(0)],
     [JmpR, "jmp", 0x7D0, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [CallR, "call", 0x7D1, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [FcallR, "fcall", 0x7D2, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [IjmpR, "ijmp", 0x7D8, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
     [IcallR, "icall", 0x7D9, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
-    [IfcallR, "ifcall", 0x7DA, CleverOperandKind::Normal(0), {}],
+    [IfcallR, "ifcall", 0x7DA, CleverOperandKind::Normal(0)],
     [JmpSMR, "jsm", 0x7DB, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
     [CallSMR, "callsm", 0x7DC, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16, v @ 3 => bool}],
 
     // Halt
-    [Halt, "halt", 0x801, CleverOperandKind::Normal(0), {}],
+    [Halt, "halt", 0x801, CleverOperandKind::Normal(0)],
 
     // Cache Control
-    [Pcfl, "pcfl", 0x802, CleverOperandKind::Normal(0), {}],
-    [FlAll, "flall", 0x803, CleverOperandKind::Normal(0), {}],
-    [Dflush, "dflush", 0x804, CleverOperandKind::Normal(1), {}],
-    [Iflush, "iflush", 0x805, CleverOperandKind::Normal(1), {}],
+    [Pcfl, "pcfl", 0x802, CleverOperandKind::Normal(0)],
+    [FlAll, "flall", 0x803, CleverOperandKind::Normal(0)],
+    [Dflush, "dflush", 0x804, CleverOperandKind::Normal(1)],
+    [Iflush, "iflush", 0x805, CleverOperandKind::Normal(1)],
 
     // I/O Transfers
     [In, "in", 0x806, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
     [Out, "out", 0x807, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
 
     // Mass Register Storage
-    [StoRegF, "storegf", 0x808, CleverOperandKind::Normal(1), {}],
-    [RstRegF, "rstregf", 0x809, CleverOperandKind::Normal(1), {}],
+    [StoRegF, "storegf", 0x808, CleverOperandKind::Normal(1)],
+    [RstRegF, "rstregf", 0x809, CleverOperandKind::Normal(1)],
 
     // Supervisor Branches
-    [Scret, "scret", 0xFC6, CleverOperandKind::Normal(0), {}],
-    [Iret, "iret", 0xFC6, CleverOperandKind::Normal(0), {}],
-    [Hcall, "hcall", 0xFCB, CleverOperandKind::Normal(0), {}],
-    [Hret, "hret", 0xFD6, CleverOperandKind::Normal(0), {}],
-    [Hresume, "hresume", 0xFD7, CleverOperandKind::Normal(0), {}],
+    [Scret, "scret", 0xFC6, CleverOperandKind::Normal(0)],
+    [Iret, "iret", 0xFC6, CleverOperandKind::Normal(0)],
+    [Hcall, "hcall", 0xFCB, CleverOperandKind::Normal(0)],
+    [Hret, "hret", 0xFD6, CleverOperandKind::Normal(0)],
+    [Hresume, "hresume", 0xFD7, CleverOperandKind::Normal(0)],
 
     // VM Creation/Disposal
-    [VMCreate, "vmcreate", 0xFDA, CleverOperandKind::Normal(1), {}],
-    [VMDestroy,"vmdestroy",0xFDB, CleverOperandKind::Normal(0), {}]
+    [VMCreate, "vmcreate", 0xFDA, CleverOperandKind::Normal(1)],
+    [VMDestroy,"vmdestroy",0xFDB, CleverOperandKind::Normal(0)]
 }
 
 impl CleverOpcode {
@@ -877,7 +926,7 @@ impl CleverOperand {
                 };
 
                 let (o, k) = match index {
-                    CleverIndex::Abs(val) => (val & 0xf, 1),
+                    CleverIndex::Abs(val) => ((*val as u16) & 0xf, 1),
                     CleverIndex::Register(r) => ((r.0 as u16) & 0xf, 0),
                 };
 
