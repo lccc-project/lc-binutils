@@ -88,6 +88,8 @@ impl HowTo for Elf64CleverHowTo {
             crate::howto::RelocCode::Plt { addr_width: 64 } => Self::from_relnum(18),
             crate::howto::RelocCode::RelPlt { addr_width: 64 } => Self::from_relnum(19),
             crate::howto::RelocCode::DynSymEntry { width: 8 } => Self::from_relnum(25),
+            crate::howto::RelocCode::CleverShort => Self::from_relnum(9),
+            crate::howto::RelocCode::CleverShortPcrel => Self::from_relnum(10),
             _ => None,
         }
     }
