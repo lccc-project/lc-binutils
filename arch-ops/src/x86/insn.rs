@@ -818,7 +818,7 @@ impl<R: InsnRead> InsnRead for X86Decoder<R> {
     }
 }
 
-impl<R: InsnRead> X86Encoder<R> {
+impl<R: InsnRead> X86Decoder<R> {
     pub fn read_insn(&mut self) -> std::io::Result<X86Instruction> {
         todo!()
     }
