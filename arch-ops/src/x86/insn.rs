@@ -1,6 +1,6 @@
-use std::io::Write;
+use std::io::{Read, Write};
 
-use crate::traits::{Address, InsnWrite, Reloc};
+use crate::traits::{Address, InsnRead, InsnWrite, Reloc};
 
 use super::{X86Register, X86RegisterClass};
 
@@ -167,26 +167,28 @@ pub enum X86OperandType {
     MemSrcGeneral,
 }
 
-macro_rules! define_x86_instructions{
+macro_rules! define_x86_instructions {
     {
         $(($enum:ident, $mnemonic:literal, $opcode:literal, [$($operand:expr),*] $(, [$($mode:ident),*] $(, [$($feature:ident),*])?)?)),* $(,)?
     } => {
-        #[derive(Copy,Clone,Debug,Hash,PartialEq,Eq)]
+        #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
         #[non_exhaustive]
-        pub enum X86Opcode{
-            $($enum,)*
+        pub enum X86Opcode {
+            $($enum,)* __NoMoreOpcodes
         }
 
         impl X86Opcode{
-            pub fn opcode(&self) -> u64{
-                match self{
+            pub fn opcode(&self) -> u64 {
+                match self {
                     $(Self::$enum => $opcode,)*
+                    Self::__NoMoreOpcodes => unreachable!(),
                 }
             }
 
-            pub fn operands(&self) -> &'static [X86OperandType]{
-                match self{
+            pub fn operands(&self) -> &'static [X86OperandType] {
+                match self {
                     $(Self::$enum => &[$($operand),*],)*
+                    Self::__NoMoreOpcodes => unreachable!(),
                 }
             }
 
@@ -215,6 +217,8 @@ macro_rules! define_x86_instructions{
                 }
             }
         }
+
+        pub const X86_OPCODES: [X86Opcode; X86Opcode::__NoMoreOpcodes as usize] = [ $(X86Opcode::$enum,)* ];
     }
 }
 
@@ -768,6 +772,56 @@ zop_insns! {
     MFence
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct X86Decoder<R> {
+    reader: R,
+    mode: X86Mode,
+}
+
+impl<R> X86Decoder<R> {
+    pub const fn new(reader: R, defmode: X86Mode) -> Self {
+        Self {
+            reader,
+            mode: defmode
+        }
+    }
+
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
+
+    pub fn reader_mut(&mut self) -> &mut R {
+        &mut self.reader
+    }
+
+    pub fn mode(&self) -> X86Mode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: X86Mode) {
+        self.mode = mode;
+    }
+}
+
+impl<R: Read> Read for X86Decoder<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.reader.read(buf)
+    }
+}
+
+impl<R: InsnRead> InsnRead for X86Decoder<R> {
+    fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
+        self.reader.read_addr(size, rel)
+    }
+}
+
+impl<R: InsnRead> X86Encoder<R> {
+    pub fn read_insn(&mut self) -> std::io::Result<X86Instruction> {
+        
+        todo!()
+    }
+}
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct X86Encoder<W> {
     writer: W,
@@ -795,7 +849,7 @@ impl<W> X86Encoder<W> {
     }
 
     pub fn set_mode(&mut self, mode: X86Mode) {
-        self.mode = mode
+        self.mode = mode;
     }
 }
 
