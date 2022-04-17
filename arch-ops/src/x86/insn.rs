@@ -192,9 +192,10 @@ macro_rules! define_x86_instructions {
                 }
             }
 
-            pub fn mnemonic(&self) -> &'static str{
-                match self{
+            pub fn mnemonic(&self) -> &'static str {
+                match self {
                     $(Self:: $enum => $mnemonic,)*
+                    Self::__NoMoreOpcodes => unreachable!(),
                 }
             }
 
@@ -205,15 +206,17 @@ macro_rules! define_x86_instructions {
                         $(X86Mode:: $mode => true,)*
                         _ => false
                     };)? true}),*
+                    Self::__NoMoreOpcodes => unreachable!(),
                 }
             }
 
         }
 
-        impl std::fmt::Display for X86Opcode{
-            fn fmt(&self, f: &mut std::fmt::Formatter)->std::fmt::Result{
-                match self{
+        impl std::fmt::Display for X86Opcode {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                match self {
                     $(Self::$enum => f.write_str($mnemonic),)*
+                    Self::__NoMoreOpcodes => unreachable!(),
                 }
             }
         }
@@ -782,7 +785,7 @@ impl<R> X86Decoder<R> {
     pub const fn new(reader: R, defmode: X86Mode) -> Self {
         Self {
             reader,
-            mode: defmode
+            mode: defmode,
         }
     }
 
@@ -817,7 +820,6 @@ impl<R: InsnRead> InsnRead for X86Decoder<R> {
 
 impl<R: InsnRead> X86Encoder<R> {
     pub fn read_insn(&mut self) -> std::io::Result<X86Instruction> {
-        
         todo!()
     }
 }
