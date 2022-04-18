@@ -10,11 +10,30 @@ pub enum Address {
 
 pub trait InsnRead: Read {
     fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address>;
+    /// Reads a relocation
+    /// If `offset` is `None`, reads from the head of the stream. Otherwise, reads from the given offset from the head.
+    ///
+    /// If `offset` is not-None, the function may error if it is not between -size and size in bytes, rounded away from zero
+    fn read_reloc(
+        &mut self,
+        size: usize,
+        rel: bool,
+        offset: Option<isize>,
+    ) -> std::io::Result<Option<Address>>;
 }
 
 impl<R: InsnRead> InsnRead for &mut R {
     fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
         <R as InsnRead>::read_addr(self, size, rel)
+    }
+
+    fn read_reloc(
+        &mut self,
+        size: usize,
+        rel: bool,
+        offset: Option<isize>,
+    ) -> std::io::Result<Option<Address>> {
+        <R as InsnRead>::read_reloc(self, size, rel, offset)
     }
 }
 

@@ -1,10 +1,10 @@
 use std::{
     convert::TryFrom,
-    io::Write,
+    io::{ErrorKind, Read, Write},
     ops::{Range, RangeFrom, RangeFull, RangeTo},
 };
 
-use crate::traits::{Address, InsnWrite};
+use crate::traits::{Address, InsnRead, InsnWrite};
 
 #[derive(Debug)]
 pub struct CleverExtensionFromStrError;
@@ -1200,6 +1200,184 @@ impl<W: InsnWrite> CleverEncoder<W> {
             CleverOperandKind::Insn => panic!("Cannot write a prefix as a primary instruction, use `CleverInstruction::new_with_prefix` instead"),
         }
         Ok(())
+    }
+}
+
+pub struct CleverDecoder<R> {
+    inner: R,
+}
+
+impl<R> CleverDecoder<R> {
+    pub const fn new(inner: R) -> Self {
+        Self { inner }
+    }
+
+    pub fn into_inner(self) -> R {
+        self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut R {
+        &mut self.inner
+    }
+
+    pub fn inner(&self) -> &R {
+        &self.inner
+    }
+}
+
+impl<R: Read> Read for CleverDecoder<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.inner.read(buf)
+    }
+}
+
+impl<R: InsnRead> InsnRead for CleverDecoder<R> {
+    fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
+        self.inner.read_addr(size, rel)
+    }
+
+    fn read_reloc(
+        &mut self,
+        size: usize,
+        rel: bool,
+        offset: Option<isize>,
+    ) -> std::io::Result<Option<Address>> {
+        self.inner.read_reloc(size, rel, offset)
+    }
+}
+
+impl<R: InsnRead> CleverDecoder<R> {
+    pub fn read_insn(&mut self) -> std::io::Result<CleverInstruction> {
+        let mut opcode = [0u8; 2];
+        self.read_exact(&mut opcode)?;
+        let opcode = u16::from_be_bytes(opcode);
+        let op = CleverOpcode::from_opcode(opcode).ok_or_else(|| {
+            std::io::Error::new(
+                ErrorKind::InvalidData,
+                format!("Invalid opcode {:#x}", opcode),
+            )
+        })?;
+        match op.operands() {
+            CleverOperandKind::Insn => {
+                let mut inner = self.read_insn()?;
+                if let Some(prefix) = inner.prefix {
+                    return Err(std::io::Error::new(
+                        ErrorKind::InvalidData,
+                        format!("Cannot combine multiple prefixes {:?} and {:?}", op, prefix),
+                    ));
+                } else {
+                    inner.prefix = Some(op);
+                }
+                Ok(inner)
+            }
+            kind @ (CleverOperandKind::AbsAddr | CleverOperandKind::RelAddr) => {
+                let bytes = 8 << (op.branch_width().unwrap() as u32);
+                let rel = kind == CleverOperandKind::RelAddr;
+                let addr = self.read_addr(bytes, rel)?;
+
+                Ok(CleverInstruction::new(
+                    op,
+                    vec![CleverOperand::Immediate(CleverImmediate::LongAddr(
+                        bytes as u16,
+                        addr,
+                    ))],
+                ))
+            }
+            CleverOperandKind::Normal(n) => {
+                let mut ops = Vec::with_capacity(n as usize);
+
+                for _ in 0..n {
+                    let mut ctrl = [0u8; 2];
+                    self.read_exact(&mut ctrl)?;
+                    let ctrl = u16::from_be_bytes(ctrl);
+
+                    let opr = match ctrl >> 14 {
+                        0b00 => {
+                            let v = (ctrl & 0x2000) != 0;
+
+                            let reg = CleverRegister(ctrl as u8);
+
+                            let ss = 8 << ((ctrl >> 8) & 0x7);
+
+                            if v {
+                                CleverOperand::VecPair { size: ss, lo: reg }
+                            } else {
+                                CleverOperand::Register { size: ss, reg }
+                            }
+                        }
+                        0b01 => {
+                            let offset = (ctrl >> 10) & 0xf;
+
+                            let scale = 1 << ((ctrl >> 7) & 0x7);
+
+                            let ss = 8 << ((ctrl >> 4) & 0x3) as u32;
+
+                            let k = (ctrl & 0x40) != 0;
+
+                            let base = CleverRegister((ctrl & 0xf) as u8);
+
+                            let index = if k {
+                                CleverIndex::Abs(offset as i16)
+                            } else {
+                                CleverIndex::Register(CleverRegister(offset as u8))
+                            };
+
+                            CleverOperand::Indirect {
+                                size: ss,
+                                base,
+                                scale,
+                                index,
+                            }
+                        }
+                        0b10 => {
+                            let short = ctrl & 0xfff;
+
+                            let rel = (ctrl & 0x1000) != 0;
+
+                            let addr = self.read_reloc(12, rel, Some(-2))?;
+
+                            let imm = match (addr, rel) {
+                                (Some(addr), true) => CleverImmediate::ShortAddrRel(addr),
+                                (Some(addr), false) => CleverImmediate::ShortAddr(addr),
+                                (None, true) => CleverImmediate::ShortRel(short as i16),
+                                (None, false) => CleverImmediate::Short(short),
+                            };
+
+                            CleverOperand::Immediate(imm)
+                        }
+                        0b11 => {
+                            let mem = (ctrl & 0x2000) != 0;
+                            let rel = (ctrl & 0x400) != 0;
+                            let size = 8 << (1 + ((ctrl >> 8) & 0x3));
+
+                            let zize = 8 << ((ctrl >> 4) & 0xf);
+
+                            let val = self.read_addr(size as usize, rel)?;
+
+                            let imm = match (val, rel, mem) {
+                                (Address::Disp(val), true, false) => {
+                                    CleverImmediate::LongRel(size, val)
+                                }
+                                (Address::Abs(val), false, false) => {
+                                    CleverImmediate::Long(size, val as u64)
+                                }
+                                (addr, true, false) => CleverImmediate::LongAddrRel(size, addr),
+                                (addr, false, false) => CleverImmediate::LongAddr(size, addr),
+                                (addr, true, true) => CleverImmediate::LongMemRel(size, addr, zize),
+                                (addr, false, true) => CleverImmediate::LongMem(size, addr, zize),
+                            };
+
+                            CleverOperand::Immediate(imm)
+                        }
+                        _ => unsafe { core::hint::unreachable_unchecked() },
+                    };
+
+                    ops.push(opr);
+                }
+
+                Ok(CleverInstruction::new(op, ops))
+            }
+        }
     }
 }
 

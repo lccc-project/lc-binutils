@@ -816,6 +816,15 @@ impl<R: InsnRead> InsnRead for X86Decoder<R> {
     fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
         self.reader.read_addr(size, rel)
     }
+
+    fn read_reloc(
+        &mut self,
+        size: usize,
+        rel: bool,
+        offset: Option<isize>,
+    ) -> std::io::Result<Option<Address>> {
+        self.reader.read_reloc(size, rel, offset)
+    }
 }
 
 impl<R: InsnRead> X86Decoder<R> {
