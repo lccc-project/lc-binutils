@@ -1355,6 +1355,8 @@ impl<R: InsnRead> CleverDecoder<R> {
                             let val = self.read_addr(size as usize, rel)?;
 
                             let imm = match (val, rel, mem) {
+                                (Address::Abs(val),false, false) if size==128 => CleverImmediate::Vec(val),
+                                _ if size==128 => return Err(std::io::Error::new(ErrorKind::InvalidData, "invalid immediate with size 128")),
                                 (Address::Disp(val), true, false) => {
                                     CleverImmediate::LongRel(size, val)
                                 }
