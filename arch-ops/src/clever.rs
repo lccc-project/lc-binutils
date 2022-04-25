@@ -263,6 +263,15 @@ pub enum CleverIndex {
     Abs(i16),
 }
 
+impl core::fmt::Display for CleverIndex {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Register(r) => r.fmt(f),
+            Self::Abs(n) => n.fmt(f),
+        }
+    }
+}
+
 trait HBits {
     fn from_bits(bits: u16) -> Self;
     fn to_hbits(self) -> u16;
@@ -884,6 +893,57 @@ impl CleverImmediate {
     }
 }
 
+fn write_immediate_size(size: u16, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    match size {
+        8 => f.write_str("byte"),
+        16 => f.write_str("half"),
+        32 => f.write_str("single"),
+        64 => f.write_str("double"),
+        128 => f.write_str("quad"),
+        n => f.write_fmt(format_args!("<invalid-size {}>", n)),
+    }
+}
+
+impl core::fmt::Display for CleverImmediate {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            CleverImmediate::Short(s) => f.write_fmt(format_args!("short {}", s)),
+            CleverImmediate::ShortRel(s) => f.write_fmt(format_args!("short {}+ip", s)),
+            CleverImmediate::ShortAddr(addr) => f.write_fmt(format_args!("short {}", addr)),
+            CleverImmediate::ShortAddrRel(addr) => f.write_fmt(format_args!("short {}+ip", addr)),
+            CleverImmediate::Long(size, val) => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!(" {}", val))
+            }
+            CleverImmediate::LongRel(size, val) => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!(" {}+ip", val))
+            }
+            CleverImmediate::LongAddr(size, val) => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!(" {}", val))
+            }
+            CleverImmediate::LongAddrRel(size, val) => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!(" {}+ip", val))
+            }
+            CleverImmediate::LongMem(asize, val, refsize) => {
+                write_immediate_size(*refsize, f)?;
+                f.write_str(" [")?;
+                write_immediate_size(*asize, f)?;
+                f.write_fmt(format_args!(" {}]", val))
+            }
+            CleverImmediate::LongMemRel(asize, val, refsize) => {
+                write_immediate_size(*refsize, f)?;
+                f.write_str(" [")?;
+                write_immediate_size(*asize, f)?;
+                f.write_fmt(format_args!(" {}+ip]", val))
+            }
+            CleverImmediate::Vec(v) => f.write_fmt(format_args!("quad {}", v)),
+        }
+    }
+}
+
 impl CleverOperand {
     pub fn as_control_structure(&self) -> u16 {
         match self {
@@ -1037,6 +1097,49 @@ impl CleverOperand {
         match self {
             Self::Immediate(imm) => Some(imm),
             _ => None,
+        }
+    }
+}
+
+impl core::fmt::Display for CleverOperand {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            CleverOperand::Register { size, reg } => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!(" {}", reg))
+            }
+            CleverOperand::Indirect {
+                size,
+                base,
+                scale: _,
+                index: CleverIndex::Abs(0),
+            } => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!("[{}]", base))
+            }
+            CleverOperand::Indirect {
+                size,
+                base,
+                scale: 1,
+                index,
+            } => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!("[{}+{}]", index, base))
+            }
+            CleverOperand::Indirect {
+                size,
+                base,
+                scale,
+                index,
+            } => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!("[{}*{}+{}]", scale, index, base))
+            }
+            CleverOperand::VecPair { size, lo } => {
+                write_immediate_size(*size, f)?;
+                f.write_fmt(format_args!(" {}", lo))
+            }
+            CleverOperand::Immediate(imm) => imm.fmt(f),
         }
     }
 }

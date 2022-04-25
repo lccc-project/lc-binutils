@@ -8,6 +8,18 @@ pub enum Address {
     PltSym { name: String },
 }
 
+impl core::fmt::Display for Address {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Abs(n) => f.write_fmt(format_args!("{:#x}", n)),
+            Self::Disp(n) => f.write_fmt(format_args!("{:+}", n)),
+            Self::Symbol { name, disp: 0 } => f.write_str(name),
+            Self::Symbol { name, disp } => f.write_fmt(format_args!("{}{:+}", name, disp)),
+            Self::PltSym { name } => f.write_fmt(format_args!("{}@plt", name)),
+        }
+    }
+}
+
 pub trait InsnRead: Read {
     fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address>;
     /// Reads a relocation
