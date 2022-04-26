@@ -939,7 +939,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
             ..
         } => {
             if r.regnum() >= 8 {
-                *output.rex.get_or_insert(0x40) |= 0x01;
+                *output.rex.get_or_insert(0x40) |= 0x0;
             }
             r.class()
         }
@@ -1767,6 +1767,87 @@ impl<W: InsnWrite> X86Encoder<W> {
                 }
             }
             [RControlBits(b), ModRM(Byte), Imm(8)] => {
+                let modrm = match &insn.operands[0] {
+                    X86Operand::Register(r) => ModRM::Direct(*r),
+                    X86Operand::ModRM(modrm) => modrm.clone(),
+                    X86Operand::RelAddr(addr) => ModRM::Indirect {
+                        size: mode.largest_gpr(),
+                        mode: ModRMRegOrSib::RipRel(addr.clone()),
+                    },
+                    X86Operand::AbsAddr(addr) => ModRM::Indirect {
+                        size: mode.largest_gpr(),
+                        mode: ModRMRegOrSib::Abs(addr.clone()),
+                    },
+                    op => panic!("Invalid operand {:?} for ModRMGeneral", op),
+                };
+
+                let encoding = encode_modrm(modrm, *b, mode);
+
+                let mut opcode = &opcode[..];
+                let sse_prefix = opcode[0];
+
+                self.writer.write_all(
+                    encoding
+                        .size_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+                self.writer.write_all(
+                    encoding
+                        .addr_override
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match sse_prefix {
+                    0x66 | 0xF2 | 0xF3 => {
+                        self.writer.write_all(core::slice::from_ref(&sse_prefix))?;
+                        opcode = &opcode[1..]
+                    }
+                    _ => {}
+                }
+
+                self.writer.write_all(
+                    encoding
+                        .rex
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                self.writer.write_all(opcode)?;
+                self.writer
+                    .write_all(core::slice::from_ref(&encoding.modrm))?;
+                self.writer.write_all(
+                    encoding
+                        .sib
+                        .as_ref()
+                        .map(core::slice::from_ref)
+                        .unwrap_or(&[]),
+                )?;
+
+                match (encoding.disp, encoding.addr) {
+                    (Some((size, disp)), None) => {
+                        self.writer.write_all(&disp.to_ne_bytes()[..size])?;
+                    }
+                    (None, Some((size, addr, pcrel))) => {
+                        self.writer.write_addr(size * 8, addr, pcrel)?;
+                    }
+                    (None, None) => {}
+                    (Some(_), Some(_)) => {
+                        panic!("Cannot encode both an address and a displacement")
+                    }
+                }
+
+                match &insn.operands[1] {
+                    X86Operand::Immediate(imm) => self.writer.write_all(&imm.to_ne_bytes()[..1]),
+                    X86Operand::AbsAddr(addr) => self.writer.write_addr(8, addr.clone(), false),
+                    op => panic!("Invalid operand {:?} for Immediate", op),
+                }
+            }
+            [RControlBits(b), ModRMGeneral, Imm(8)] => {
                 let modrm = match &insn.operands[0] {
                     X86Operand::Register(r) => ModRM::Direct(*r),
                     X86Operand::ModRM(modrm) => modrm.clone(),
