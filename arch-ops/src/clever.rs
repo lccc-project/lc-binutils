@@ -1,7 +1,7 @@
 use std::{
     convert::TryFrom,
     io::{ErrorKind, Read, Write},
-    ops::{Range, RangeFrom, RangeFull, RangeTo},
+    ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive},
 };
 
 use crate::traits::{Address, InsnRead, InsnWrite};
@@ -62,6 +62,7 @@ define_clever_features! {
     (Float, "float"),
     (FloatExt, "float-ext"),
     (Vec, "vec"),
+    (Rand, "rand"),
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -233,7 +234,8 @@ clever_registers! {
     msr3 => 151,
     msr4 => 152,
     msr5 => 153,
-    msr6 => 154
+    msr6 => 154,
+    rdinfo => 156
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -378,6 +380,16 @@ impl HBitRange for Range<u32> {
     }
 }
 
+impl HBitRange for RangeInclusive<u32> {
+    fn shift(&self) -> u32 {
+        *self.start()
+    }
+
+    fn mask(&self) -> u16 {
+        ((1u16 << (self.end() - self.start())) - 1) << self.start()
+    }
+}
+
 impl HBitRange for RangeFrom<u32> {
     fn shift(&self) -> u32 {
         self.start
@@ -395,6 +407,16 @@ impl HBitRange for RangeTo<u32> {
 
     fn mask(&self) -> u16 {
         (1u16 << (self.end - 1)) - 1
+    }
+}
+
+impl HBitRange for RangeToInclusive<u32> {
+    fn shift(&self) -> u32 {
+        0
+    }
+
+    fn mask(&self) -> u16 {
+        (1u16 << self.end) - 1
     }
 }
 
@@ -484,8 +506,8 @@ clever_instructions! {
     [Xor, "xor", 0x005, CleverOperandKind::Normal(2), {lock @ 3 => bool, flags @ 0 => bool}],
 
     // Division and multiplication Instructions
-    [Mul, "mul", 0x006, CleverOperandKind::Normal(0), {ss @ 2..4 => u16, flags @ 0 => bool}],
-    [Div, "div", 0x007, CleverOperandKind::Normal(0), {ss @ 2..4 => u16, wide @ 1 => bool, flags @ 0 => bool}],
+    [Mul, "mul", 0x006, CleverOperandKind::Normal(0), {ss @ 2..=4 => u16, flags @ 0 => bool}],
+    [Div, "div", 0x007, CleverOperandKind::Normal(0), {ss @ 2..=4 => u16, wide @ 1 => bool, flags @ 0 => bool}],
 
     // Register Manipulation Instructions
     [Mov, "mov", 0x008, CleverOperandKind::Normal(2)],
@@ -526,13 +548,13 @@ clever_instructions! {
 
 
     // Block Instructions
-    [Repbi, "repbi", 0x028, CleverOperandKind::Insn, {cc @ 0..4 => ConditionCode}],
+    [Repbi, "repbi", 0x028, CleverOperandKind::Insn, {cc @ .. => ConditionCode}],
     [Repbc, "repbc", 0x029, CleverOperandKind::Insn],
-    [Bcpy, "bcpy", 0x02a, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
-    [Bsto, "bsto", 0x02b, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
-    [Bsca, "bsca", 0x02c, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
-    [Bcmp, "bcmp", 0x02d, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
-    [Btst, "btst", 0x02e, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
+    [Bcpy, "bcpy", 0x02a, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
+    [Bsto, "bsto", 0x02b, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
+    [Bsca, "bsca", 0x02c, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
+    [Bcmp, "bcmp", 0x02d, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
+    [Btst, "btst", 0x02e, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
 
     // Integer Shifts
     [Lsh, "lsh", 0x030, CleverOperandKind::Normal(2), {l @ 3 => bool, f @ 0 => bool}],
@@ -542,39 +564,39 @@ clever_instructions! {
     [Rshc, "rshc", 0x034, CleverOperandKind::Normal(2), {l @ 3 => bool, f @ 0 => bool}],
     [Lrot, "lrot", 0x035, CleverOperandKind::Normal(2), {l @ 3 => bool, f @ 0 => bool}],
     [Rrot, "rrot", 0x036, CleverOperandKind::Normal(2), {l @ 3 => bool, f @ 0 => bool}],
-    [LshR, "lsh", 0x038, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
-    [RshR, "rsh", 0x039, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
-    [ArshR, "arsh", 0x03A, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
-    [LshcR, "lshc", 0x03B, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
-    [RshcR, "rshc", 0x03C, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
-    [LrotR, "lrot", 0x03D, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
-    [RrotR, "rrot", 0x03E, CleverOperandKind::Normal(2), {r @ 0..4 => CleverRegister}],
+    [LshR, "lsh", 0x038, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
+    [RshR, "rsh", 0x039, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
+    [ArshR, "arsh", 0x03A, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
+    [LshcR, "lshc", 0x03B, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
+    [RshcR, "rshc", 0x03C, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
+    [LrotR, "lrot", 0x03D, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
+    [RrotR, "rrot", 0x03E, CleverOperandKind::Normal(2), {r @ .. => CleverRegister}],
 
     // Arithmetic/Logic GPR Specifications
     // Unary Operations
     // Signed Multiplication/Division
-    [Imul, "imul", 0x040, CleverOperandKind::Normal(0), {ss @ 2..4 => u16, flags @ 0 => bool}],
-    [AddRD, "add", 0x041, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [SubRD, "sub", 0x042, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [AndRD, "and", 0x043, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [OrRD, "or", 0x044, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [XorRD, "xor", 0x045, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
+    [Imul, "imul", 0x040, CleverOperandKind::Normal(0), {ss @ 2.. => u16, flags @ 0 => bool}],
+    [AddRD, "add", 0x041, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [SubRD, "sub", 0x042, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [AndRD, "and", 0x043, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [OrRD, "or", 0x044, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [XorRD, "xor", 0x045, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
     [BNot, "bnot", 0x046, CleverOperandKind::Normal(1), {l @ 3 => bool, f @ 0 => bool}],
     [Neg, "neg", 0x047, CleverOperandKind::Normal(1), {l @ 3 => bool, f @ 0 => bool}],
-    [Idiv, "idiv", 0x048, CleverOperandKind::Normal(1), {ss @ 2..4 => u16, wide @ 1 => bool, flags @ 0 => bool}],
-    [AddRS, "add", 0x049, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [SubRS, "sub", 0x04A, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [AndRS, "and", 0x04B, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [OrRS, "or", 0x04C, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [XorRS, "xor", 0x04D, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [BNotR, "bnot", 0x046, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [NegR, "neg", 0x047, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
+    [Idiv, "idiv", 0x048, CleverOperandKind::Normal(1), {ss @ 2.. => u16, wide @ 1 => bool, flags @ 0 => bool}],
+    [AddRS, "add", 0x049, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [SubRS, "sub", 0x04A, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [AndRS, "and", 0x04B, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [OrRS, "or", 0x04C, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [XorRS, "xor", 0x04D, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [BNotR, "bnot", 0x046, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [NegR, "neg", 0x047, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
 
     // Comparison operations
     [Cmp, "cmp", 0x06C, CleverOperandKind::Normal(2)],
     [Test, "test", 0x06D, CleverOperandKind::Normal(2)],
-    [CmpR, "cmp", 0x06C, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
-    [TestR, "test", 0x06D, CleverOperandKind::Normal(1), {r @ 0..4 => CleverRegister}],
+    [CmpR, "cmp", 0x06C, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
+    [TestR, "test", 0x06D, CleverOperandKind::Normal(1), {r @ .. => CleverRegister}],
 
     // Floating-Point Operations
     [Round, "round", 0x100, CleverOperandKind::Normal(1), {f @ 0 => bool}],
@@ -620,134 +642,137 @@ clever_instructions! {
     [Wcmpxchg, "wcmpxchg", 0x202, CleverOperandKind::Normal(3)],
     [Fence, "fence", 0x203, CleverOperandKind::Normal(0)],
 
+    // Random Device Polling
+    [RPoll, "rpoll", 0x230, CleverOperandKind::Normal(0), {r @ .. => CleverRegister}],
+
     // Vector Instructions
     [Vec, "vec", 0x400, CleverOperandKind::Insn],
     [Vmov, "vmov",0x401, CleverOperandKind::Normal(2)],
 
     // conditional Branches
-    [CBP0A , "jp" , 0x700, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBC0A , "jc" , 0x701, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBV0A , "jo" , 0x702, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBZ0A , "jz" , 0x703, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBL0A , "jlt", 0x704, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBLE0A, "jle", 0x705, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBBE0A, "jbe", 0x706, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBM0A , "jmi", 0x707, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBPS0A, "jps", 0x708, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBA0A , "ja" , 0x709, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBG0A , "jgt", 0x70A, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBGE0A, "jge", 0x70B, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNZ0A, "jnz", 0x70C, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNV0A, "jno", 0x70D, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNC0A, "jnc", 0x70E, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNP0A, "jnp", 0x70F, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
+    [CBP0A , "jp" , 0x700, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBC0A , "jc" , 0x701, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBV0A , "jo" , 0x702, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBZ0A , "jz" , 0x703, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBL0A , "jlt", 0x704, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBLE0A, "jle", 0x705, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBBE0A, "jbe", 0x706, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBM0A , "jmi", 0x707, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBPS0A, "jps", 0x708, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBA0A , "ja" , 0x709, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBG0A , "jgt", 0x70A, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBGE0A, "jge", 0x70B, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNZ0A, "jnz", 0x70C, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNV0A, "jno", 0x70D, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNC0A, "jnc", 0x70E, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNP0A, "jnp", 0x70F, CleverOperandKind::AbsAddr, {w @ .. => i8}],
 
-    [CBP0R , "jp" , 0x710, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBC0R , "jc" , 0x711, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBV0R , "jo" , 0x712, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBZ0R , "jz" , 0x713, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBL0R , "jlt", 0x714, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBLE0R, "jle", 0x715, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBBE0R, "jbe", 0x716, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBM0R , "jmi", 0x717, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBPS0R, "jps", 0x718, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBA0R , "ja" , 0x719, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBG0R , "jgt", 0x71A, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBGE0R, "jge", 0x71B, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNZ0R, "jnz", 0x71C, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNV0R, "jno", 0x71D, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNC0R, "jnc", 0x71E, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNP0R, "jnp", 0x71F, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
+    [CBP0R , "jp" , 0x710, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBC0R , "jc" , 0x711, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBV0R , "jo" , 0x712, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBZ0R , "jz" , 0x713, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBL0R , "jlt", 0x714, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBLE0R, "jle", 0x715, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBBE0R, "jbe", 0x716, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBM0R , "jmi", 0x717, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBPS0R, "jps", 0x718, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBA0R , "ja" , 0x719, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBG0R , "jgt", 0x71A, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBGE0R, "jge", 0x71B, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNZ0R, "jnz", 0x71C, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNV0R, "jno", 0x71D, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNC0R, "jnc", 0x71E, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNP0R, "jnp", 0x71F, CleverOperandKind::RelAddr, {w @ .. => i8}],
 
-    [CBP1A , "jp" , 0x740, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBC1A , "jc" , 0x741, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBV1A , "jo" , 0x742, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBZ1A , "jz" , 0x743, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBL1A , "jlt", 0x744, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBLE1A, "jle", 0x745, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBBE1A, "jbe", 0x746, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBM1A , "jmi", 0x747, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBPS1A, "jps", 0x748, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBA1A , "ja" , 0x749, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBG1A , "jgt", 0x74A, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBGE1A, "jge", 0x74B, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNZ1A, "jnz", 0x74C, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNV1A, "jno", 0x74D, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNC1A, "jnc", 0x74E, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNP1A, "jnp", 0x74F, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
+    [CBP1A , "jp" , 0x740, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBC1A , "jc" , 0x741, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBV1A , "jo" , 0x742, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBZ1A , "jz" , 0x743, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBL1A , "jlt", 0x744, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBLE1A, "jle", 0x745, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBBE1A, "jbe", 0x746, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBM1A , "jmi", 0x747, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBPS1A, "jps", 0x748, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBA1A , "ja" , 0x749, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBG1A , "jgt", 0x74A, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBGE1A, "jge", 0x74B, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNZ1A, "jnz", 0x74C, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNV1A, "jno", 0x74D, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNC1A, "jnc", 0x74E, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNP1A, "jnp", 0x74F, CleverOperandKind::AbsAddr, {w @ .. => i8}],
 
-    [CBP1R , "jp" , 0x750, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBC1R , "jc" , 0x751, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBV1R , "jo" , 0x752, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBZ1R , "jz" , 0x753, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBL1R , "jlt", 0x754, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBLE1R, "jle", 0x755, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBBE1R, "jbe", 0x756, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBM1R , "jmi", 0x757, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBPS1R, "jps", 0x758, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBA1R , "ja" , 0x759, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBG1R , "jgt", 0x75A, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBGE1R, "jge", 0x75B, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNZ1R, "jnz", 0x75C, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNV1R, "jno", 0x75D, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNC1R, "jnc", 0x75E, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNP1R, "jnp", 0x75F, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
+    [CBP1R , "jp" , 0x750, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBC1R , "jc" , 0x751, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBV1R , "jo" , 0x752, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBZ1R , "jz" , 0x753, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBL1R , "jlt", 0x754, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBLE1R, "jle", 0x755, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBBE1R, "jbe", 0x756, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBM1R , "jmi", 0x757, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBPS1R, "jps", 0x758, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBA1R , "ja" , 0x759, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBG1R , "jgt", 0x75A, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBGE1R, "jge", 0x75B, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNZ1R, "jnz", 0x75C, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNV1R, "jno", 0x75D, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNC1R, "jnc", 0x75E, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNP1R, "jnp", 0x75F, CleverOperandKind::RelAddr, {w @ .. => i8}],
 
-    [CBP2A , "jp" , 0x780, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBC2A , "jc" , 0x781, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBV2A , "jo" , 0x782, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBZ2A , "jz" , 0x783, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBL2A , "jlt", 0x784, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBLE2A, "jle", 0x785, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBBE2A, "jbe", 0x786, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBM2A , "jmi", 0x787, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBPS2A, "jps", 0x788, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBA2A , "ja" , 0x789, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBG2A , "jgt", 0x78A, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBGE2A, "jge", 0x78B, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNZ2A, "jnz", 0x78C, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNV2A, "jno", 0x78D, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNC2A, "jnc", 0x78E, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
-    [CBNP2A, "jnp", 0x78F, CleverOperandKind::AbsAddr, {w @ 0..4 => i8}],
+    [CBP2A , "jp" , 0x780, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBC2A , "jc" , 0x781, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBV2A , "jo" , 0x782, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBZ2A , "jz" , 0x783, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBL2A , "jlt", 0x784, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBLE2A, "jle", 0x785, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBBE2A, "jbe", 0x786, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBM2A , "jmi", 0x787, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBPS2A, "jps", 0x788, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBA2A , "ja" , 0x789, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBG2A , "jgt", 0x78A, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBGE2A, "jge", 0x78B, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNZ2A, "jnz", 0x78C, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNV2A, "jno", 0x78D, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNC2A, "jnc", 0x78E, CleverOperandKind::AbsAddr, {w @ .. => i8}],
+    [CBNP2A, "jnp", 0x78F, CleverOperandKind::AbsAddr, {w @ .. => i8}],
 
-    [CBP2R , "jp" , 0x790, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBC2R , "jc" , 0x791, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBV2R , "jo" , 0x792, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBZ2R , "jz" , 0x793, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBL2R , "jlt", 0x794, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBLE2R, "jle", 0x795, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBBE2R, "jbe", 0x796, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBM2R , "jmi", 0x797, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBPS2R, "jps", 0x798, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBA2R , "ja" , 0x799, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBG2R , "jgt", 0x79A, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBGE2R, "jge", 0x79B, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNZ2R, "jnz", 0x79C, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNV2R, "jno", 0x79D, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNC2R, "jnc", 0x79E, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
-    [CBNP2R, "jnp", 0x79F, CleverOperandKind::RelAddr, {w @ 0..4 => i8}],
+    [CBP2R , "jp" , 0x790, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBC2R , "jc" , 0x791, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBV2R , "jo" , 0x792, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBZ2R , "jz" , 0x793, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBL2R , "jlt", 0x794, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBLE2R, "jle", 0x795, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBBE2R, "jbe", 0x796, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBM2R , "jmi", 0x797, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBPS2R, "jps", 0x798, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBA2R , "ja" , 0x799, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBG2R , "jgt", 0x79A, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBGE2R, "jge", 0x79B, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNZ2R, "jnz", 0x79C, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNV2R, "jno", 0x79D, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNC2R, "jnc", 0x79E, CleverOperandKind::RelAddr, {w @ .. => i8}],
+    [CBNP2R, "jnp", 0x79F, CleverOperandKind::RelAddr, {w @ .. => i8}],
 
     // Unconditional Branches/Calls
-    [JmpA, "jmp", 0x7C0, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [CallA, "call", 0x7C1, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [FcallA, "fcall", 0x7C2, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
+    [JmpA, "jmp", 0x7C0, CleverOperandKind::AbsAddr, {ss @ 0..=2 => u16}],
+    [CallA, "call", 0x7C1, CleverOperandKind::AbsAddr, {ss @ 0..=2 => u16}],
+    [FcallA, "fcall", 0x7C2, CleverOperandKind::AbsAddr, {ss @ 0..=2 => u16}],
     [Ret, "ret", 0x7C3, CleverOperandKind::Normal(0)],
     [Scall, "scall", 0x7C4, CleverOperandKind::Normal(0)],
-    [Int, "int", 0x7C5, CleverOperandKind::Normal(0), {i @ 0..4 => u16}],
-    [IjmpA, "ijmp", 0x7C8, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
-    [IcallA, "icall", 0x7C9, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
+    [Int, "int", 0x7C5, CleverOperandKind::Normal(0), {i @ .. => u16}],
+    [IjmpA, "ijmp", 0x7C8, CleverOperandKind::Normal(0), {r @ .. => CleverRegister}],
+    [IcallA, "icall", 0x7C9, CleverOperandKind::Normal(0), {r @ .. => CleverRegister}],
     [IfcallA, "ifcall", 0x7CA, CleverOperandKind::Normal(0)],
-    [JmpSM, "jsm", 0x7CB, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [CallSM, "callsm", 0x7CC, CleverOperandKind::AbsAddr, {v @ 3 => bool, ss @ 0..2 => u16}],
+    [JmpSM, "jsm", 0x7CB, CleverOperandKind::AbsAddr, {ss @ 0..=2 => u16}],
+    [CallSM, "callsm", 0x7CC, CleverOperandKind::AbsAddr, {v @ 3 => bool, ss @ 0..=2 => u16}],
     [RetRSM, "retrsm", 0x7CD, CleverOperandKind::Normal(0)],
-    [JmpR, "jmp", 0x7D0, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [CallR, "call", 0x7D1, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [FcallR, "fcall", 0x7D2, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [IjmpR, "ijmp", 0x7D8, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
-    [IcallR, "icall", 0x7D9, CleverOperandKind::Normal(0), {r @ 0..4 => CleverRegister}],
+    [JmpR, "jmp", 0x7D0, CleverOperandKind::RelAddr, {ss @ 0..=2 => u16}],
+    [CallR, "call", 0x7D1, CleverOperandKind::RelAddr, {ss @ 0..=2 => u16}],
+    [FcallR, "fcall", 0x7D2, CleverOperandKind::RelAddr, {ss @ 0..=2 => u16}],
+    [IjmpR, "ijmp", 0x7D8, CleverOperandKind::Normal(0), {r @ .. => CleverRegister}],
+    [IcallR, "icall", 0x7D9, CleverOperandKind::Normal(0), {r @ .. => CleverRegister}],
     [IfcallR, "ifcall", 0x7DA, CleverOperandKind::Normal(0)],
-    [JmpSMR, "jsm", 0x7DB, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16}],
-    [CallSMR, "callsm", 0x7DC, CleverOperandKind::AbsAddr, {ss @ 0..2 => u16, v @ 3 => bool}],
+    [JmpSMR, "jsm", 0x7DB, CleverOperandKind::RelAddr, {ss @ 0..=2 => u16}],
+    [CallSMR, "callsm", 0x7DC, CleverOperandKind::RelAddr, {ss @ 0..=2 => u16, v @ 3 => bool}],
 
     // Halt
     [Halt, "halt", 0x801, CleverOperandKind::Normal(0)],
@@ -759,8 +784,8 @@ clever_instructions! {
     [Iflush, "iflush", 0x805, CleverOperandKind::Normal(1)],
 
     // I/O Transfers
-    [In, "in", 0x806, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
-    [Out, "out", 0x807, CleverOperandKind::Normal(0), {ss @ 0..2 => u16}],
+    [In, "in", 0x806, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
+    [Out, "out", 0x807, CleverOperandKind::Normal(0), {ss @ 0..=2 => u16}],
 
     // Mass Register Storage
     [StoRegF, "storegf", 0x808, CleverOperandKind::Normal(1)],
@@ -1490,6 +1515,28 @@ impl<R: InsnRead> CleverDecoder<R> {
                 Ok(CleverInstruction::new(op, ops))
             }
         }
+    }
+}
+
+pub struct CleverPrinter<W> {
+    inner: W,
+}
+
+impl<W> CleverPrinter<W> {
+    pub const fn new(inner: W) -> Self {
+        Self { inner }
+    }
+
+    pub fn into_inner(self) -> W {
+        self.inner
+    }
+
+    pub fn inner(&self) -> &W {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut W {
+        &mut self.inner
     }
 }
 

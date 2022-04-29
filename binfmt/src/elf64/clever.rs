@@ -68,6 +68,7 @@ impl HowTo for Elf64CleverHowTo {
     where
         Self: Sized + 'a,
     {
+        eprintln!("Looking up Relocation by RELNO: {}", num);
         HOWTO.get(num as usize).and_then(Option::as_ref)
     }
 
@@ -97,27 +98,27 @@ impl HowTo for Elf64CleverHowTo {
     fn reloc_num(&self) -> u32 {
         match self {
             Elf64CleverHowTo::None => 0,
-            Elf64CleverHowTo::Abs16 => todo!(),
-            Elf64CleverHowTo::Abs32 => todo!(),
-            Elf64CleverHowTo::Abs64 => todo!(),
-            Elf64CleverHowTo::Rel16 => todo!(),
-            Elf64CleverHowTo::Rel32 => todo!(),
-            Elf64CleverHowTo::Rel64 => todo!(),
-            Elf64CleverHowTo::Simm => todo!(),
-            Elf64CleverHowTo::SimmRel => todo!(),
-            Elf64CleverHowTo::RelaxLong => todo!(),
-            Elf64CleverHowTo::RelaxLongPcrel => todo!(),
-            Elf64CleverHowTo::RelaxShort => todo!(),
-            Elf64CleverHowTo::RelaxShortPcrel => todo!(),
-            Elf64CleverHowTo::Got => todo!(),
-            Elf64CleverHowTo::GotPcrel => todo!(),
-            Elf64CleverHowTo::Plt => todo!(),
-            Elf64CleverHowTo::PltRcrel => todo!(),
-            Elf64CleverHowTo::RelaxGot => todo!(),
-            Elf64CleverHowTo::RelaxGotPcrel => todo!(),
-            Elf64CleverHowTo::RelaxPlt => todo!(),
-            Elf64CleverHowTo::RelaxPltPcrel => todo!(),
-            Elf64CleverHowTo::Dynent => todo!(),
+            Elf64CleverHowTo::Abs16 => 1,
+            Elf64CleverHowTo::Abs32 => 2,
+            Elf64CleverHowTo::Abs64 => 3,
+            Elf64CleverHowTo::Rel16 => 5,
+            Elf64CleverHowTo::Rel32 => 6,
+            Elf64CleverHowTo::Rel64 => 7,
+            Elf64CleverHowTo::Simm => 8,
+            Elf64CleverHowTo::SimmRel => 9,
+            Elf64CleverHowTo::RelaxLong => 10,
+            Elf64CleverHowTo::RelaxLongPcrel => 11,
+            Elf64CleverHowTo::RelaxShort => 12,
+            Elf64CleverHowTo::RelaxShortPcrel => 13,
+            Elf64CleverHowTo::Got => 16,
+            Elf64CleverHowTo::GotPcrel => 17,
+            Elf64CleverHowTo::Plt => 18,
+            Elf64CleverHowTo::PltRcrel => 19,
+            Elf64CleverHowTo::RelaxGot => 20,
+            Elf64CleverHowTo::RelaxGotPcrel => 21,
+            Elf64CleverHowTo::RelaxPlt => 22,
+            Elf64CleverHowTo::RelaxPltPcrel => 23,
+            Elf64CleverHowTo::Dynent => 24,
         }
     }
 

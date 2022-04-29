@@ -1159,6 +1159,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             if !section.relocs.is_empty() {
                 let mut relocs = Vec::new();
                 for reloc in &section.relocs {
+                    eprintln!("Handling reloc {:?}", reloc);
                     relocs.push(ElfRela::<Class> {
                         r_offset: Class::Addr::from_usize(reloc.offset as usize),
                         r_info: Class::Size::from_usize(
