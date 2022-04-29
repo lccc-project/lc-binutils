@@ -68,7 +68,6 @@ impl HowTo for Elf64CleverHowTo {
     where
         Self: Sized + 'a,
     {
-        eprintln!("Looking up Relocation by RELNO: {}", num);
         HOWTO.get(num as usize).and_then(Option::as_ref)
     }
 
