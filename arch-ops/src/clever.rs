@@ -831,14 +831,14 @@ clever_instructions! {
 }
 
 macro_rules! nop_instructions{
-    ($($nop:ident),*) => {
+    ($($constant:ident: $var:ident),*) => {
         impl CleverOpcode{
-            $(#[allow(non_upper_case_globals)] pub const $nop: Self = Self:: $nop{any: 0};)*
+            $(#[allow(non_upper_case_globals)] pub const $constant: Self = Self:: $var{any: 0};)*
         }
     }
 }
 
-nop_instructions!(Nop10, Nop11, Nop12, Nop13);
+nop_instructions!(NOP0: Nop10, NOP1: Nop11, NOP2: Nop12, NOP3: Nop13);
 
 impl CleverOpcode {
     pub fn is_branch(&self) -> bool {
@@ -1590,10 +1590,7 @@ mod test {
     pub fn test_encode_nop() {
         let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
         encoder
-            .write_instruction(CleverInstruction::new(
-                CleverOpcode::Nop10 { any: 0 },
-                vec![],
-            ))
+            .write_instruction(CleverInstruction::new(CleverOpcode::NOP0, vec![]))
             .unwrap();
 
         assert_eq!(&*encoder.inner_mut().inner, &[0x01, 0x00]);
@@ -1604,7 +1601,7 @@ mod test {
         let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
         encoder
             .write_instruction(CleverInstruction::new(
-                CleverOpcode::Nop11,
+                CleverOpcode::NOP1,
                 vec![CleverOperand::Register {
                     size: 64,
                     reg: CleverRegister::r0,
@@ -1620,7 +1617,7 @@ mod test {
         let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
         encoder
             .write_instruction(CleverInstruction::new(
-                CleverOpcode::Nop11,
+                CleverOpcode::NOP1,
                 vec![CleverOperand::Immediate(CleverImmediate::Short(1337))],
             ))
             .unwrap();
@@ -1633,7 +1630,7 @@ mod test {
         let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
         encoder
             .write_instruction(CleverInstruction::new(
-                CleverOpcode::Nop12,
+                CleverOpcode::NOP2,
                 vec![
                     CleverOperand::Register {
                         size: 64,
