@@ -825,8 +825,20 @@ clever_instructions! {
 
     // VM Creation/Disposal
     [VMCreate, "vmcreate", 0xFDA, CleverOperandKind::Normal(1), Virtualization],
-    [VMDestroy,"vmdestroy",0xFDB, CleverOperandKind::Normal(0), Virtualization]
+    [VMDestroy,"vmdestroy",0xFDB, CleverOperandKind::Normal(0), Virtualization],
+
+    [Und255, "und", 0xFFF, CleverOperandKind::Normal(0), Main]
 }
+
+macro_rules! nop_instructions{
+    ($($nop:ident),*) => {
+        impl CleverOpcode{
+            $(#[allow(non_upper_case_globals)] pub const $nop: Self = Self:: $nop{any: 0};)*
+        }
+    }
+}
+
+nop_instructions!(Nop10, Nop11, Nop12, Nop13);
 
 impl CleverOpcode {
     pub fn is_branch(&self) -> bool {
@@ -1232,6 +1244,10 @@ impl CleverInstruction {
     pub fn operands(&self) -> &[CleverOperand] {
         &self.operands
     }
+
+    pub fn set_prefix(&mut self, prefix: CleverOpcode) {
+        self.prefix = Some(prefix);
+    }
 }
 
 pub struct CleverEncoder<W> {
@@ -1574,7 +1590,10 @@ mod test {
     pub fn test_encode_nop() {
         let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
         encoder
-            .write_instruction(CleverInstruction::new(CleverOpcode::Nop10, vec![]))
+            .write_instruction(CleverInstruction::new(
+                CleverOpcode::Nop10 { any: 0 },
+                vec![],
+            ))
             .unwrap();
 
         assert_eq!(&*encoder.inner_mut().inner, &[0x01, 0x00]);
