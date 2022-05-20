@@ -638,8 +638,8 @@ clever_instructions! {
     [Popar  , "popar"  , 0x01F, CleverOperandKind::Normal(0), Main],
 
     // Converting Moves
-    [Movsx, "movsx", 0x020, CleverOperandKind::Normal(2), Main],
-    [Bswap, "bswap", 0x021, CleverOperandKind::Normal(2), Main],
+    [Movsx, "movsx", 0x020, CleverOperandKind::Normal(2), Main, {flags @ 0 => bool}],
+    [Bswap, "bswap", 0x021, CleverOperandKind::Normal(2), Main, {flags @ 0 => bool}],
     [Movsif, "movsif", 0x022, CleverOperandKind::Normal(2), Float, {flags @ 0 => bool}],
     [Movxf, "movxf", 0x023, CleverOperandKind::Normal(2), Float, {ss @ 3..=4 => u16, int @ 2 => bool,flags @0 => bool}],
     [Movfsi, "movfsi", 0x024, CleverOperandKind::Normal(2), Float, {flags @ 0 => bool}],
@@ -1082,6 +1082,42 @@ impl core::fmt::Display for CleverImmediate {
 }
 
 impl CleverOperand {
+    pub fn size(&self) -> u16 {
+        match self {
+            CleverOperand::Register { size, .. } => *size,
+            CleverOperand::VecPair { size, .. } => *size,
+            CleverOperand::Indirect { size, .. } => *size,
+            CleverOperand::Immediate(
+                CleverImmediate::Short(_)
+                | CleverImmediate::ShortRel(_)
+                | CleverImmediate::ShortAddr(_)
+                | CleverImmediate::ShortAddrRel(_),
+            ) => 12,
+            CleverOperand::Immediate(
+                CleverImmediate::Long(size, _)
+                | CleverImmediate::LongRel(size, _)
+                | CleverImmediate::LongAddr(size, _)
+                | CleverImmediate::LongAddrRel(size, _),
+            ) => *size,
+            CleverOperand::Immediate(CleverImmediate::Vec(_)) => 16,
+            CleverOperand::Immediate(
+                CleverImmediate::LongMem(_, _, size) | CleverImmediate::LongMemRel(_, _, size),
+            ) => *size,
+        }
+    }
+
+    pub fn size_ss(&self) -> Option<u16> {
+        match self.size() {
+            8 => Some(0),
+            12 => None,
+            16 => Some(1),
+            32 => Some(2),
+            64 => Some(3),
+            128 => Some(4),
+            size => panic!("Invalid register size {:?}", size),
+        }
+    }
+
     pub fn as_control_structure(&self) -> u16 {
         match self {
             CleverOperand::Register { size, reg } => {
