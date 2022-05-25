@@ -905,6 +905,35 @@ clever_instructions! {
     [Und255, "und", 0xFFF, CleverOperandKind::Normal(0), Main]
 }
 
+macro_rules! prefix_valid_instructions{
+    ($($prefix:ident : {
+        $($insn:ident),*
+        $(,)?
+    })*) => {
+        impl CleverOpcode{
+            pub fn valid_prefix_for(&self, prefixed: &CleverOpcode) -> bool{
+                match (self,prefixed){
+                    $($((Self:: $prefix {..},Self:: $insn {..}) => true,)*)*
+                    #[allow(unreachable_patterns)] _ => false
+                }
+            }
+        }
+    }
+}
+
+prefix_valid_instructions! {
+    Repbc : { Bcpy, Bsto, Bsca, Bcmp, Btst, In, Out}
+    Repbi : { Bcpy, Bsto, Bsca, Bcmp, Btst, In, Out}
+    Vec : {Add, Sub, And, Or, Xor, Mov, MovRD, MovRS,
+         Lsh, Rsh, Arsh, Lshc, Rshc, Lrot, Rrot,
+         LshR, RshR, ArshR, LshcR, RshcR, LrotR, RrotR,
+         AddRD, SubRD, AndRD, OrRD, XorRD, BNot, Neg,
+         AddRS, SubRS, AndRS, OrRS, XorRS, BNotR, NegR,
+         Round, Ceil, Floor, FAbs, FNeg, FInv, FAdd, FSub, FMul, FDiv, FRem, FFma,
+         Exp, Ln, Lg, Sin, Cos, Tan, Asin, Acos, Atan, Exp2, Log10, Lnp1, Expm1, Sqrt,
+        }
+}
+
 macro_rules! gpr_specializations{
     ($($base:ident : {
         $left_spec:ident
