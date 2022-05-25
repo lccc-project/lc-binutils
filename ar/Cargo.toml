@@ -12,3 +12,13 @@ binfmt = {path = "../binfmt",features=["ar"]}
 
 [features]
 elf = ["binfmt/elf"]
+elf32 = ["binfmt/elf32","elf"]
+elf64 = ["binfmt/elf64","elf"]
+coff = ["binfmt/coff"]
+aout = ["binfmt/aout"]
+o65 = ["binfmt/o65"]
+xo65 = ["binfmt/xo65"]
+default-formats = ["elf32", "elf64", "coff",  "o65", "xo65"]
+all-formats = ["aout","default-formats"]
+all = ["all-formats"]
+default = ["default-formats"]

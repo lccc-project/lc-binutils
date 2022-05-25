@@ -1244,4 +1244,75 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
     fn has_sections(&self) -> bool {
         true
     }
+
+    fn ident_file(&self, file: &mut (dyn std::io::Read + '_)) -> std::io::Result<bool> {
+        let mut header = ElfHeader::<Class>::zeroed();
+        file.read_exact(bytemuck::bytes_of_mut(&mut header.e_ident))?;
+
+        if header.e_ident.ei_mag != consts::ELFMAG {
+            return Ok(false);
+        }
+
+        if header.e_ident.ei_class != Class::EI_CLASS {
+            return Ok(false);
+        }
+
+        if header.e_ident.ei_data != self.data {
+            return Ok(false);
+        }
+
+        file.read_exact(&mut bytemuck::bytes_of_mut(&mut header)[16..])?;
+
+        if self.em != header.e_machine && self.em != consts::EM_NONE {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+}
+
+pub struct ElfHowToUnknown;
+
+impl HowTo for ElfHowToUnknown {
+    fn from_relnum<'a>(_: u32) -> Option<&'a Self>
+    where
+        Self: Sized + 'a,
+    {
+        Some(&ElfHowToUnknown)
+    }
+
+    fn from_reloc_code<'a>(_: arch_ops::traits::RelocCode) -> Option<&'a Self>
+    where
+        Self: Sized + 'a,
+    {
+        None
+    }
+
+    fn reloc_num(&self) -> u32 {
+        0
+    }
+
+    fn name(&self) -> &'static str {
+        "**UNKNOWN RELOC**"
+    }
+
+    fn reloc_size(&self) -> usize {
+        0
+    }
+
+    fn pcrel(&self) -> bool {
+        false
+    }
+
+    fn is_relax(&self) -> bool {
+        false
+    }
+
+    fn relax_size(&self, _: u128, _: u128) -> Option<usize> {
+        None
+    }
+
+    fn apply(&self, _: u128, _: u128, _: &mut [u8]) -> Result<bool, crate::howto::HowToError> {
+        Ok(false)
+    }
 }

@@ -79,4 +79,12 @@ impl Binfmt for Binary {
     }
 
     fn before_relocate(&self, _reloc: &mut crate::howto::Reloc, _symbol: &crate::sym::Symbol) {}
+
+    fn ident_file(&self, _: &mut (dyn std::io::Read + '_)) -> std::io::Result<bool> {
+        Ok(true)
+    }
+
+    fn file_priority(&self) -> i32 {
+        i32::MIN
+    }
 }

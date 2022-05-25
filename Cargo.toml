@@ -10,5 +10,6 @@ members = [
     "binfmt-test",
     "arch-ops",
     "lc-as",
-    "dbg-info"
+    "dbg-info",
+    "lccc-mangle"
 ]

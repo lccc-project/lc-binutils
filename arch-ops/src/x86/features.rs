@@ -138,5 +138,9 @@ define_x86_features! {
     (WideKl, "widekl"),
     (X87, "x87"),
     (Cx8, "cx8"),
-    (Cx16, "cx16")
+    (Cx16, "cx16"),
+    (Sahf, "sahf"),
+    (MovBe, "movbe"),
+    (Adcx, "adcx"),
+    (PrefecthW, "prefetchw")
 }

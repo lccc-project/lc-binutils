@@ -24,6 +24,10 @@ pub trait Binfmt {
 
     fn name(&self) -> &'static str;
     fn create_file(&self, ty: FileType) -> BinaryFile;
+    fn ident_file(&self, file: &mut (dyn Read + '_)) -> io::Result<bool>;
+    fn file_priority(&self) -> i32 {
+        0
+    }
     fn read_file(&self, file: &mut (dyn Read + '_)) -> io::Result<Option<BinaryFile>>;
     fn write_file(&self, file: &mut (dyn Write + '_), bfile: &BinaryFile) -> io::Result<()>;
 
@@ -369,6 +373,10 @@ mod tests {
 
         fn has_sections(&self) -> bool {
             true
+        }
+
+        fn ident_file(&self, _: &mut (dyn std::io::Read + '_)) -> std::io::Result<bool> {
+            Ok(false)
         }
     }
     #[test]

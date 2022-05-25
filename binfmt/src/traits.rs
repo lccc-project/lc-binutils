@@ -6,7 +6,10 @@ use core::{
     fmt::{Debug, LowerHex},
     ops::*,
 };
-use std::convert::TryFrom;
+use std::{
+    convert::TryFrom,
+    io::{Read, Seek},
+};
 
 #[doc(hidden)]
 pub(crate) mod private {
@@ -86,3 +89,7 @@ macro_rules! impl_numeric {
     }
 
 impl_numeric!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, usize, isize);
+
+pub trait ReadSeek: Read + Seek {}
+
+impl<T: Read + Seek + ?Sized> ReadSeek for T {}

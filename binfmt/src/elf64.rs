@@ -7,3 +7,25 @@ pub mod x86_64;
 
 #[cfg(feature = "clever")]
 pub mod clever;
+
+pub mod genericle {
+    pub fn create_format() -> super::Elf64Format<crate::elf::ElfHowToUnknown> {
+        super::Elf64Format::new(
+            super::consts::EM_NONE,
+            super::consts::ELFDATA2LSB,
+            "elf64-genericle",
+            None,
+        )
+    }
+}
+
+pub mod genericbe {
+    pub fn create_format() -> super::Elf64Format<crate::elf::ElfHowToUnknown> {
+        super::Elf64Format::new(
+            super::consts::EM_NONE,
+            super::consts::ELFDATA2MSB,
+            "elf64-genericbe",
+            None,
+        )
+    }
+}

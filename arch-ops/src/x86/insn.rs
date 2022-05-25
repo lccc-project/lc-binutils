@@ -278,6 +278,7 @@ define_x86_instructions! {
     (CmpRM,   "cmp", 0x3B, [RegGeneral, ModRMGeneral]),
     (CmpAImm8,"cmp", 0x3C, [AReg(Byte), Imm(1)]),
     (CmpAImm, "cmp", 0x3D, [ARegGeneral, ImmGeneral]),
+    (IncR,    "inc", 0x40, [OpRegMode], [Real, Protected, Virtual8086, Compatibility]),
     (Rex,     "rex", 0x40, [Insn], [Long]),
     (RexB,    "rex.b",0x41, [Insn], [Long]),
     (RexX,    "rex.x",0x42, [Insn], [Long]),
@@ -286,6 +287,7 @@ define_x86_instructions! {
     (RexRB,   "rex.rb",0x45, [Insn], [Long]),
     (RexRX,   "rex.rx",0x46, [Insn], [Long]),
     (RexRXB,  "rex.rxb", 0x47, [Insn], [Long]),
+    (DecR,    "dec", 0x48, [OpRegMode], [Real, Protected, Virtual8086, Compatibility]),
     (RexW,    "rex.w", 0x48, [Insn], [Long]),
     (RexWB,   "rex.wb",0x49, [Insn], [Long]),
     (RexWX,   "rex.wx",0x4A, [Insn], [Long]),
@@ -609,11 +611,11 @@ define_x86_instructions! {
     (MovQRM, "movq", 0x0F6F, [Reg(Mmx),ModRM(Quad)]),
     (MovDMR, "movd", 0x0F7E, [Reg(Mmx),ModRM(Double)]),
     (MovQMR, "movq", 0x0F7F, [ModRM(Quad),Reg(Mmx)]),
-    (MFence, "vmfence", 0x0FAE, []),
+    (MFence, "mfence", 0x0FAE, []),
 
-    (TileLoadD, "tileloadd", 0xF20F384B,[VexPrefix(Xmm), Reg(Tmm), ModRMSib(Tmm)]),
-    (TileLoadDT1, "tileloaddt1", 0x660F384B,[VexPrefix(Xmm), Reg(Tmm), ModRMSib(Tmm)]),
-    (TileStoreD, "tilestored", 0xF30F384B, [VexPrefix(Xmm),ModRMSib(Tmm),Reg(Tmm)]),
+    (TileLoadD, "tileloadd", 0xF20F384B,[VexPrefix(Xmm), Reg(Tmm), ModRMSib(Tmm)], [Long]),
+    (TileLoadDT1, "tileloaddt1", 0x660F384B,[VexPrefix(Xmm), Reg(Tmm), ModRMSib(Tmm)], [Long]),
+    (TileStoreD, "tilestored", 0xF30F384B, [VexPrefix(Xmm),ModRMSib(Tmm),Reg(Tmm)], [Long]),
 
 }
 

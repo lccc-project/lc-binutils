@@ -1,8 +1,9 @@
 use std::{
+    convert::TryFrom,
     error::Error,
-    ffi::{OsStr, OsString},
+    ffi::{CString, OsStr, OsString},
     fmt::Display,
-    io::{ErrorKind, Read, Write},
+    io::{Cursor, ErrorKind, Read, Seek, Write},
     mem::size_of,
     slice,
     time::SystemTime,
@@ -28,6 +29,7 @@ pub struct ArchiveHeader {
 pub struct Archive {
     mag: [u8; 8],
     symtab: Option<ArchiveMember>,
+    esymtab: Option<ArchiveMember>,
     strtab: Option<ArchiveMember>,
     members: Vec<ArchiveMember>,
 }
@@ -250,6 +252,19 @@ impl Archive {
             members: Vec::new(),
             strtab: None,
             symtab: None,
+            esymtab: None,
+        }
+    }
+
+    pub fn get_extsymtable(&mut self) -> &mut ArchiveMember {
+        if self.symtab.is_none() {
+            panic!("Cannot Create extended symbol table without creating symbol table")
+        } else {
+            self.esymtab.get_or_insert_with(|| {
+                let mut esymtab = ArchiveMember::new();
+                esymtab.set_name(SYMTAB);
+                esymtab
+            })
         }
     }
 
@@ -259,7 +274,39 @@ impl Archive {
             symtab.set_name(SYMTAB);
             self.symtab = Some(symtab);
         }
-        self.symtab.as_mut().unwrap()
+        let mut sym_entries = Vec::new();
+
+        for (i, m) in self.members.iter().enumerate() {
+            let mut read = Cursor::new(&m.bytes);
+            for fmt in crate::formats() {
+                if let Ok(true) = fmt.ident_file(&mut read) {
+                    let _ = read.rewind();
+                    let file = fmt.read_file(&mut read).unwrap().unwrap();
+                    for sym in file.symbols() {
+                        sym_entries.push((u32::try_from(i).unwrap(), sym.name().to_owned()));
+                    }
+                    break;
+                } else {
+                    let _ = read.rewind();
+                }
+            }
+        }
+
+        let mem = self.symtab.as_mut().unwrap();
+        mem.truncate();
+
+        let size = u32::try_from(sym_entries.len()).unwrap();
+        let bytes = &mut mem.bytes;
+
+        bytes.write_all(&size.to_be_bytes()).unwrap();
+
+        for (file, sym) in sym_entries {
+            let sym = CString::new(sym).unwrap();
+            bytes.write_all(&file.to_be_bytes()).unwrap();
+            bytes.write_all(sym.as_bytes()).unwrap();
+        }
+
+        mem
     }
 
     pub fn collect_names(&mut self) {
@@ -294,6 +341,9 @@ impl Archive {
         if let Some(symtab) = &self.symtab {
             symtab.write(&mut w)?;
         }
+        if let Some(esymtab) = &self.esymtab {
+            esymtab.write(&mut w)?;
+        }
         if let Some(symtab) = &self.strtab {
             symtab.write(&mut w)?;
         }
@@ -315,15 +365,32 @@ impl Archive {
         }
         let mut members = Vec::new();
         let mut symtab = None;
+        let mut esymtab = None;
         let mut strtab = None;
         loop {
             match ArchiveMember::read(&mut r) {
                 Ok(mut m) => {
                     if m.header.ar_name == SYMTAB.as_bytes() {
-                        symtab = Some(m);
+                        if symtab.is_none() {
+                            symtab = Some(m);
+                        } else if esymtab.is_none() {
+                            esymtab = Some(m);
+                        } else {
+                            return Err(std::io::Error::new(
+                                ErrorKind::InvalidData,
+                                "Invalid Archive Table (multiple symbol tables present in file)",
+                            ));
+                        }
                         continue;
                     } else if m.header.ar_name == STRTAB.as_bytes() {
-                        strtab = Some(m);
+                        if strtab.is_none() {
+                            strtab = Some(m);
+                        } else {
+                            return Err(std::io::Error::new(
+                                ErrorKind::InvalidData,
+                                "Invalid Archive Table (multiple string tables present in file)",
+                            ));
+                        }
                         continue;
                     } else if m.header.ar_name[0] == b'/' {
                         let name = std::str::from_utf8(&m.header.ar_name)
@@ -367,6 +434,7 @@ impl Archive {
         Ok(Self {
             mag,
             symtab,
+            esymtab,
             strtab,
             members,
         })

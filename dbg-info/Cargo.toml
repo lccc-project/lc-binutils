@@ -9,3 +9,6 @@ license = "BSD-2-Clause-Patent"
 [dependencies]
 
 [features]
+dwarf5 = []
+all-formats = ["dwarf5"]
+default-formats = ["dwarf5"]

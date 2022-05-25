@@ -905,6 +905,53 @@ clever_instructions! {
     [Und255, "und", 0xFFF, CleverOperandKind::Normal(0), Main]
 }
 
+macro_rules! gpr_specializations{
+    ($($base:ident : {
+        $left_spec:ident
+        $(, $right_spec:ident)?
+        $(,)?
+    })*) => {
+        impl CleverOpcode{
+            pub fn gpr_dest_specialization(&self,reg: CleverRegister) -> Option<CleverOpcode>{
+                match self{
+                    $(Self:: $base {..} => {
+                        Some(Self:: $left_spec {r: reg})
+                    },)*
+                    _ => None
+                }
+            }
+
+            pub fn gpr_src_specialization(&self,reg: CleverRegister) -> Option<CleverOpcode>{
+                match self{
+                    $($(Self:: $base {..} => {
+                        Some(Self:: $right_spec {r: reg})
+                    },)?)*
+                    _ => None
+                }
+            }
+        }
+    }
+}
+
+gpr_specializations! {
+    Add: {AddRD, AddRS}
+    Sub: {SubRD, SubRS}
+    And: {AndRD, AndRS}
+    Or:  {OrRD , OrRS }
+    Xor: {XorRD, XorRS}
+    Mov: {MovRD, MovRS}
+    Lea: {LeaRD}
+    Lsh: {LshR}
+    Rsh: {RshR}
+    Arsh: {ArshR}
+    Lshc: {LshcR}
+    Rshc: {RshcR}
+    Lrot: {LrotR}
+    Rrot: {RrotR}
+    Neg: {NegR}
+    BNot: {BNotR}
+}
+
 macro_rules! nop_instructions{
     ($($constant:ident: $var:ident),*) => {
         impl CleverOpcode{

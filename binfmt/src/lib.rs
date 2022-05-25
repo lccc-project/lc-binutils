@@ -101,6 +101,14 @@ define_formats![
     elf64-x86_64,
     #[cfg(all(feature = "elf64", feature = "clever"))]
     elf64-clever,
+    #[cfg(feature = "elf32")]
+    elf32-genericle,
+    #[cfg(feature = "elf32")]
+    elf32-genericbe,
+    #[cfg(feature = "elf64")]
+    elf32-genericle,
+    #[cfg(feature = "elf64")]
+    elf32-genericbe,
     binary
 ];
 

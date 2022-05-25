@@ -5,6 +5,9 @@ pub mod traits;
 #[cfg(feature = "w65")]
 pub mod w65;
 
+#[cfg(feature = "m6502")]
+pub mod m6502;
+
 #[cfg(feature = "x86")]
 pub mod x86;
 
