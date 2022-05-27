@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![allow(unknown_lints, renamed_and_removed_lints)]
 
 pub mod traits;
 

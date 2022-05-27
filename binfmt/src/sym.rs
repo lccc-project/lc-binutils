@@ -1,4 +1,4 @@
-#[derive(Clone, Hash, PartialEq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub struct Symbol {
     name: String,
     value: Option<u128>,

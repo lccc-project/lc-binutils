@@ -534,7 +534,7 @@ macro_rules! clever_instructions{
                         #[allow(unused_mut)]
                         let mut hmask = 0;
 
-                        $(#[allow(unused_parens,clippy::eval_order_dependence)] let ($($hfield),*) = (
+                        $(#[allow(unused_parens, clippy::eval_order_dependence, clippy::mixed_read_write_in_expression)] let ($($hfield),*) = (
                             $({
                                 fn range() -> impl HBitRange<u32>{
                                     $range
