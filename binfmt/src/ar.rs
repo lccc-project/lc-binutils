@@ -279,6 +279,9 @@ impl Archive {
         for (i, m) in self.members.iter().enumerate() {
             let mut read = Cursor::new(&m.bytes);
             for fmt in crate::formats() {
+                #[allow(clippy::branches_sharing_code)]
+                // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime
+                // So shut it
                 if let Ok(true) = fmt.ident_file(&mut read) {
                     let _ = read.rewind();
                     let file = fmt.read_file(&mut read).unwrap().unwrap();
