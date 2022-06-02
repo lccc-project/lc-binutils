@@ -2,7 +2,6 @@
 
 use std::io::{Error as IOError, ErrorKind};
 
-pub mod arch;
 pub mod driver;
 
 pub enum Mode {
