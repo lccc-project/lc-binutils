@@ -433,14 +433,14 @@ w65_opcodes! {
             Long => 0x5C,
             Indirect => 0x6C,
             IndirectX => 0x7C,
-            IndirectLong => 0xDc
+            IndirectLong => 0xDC
         ]
     },
     {
         Jsr, "jsr", [
             Long => 0x22,
             Abs => 0x20,
-            AbsX => 0xFc
+            AbsX => 0xFC
         ]
     },
     {
@@ -1012,7 +1012,7 @@ impl BitAnd for W65Mode {
     type Output = Self;
     fn bitand(self, rhs: Self) -> Self {
         Self {
-            bits: self.bits | rhs.bits,
+            bits: self.bits & rhs.bits,
         }
     }
 }
@@ -1021,7 +1021,7 @@ impl BitXor for W65Mode {
     type Output = Self;
     fn bitxor(self, rhs: Self) -> Self {
         Self {
-            bits: self.bits | rhs.bits,
+            bits: self.bits ^ rhs.bits,
         }
     }
 }
