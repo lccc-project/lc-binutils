@@ -1,6 +1,9 @@
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
+use std::{
+    io::{ErrorKind, Write},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not},
+};
 
-use crate::traits::Address;
+use crate::traits::{Address, InsnWrite};
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum W65Address {
@@ -14,6 +17,46 @@ pub enum W65Address {
     Indirect(Box<W65Address>),
     IndirectLong(Box<W65Address>),
     Stack { off: i8 },
+}
+
+impl W65Address {
+    pub fn into_addr(self) -> Option<Address> {
+        match self {
+            Self::Stack { .. } => None,
+            Self::Absolute(addr)
+            | Self::Direct(addr)
+            | Self::Long(addr)
+            | Self::Rel8(addr)
+            | Self::Rel16(addr) => Some(addr),
+            Self::IndexedX(addr)
+            | Self::IndexedY(addr)
+            | Self::Indirect(addr)
+            | Self::IndirectLong(addr) => addr.into_addr(),
+        }
+    }
+
+    pub fn is_rel(&self) -> bool {
+        match self {
+            Self::Rel8(_) | Self::Rel16(_) => true,
+            Self::Direct(_) | Self::Absolute(_) | Self::Long(_) | Self::Stack { .. } => false,
+            Self::IndexedX(addr)
+            | Self::IndexedY(addr)
+            | Self::Indirect(addr)
+            | Self::IndirectLong(addr) => addr.is_rel(),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Rel8(_) | Self::Direct(_) | Self::Stack { .. } => 1,
+            Self::Absolute(_) | Self::Rel16(_) => 2,
+            Self::Long(_) => 3,
+            Self::IndexedX(addr)
+            | Self::IndexedY(addr)
+            | Self::Indirect(addr)
+            | Self::IndirectLong(addr) => addr.size(),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -939,12 +982,13 @@ w65_synthetic_instructions! {
     [W65Opcode::Pl, W65Operand::Register(W65Register::P) => W65Opcode::Plp, W65Operand::Implied]
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Default)]
 pub struct W65Mode {
     bits: u16,
 }
 
 impl W65Mode {
+    pub const NONE: W65Mode = W65Mode { bits: 0 };
     pub const M: W65Mode = W65Mode { bits: 1 };
     pub const X: W65Mode = W65Mode { bits: 2 };
     pub const E: W65Mode = W65Mode { bits: 4 };
@@ -1022,6 +1066,111 @@ impl BitXor for W65Mode {
     fn bitxor(self, rhs: Self) -> Self {
         Self {
             bits: self.bits ^ rhs.bits,
+        }
+    }
+}
+
+pub struct W65Encoder<W> {
+    inner: W,
+    mode: W65Mode,
+}
+
+impl<W> W65Encoder<W> {
+    pub const fn new(inner: W) -> Self {
+        Self {
+            inner,
+            mode: W65Mode::NONE,
+        }
+    }
+
+    pub fn into_inner(self) -> W {
+        self.inner
+    }
+
+    pub const fn writer(&self) -> &W {
+        &self.inner
+    }
+
+    pub fn writer_mut(&mut self) -> &mut W {
+        &mut self.inner
+    }
+
+    pub fn set_mode_flags(&mut self, mode: W65Mode) {
+        self.mode |= mode;
+    }
+
+    pub fn clear_mode_flags(&mut self, mode: W65Mode) {
+        self.mode &= !mode;
+    }
+
+    pub fn mode(&self) -> W65Mode {
+        self.mode
+    }
+
+    pub fn mode_mut(&mut self) -> &mut W65Mode {
+        &mut self.mode
+    }
+}
+
+impl<W: Write> Write for W65Encoder<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<W: InsnWrite> InsnWrite for W65Encoder<W> {
+    fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
+        self.inner.write_addr(size, addr, rel)
+    }
+
+    fn write_reloc(&mut self, reloc: crate::traits::Reloc) -> std::io::Result<()> {
+        self.inner.write_reloc(reloc)
+    }
+
+    fn offset(&self) -> usize {
+        self.inner.offset()
+    }
+}
+
+impl<W: InsnWrite> W65Encoder<W> {
+    pub fn write_insn(&mut self, insn: W65Instruction) -> std::io::Result<()> {
+        let mode = insn.mode.unwrap_or(self.mode);
+        let insn = insn.into_real();
+        let addr_mode = insn.addr_mode().unwrap();
+        let opc = insn.opc.opcode(addr_mode).ok_or_else(|| {
+            std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "Error: Cannot encode {} in mode {:?}",
+                    insn.opc.insn(),
+                    addr_mode
+                ),
+            )
+        })?;
+
+        self.write_all(core::slice::from_ref(&opc))?;
+        match insn.opr {
+            W65Operand::SrcDest { .. } => {
+                todo!("src, dest")
+            }
+            W65Operand::Immediate(imm) => {
+                let size = mode.get_immediate_size(addr_mode).unwrap();
+                self.write_all(&imm.to_le_bytes()[..size])
+            }
+            W65Operand::Address(addr) => {
+                if let W65Address::Stack { off } = &addr {
+                    self.write_all(core::slice::from_ref(&(*off as u8)))
+                } else {
+                    let size = addr.size();
+                    let rel = addr.is_rel();
+                    self.write_addr(size, addr.into_addr().unwrap(), rel)
+                }
+            }
+            _ => Ok(()),
         }
     }
 }
