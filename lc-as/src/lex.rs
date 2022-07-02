@@ -3,12 +3,13 @@ use core::iter::Peekable;
 
 static GROUP_PAIRS: [[char; 2]; 4] = [['{', '}'], ['(', ')'], ['[', ']'], ['<', '>']];
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Token {
     LineTerminator, // Sentinel for EOL - not passed to assemblers
     Error,
     Group(char, Vec<Token>),
     Identifier(String),
-    Sigil(char),
+    Sigil(String),
     StringLiteral(String),
     IntegerLiteral(u128),
 }
@@ -85,7 +86,6 @@ impl<I: Iterator<Item = char>, A: TargetMachine> Iterator for Lexer<'_, I, A> {
                     Lexer((&mut self.0).peekable(), self.1, Some(end)).collect(),
                 ))
             }
-            x if self.1.extra_sigil_chars().contains(&x) => Some(Token::Sigil(x)),
             _ => Some(Token::Error),
         }
     }
