@@ -32,3 +32,15 @@ impl<'a> AsState<'a> {
         &mut self.iter
     }
 }
+
+pub fn int_to_bytes_le(val: u128, bytes: &mut [u8]) -> &mut [u8] {
+    let val = val.to_le_bytes();
+    bytes.copy_from_slice(&val[..bytes.len()]);
+    bytes
+}
+
+pub fn int_to_bytes_be(val: u128, bytes: &mut [u8]) -> &mut [u8] {
+    let val = val.to_be_bytes();
+    bytes.copy_from_slice(&val[..bytes.len()]);
+    bytes
+}

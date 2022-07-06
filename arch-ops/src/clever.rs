@@ -748,6 +748,7 @@ clever_instructions! {
     // Vector Instructions
     [Vec, "vec", 0x400, CleverOperandKind::Insn, CleverExtension::Vec],
     [Vmov, "vmov",0x401, CleverOperandKind::Normal(2), CleverExtension::Vec],
+    [VShuffle, "vshuffle", 0x402, CleverOperandKind::Normal(2), CleverExtension::Vec],
 
     // conditional Branches
     [CBP0A , "jp" , 0x700, CleverOperandKind::AbsAddr, Main, {w @ .. => i8}],

@@ -1,4 +1,7 @@
-use crate::fmt::{BinaryFile, Binfmt, CallbackError, FileType, Section, SectionType};
+use crate::{
+    fmt::{BinaryFile, Binfmt, CallbackError, FileType, Section, SectionType},
+    traits::ReadSeek,
+};
 
 pub struct Binary;
 
@@ -25,7 +28,7 @@ impl Binfmt for Binary {
 
     fn read_file(
         &self,
-        file: &mut (dyn std::io::Read + '_),
+        file: &mut (dyn ReadSeek + '_),
     ) -> std::io::Result<Option<crate::fmt::BinaryFile>> {
         let mut vec = Vec::new();
         file.read_to_end(&mut vec)?;
@@ -36,7 +39,7 @@ impl Binfmt for Binary {
             name: ".data".to_string(),
             ty: SectionType::ProgBits,
             relocs: Vec::new(),
-            __private: (),
+            ..Default::default()
         });
 
         Ok(Some(file))

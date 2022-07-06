@@ -8,6 +8,7 @@ use std::{
 use crate::{
     howto::{HowTo, Reloc, RelocCode},
     sym::{Symbol, SymbolKind, SymbolType},
+    traits::ReadSeek,
 };
 
 use arch_ops::traits::{Address, InsnWrite};
@@ -28,7 +29,7 @@ pub trait Binfmt {
     fn file_priority(&self) -> i32 {
         0
     }
-    fn read_file(&self, file: &mut (dyn Read + '_)) -> io::Result<Option<BinaryFile>>;
+    fn read_file(&self, file: &mut (dyn ReadSeek + '_)) -> io::Result<Option<BinaryFile>>;
     fn write_file(&self, file: &mut (dyn Write + '_), bfile: &BinaryFile) -> io::Result<()>;
 
     fn has_sections(&self) -> bool;
@@ -113,11 +114,35 @@ impl<'a> BinaryFile<'a> {
         SectionsMut(self.sections.as_mut().map(|x| x.iter_mut()))
     }
 
+    pub fn get_section(&self, secno: u32) -> Option<&Section> {
+        self.sections
+            .as_ref()
+            .and_then(|sect| sect.get(secno as usize))
+    }
+
     pub fn remove_section(&mut self, x: u32) -> Option<Section> {
         self.sections
             .as_mut()
             .filter(|v| (x as usize) < v.len())
             .map(|v| v.remove(x as usize))
+    }
+
+    pub fn add_symbols<I: IntoIterator<Item = Symbol>>(
+        &mut self,
+        syms: I,
+    ) -> Result<(), CallbackError> {
+        if self.symbols.is_none() {
+            self.symbols = Some(HashMap::new());
+        }
+
+        let symtab = self.symbols.as_mut().unwrap();
+
+        for mut sym in syms {
+            self.fmt.create_symbol(&mut sym)?;
+            symtab.insert(sym.name().to_string(), sym);
+        }
+
+        Ok(())
     }
 
     pub fn get_or_create_symbol(&mut self, name: &str) -> Result<&mut Symbol, CallbackError> {
@@ -191,6 +216,10 @@ impl<'a> BinaryFile<'a> {
             .filter(|v| x < v.len())
             .map(|v| v.remove(x))
     }
+
+    pub fn fmt(&self) -> &'a (dyn Binfmt + 'a) {
+        self.fmt
+    }
 }
 
 pub struct Sections<'a>(Option<Iter<'a, Section>>);
@@ -234,14 +263,25 @@ impl<'a> Iterator for Relocs<'a> {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum HashTableType {
+    Elf,
+    Gnu,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SectionType {
     NoBits,
     ProgBits,
     SymbolTable,
+    SymbolHashTable(HashTableType),
     StringTable,
     Dynamic,
     ProcedureLinkageTable,
     GlobalOffsetTable,
+    RelocationTable,
+    RelocationAddendTable,
     FormatSpecific(u32),
 }
 
@@ -258,6 +298,8 @@ pub struct Section {
     pub ty: SectionType,
     pub content: Vec<u8>,
     pub relocs: Vec<Reloc>,
+    pub info: u64,
+    pub link: u64,
     pub __private: (),
 }
 
@@ -329,6 +371,8 @@ impl Write for Section {
 
 #[cfg(test)]
 mod tests {
+    use crate::traits::ReadSeek;
+
     use super::{Binfmt, FileType};
 
     pub struct TestBinfmt;
@@ -352,7 +396,7 @@ mod tests {
 
         fn read_file(
             &self,
-            _: &mut (dyn std::io::Read + '_),
+            _: &mut (dyn ReadSeek + '_),
         ) -> std::io::Result<Option<super::BinaryFile>> {
             Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,

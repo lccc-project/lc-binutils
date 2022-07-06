@@ -2,17 +2,18 @@ use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, SeekFrom};
 use std::marker::PhantomData;
 use std::mem::size_of;
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::fmt::{BinaryFile, Binfmt, FileType, SectionType};
+use crate::debug::PrintHex;
+use crate::fmt::{BinaryFile, Binfmt, FileType, Section, SectionType};
 use crate::howto::HowTo;
 use crate::sym::{SymbolKind, SymbolType};
 use crate::traits::private::Sealed;
-use crate::traits::Numeric;
+use crate::traits::{Numeric, ReadSeek};
 
 pub type ElfByte<E> = <E as ElfClass>::Byte;
 pub type ElfHalf<E> = <E as ElfClass>::Half;
@@ -809,7 +810,7 @@ impl ElfProgramHeader for Elf64Phdr {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 #[repr(C)]
 pub struct ElfSectionHeader<Class: ElfClass> {
     pub sh_name: ElfWord<Class>,
@@ -822,6 +823,23 @@ pub struct ElfSectionHeader<Class: ElfClass> {
     pub sh_info: ElfWord<Class>,
     pub sh_addralign: ElfAddr<Class>,
     pub sh_entsize: ElfSize<Class>,
+}
+
+impl<Class: ElfClass> core::fmt::Debug for ElfSectionHeader<Class> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_struct("ElfSectionHeader")
+            .field("sh_name", &self.sh_name)
+            .field("sh_type", &self.sh_type)
+            .field("sh_flags", &PrintHex(self.sh_flags))
+            .field("sh_addr", &PrintHex(self.sh_addr))
+            .field("sh_offset", &self.sh_offset)
+            .field("sh_size", &self.sh_size)
+            .field("sh_link", &PrintHex(self.sh_link))
+            .field("sh_info", &PrintHex(self.sh_info))
+            .field("sh_addralign", &self.sh_addralign)
+            .field("sh_entsize", &self.sh_entsize)
+            .finish()
+    }
 }
 
 unsafe impl<Class: ElfClass> Zeroable for ElfSectionHeader<Class> {}
@@ -906,6 +924,27 @@ fn elf_type_to_file_type(ty: consts::ElfType) -> FileType {
     }
 }
 
+fn elf_shtype_to_file_type(ty: consts::SectionType) -> SectionType {
+    match ty {
+        consts::SHT_PROGBITS => SectionType::ProgBits,
+        consts::SHT_SYMTAB => SectionType::SymbolTable,
+        consts::SHT_STRTAB => SectionType::StringTable,
+        consts::SHT_REL => SectionType::RelocationTable,
+        consts::SHT_RELA => SectionType::RelocationAddendTable,
+        consts::SHT_DYNAMIC => SectionType::Dynamic,
+        consts::SHT_NOBITS => SectionType::NoBits,
+        consts::SectionType(ty) => SectionType::FormatSpecific(ty),
+    }
+}
+
+fn from_null_term_str(bytes: &[u8]) -> std::io::Result<String> {
+    let l = bytes.split(|b| *b == 0).next().unwrap();
+
+    core::str::from_utf8(l)
+        .map_err(|e| std::io::Error::new(ErrorKind::InvalidData, e))
+        .map(str::to_string)
+}
+
 impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Class, Howto> {
     fn relnum_to_howto(&self, relnum: u32) -> Option<&dyn HowTo> {
         Howto::from_relnum(relnum).map(|x| x as &dyn HowTo)
@@ -959,7 +998,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
 
     fn read_file(
         &self,
-        file: &mut (dyn std::io::Read + '_),
+        file: &mut (dyn ReadSeek + '_),
     ) -> std::io::Result<Option<crate::fmt::BinaryFile>> {
         let mut header = ElfHeader::<Class>::zeroed();
         file.read_exact(bytemuck::bytes_of_mut(&mut header.e_ident))?;
@@ -987,7 +1026,10 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             ));
         }
         let mut phdrs = vec![Class::ProgramHeader::zeroed(); header.e_phnum.as_usize()];
-        file.read_exact(bytemuck::cast_slice_mut(&mut phdrs))?;
+        if header.e_phnum.as_usize() != 0 {
+            file.seek(SeekFrom::Start(header.e_phoff.as_u64()))?;
+            file.read_exact(bytemuck::cast_slice_mut(&mut phdrs))?;
+        }
 
         let data = ElfFileData { header, phdrs };
         #[allow(unused_mut)]
@@ -1003,10 +1045,104 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             ));
         }
 
+        file.seek(SeekFrom::Start(Numeric::as_u64(header.e_shoff)))?;
+
         let mut shdrs = vec![ElfSectionHeader::<Class>::zeroed(); header.e_shnum.as_usize()];
         file.read_exact(bytemuck::cast_slice_mut(&mut shdrs))?;
 
-        for _shdr in &shdrs {}
+        let mut strings = Vec::new();
+
+        let shstrndx = Numeric::as_usize(header.e_shstrndx);
+
+        let shstrhdr = *shdrs.get(shstrndx).ok_or_else(|| {
+            std::io::Error::new(
+                ErrorKind::InvalidData,
+                "Invalid or Out of range section string table index",
+            )
+        })?;
+
+        strings.resize(Numeric::as_usize(shstrhdr.sh_size), 0u8);
+
+        file.seek(SeekFrom::Start(Numeric::as_u64(shstrhdr.sh_offset)))?;
+
+        file.read_exact(&mut strings)?;
+
+        for shdr in &shdrs[1..] {
+            let mut sect = Section::default();
+
+            sect.align = Numeric::as_usize(shdr.sh_addralign);
+            sect.ty = elf_shtype_to_file_type(shdr.sh_type);
+            let noff = Numeric::as_usize(shdr.sh_name);
+            let name = &strings[noff..];
+
+            sect.name = from_null_term_str(name)?;
+
+            sect.content.resize(Numeric::as_usize(shdr.sh_size), 0);
+
+            if sect.ty != SectionType::NoBits {
+                file.seek(SeekFrom::Start(Numeric::as_u64(shdr.sh_offset)))
+                    .unwrap();
+                file.read_exact(&mut sect.content)?;
+            }
+
+            sect.info = shdr.sh_info.as_u64();
+            sect.link = shdr.sh_link.as_u64();
+
+            match sect.ty {
+                SectionType::SymbolTable => {
+                    if shdr.sh_entsize.as_usize() != size_of::<Class::Symbol>() {
+                        return Err(std::io::Error::new(
+                            ErrorKind::InvalidData,
+                            "Invalid Symbol Header Entry Size",
+                        ));
+                    }
+                }
+                _ => {}
+            }
+
+            drop(bfile.add_section(sect))
+        }
+
+        let mut syms = Vec::new();
+        for sect in bfile.sections() {
+            match sect.ty {
+                SectionType::SymbolTable => {
+                    let strsect = bfile.get_section((sect.link as u32) - 1).ok_or_else(|| {
+                        std::io::Error::new(
+                            ErrorKind::InvalidData,
+                            "Out of range str section referenced from symbol table",
+                        )
+                    })?;
+                    for window in sect
+                        .content
+                        .chunks_exact(size_of::<Class::Symbol>())
+                        .skip(1)
+                    {
+                        let mut sym = Class::Symbol::zeroed();
+                        bytemuck::bytes_of_mut(&mut sym).copy_from_slice(window);
+                        let name = sym.name_idx().as_usize();
+
+                        let name = from_null_term_str(&strsect.content[name..])?;
+
+                        let value = sym.value().as_u64() as u128;
+                        let section = (sym.section().as_u64() as u32).checked_sub(1);
+
+                        let sym = crate::sym::Symbol::new(
+                            name,
+                            section,
+                            section.map(|_| value),
+                            SymbolType::Object,
+                            SymbolKind::Local,
+                        );
+
+                        syms.push(sym);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        bfile.add_symbols(syms).unwrap();
 
         Ok(Some(bfile))
     }
@@ -1066,6 +1202,9 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                     SectionType::ProcedureLinkageTable => todo!(),
                     SectionType::GlobalOffsetTable => todo!(),
                     SectionType::FormatSpecific(_) => todo!(),
+                    SectionType::SymbolHashTable(_) => todo!(),
+                    SectionType::RelocationTable => todo!(),
+                    SectionType::RelocationAddendTable => todo!(),
                 },
                 sh_flags: Class::Offset::from_usize(7),
                 sh_addr: Class::Addr::from_usize(0),

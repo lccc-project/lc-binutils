@@ -44,6 +44,8 @@ pub trait Numeric:
     fn max() -> Self;
     fn as_usize(self) -> usize;
     fn from_usize(x: usize) -> Self;
+    fn as_u64(self) -> u64;
+    fn from_u64(x: u64) -> Self;
     #[must_use]
     fn from_be(self) -> Self;
     #[must_use]
@@ -73,6 +75,13 @@ macro_rules! impl_numeric {
                 }
 
                 fn from_usize(x: usize) -> Self{
+                    x as Self
+                }
+                fn as_u64(self) -> u64{
+                    self as u64
+                }
+
+                fn from_u64(x: u64) -> Self{
                     x as Self
                 }
 

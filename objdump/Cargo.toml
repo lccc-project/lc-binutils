@@ -8,3 +8,21 @@ license = "BSD-2-Clause-Patent"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+binfmt = {path="../binfmt", features=["all-archs"]}
+
+[features]
+elf = ["binfmt/elf"]
+elf32 = ["binfmt/elf32"]
+elf64 = ["binfmt/elf64"]
+coff = ["binfmt/coff"]
+pe = ["binfmt/pe"]
+macho = ["binfmt/macho"]
+aout = ["binfmt/aout"]
+o65 = ["binfmt/o65"]
+xo65 = ["binfmt/xo65"]
+llir = ["binfmt/llir"]
+xir = ["binfmt/xir"]
+default-formats = ["elf","coff","pe","macho"]
+lto-formats = ["xir","llir"]
+all-formats = ["default-formats","aout","o65", "xo65","lto-formats"]
+default = ["default-formats"]

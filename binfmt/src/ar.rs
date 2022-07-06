@@ -3,7 +3,7 @@ use std::{
     error::Error,
     ffi::{CString, OsStr, OsString},
     fmt::Display,
-    io::{Cursor, ErrorKind, Read, Seek, Write},
+    io::{Cursor, ErrorKind, Read, Write},
     mem::size_of,
     slice,
     time::SystemTime,
@@ -277,21 +277,10 @@ impl Archive {
         let mut sym_entries = Vec::new();
 
         for (i, m) in self.members.iter().enumerate() {
-            let mut read = Cursor::new(&m.bytes);
-            for fmt in crate::formats() {
-                #[allow(clippy::branches_sharing_code)]
-                // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime
-                // So shut it
-                if let Ok(true) = fmt.ident_file(&mut read) {
-                    let _ = read.rewind();
-                    let file = fmt.read_file(&mut read).unwrap().unwrap();
-                    for sym in file.symbols() {
-                        sym_entries.push((u32::try_from(i).unwrap(), sym.name().to_owned()));
-                    }
-                    break;
-                } else {
-                    let _ = read.rewind();
-                }
+            let read = Cursor::new(&m.bytes);
+            let file = crate::open_file(read).unwrap();
+            for sym in file.symbols() {
+                sym_entries.push((u32::try_from(i).unwrap(), sym.name().to_owned()));
             }
         }
 

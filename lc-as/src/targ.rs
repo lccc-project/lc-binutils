@@ -4,6 +4,8 @@ use arch_ops::traits::InsnWrite;
 
 use crate::as_state::AsState;
 
+use target_tuples::Architecture;
+
 pub trait TargetMachine {
     fn group_chars(&self) -> &[char];
     fn comment_chars(&self) -> &[char];
@@ -19,4 +21,21 @@ pub trait TargetMachine {
     fn assemble_insn(&self, state: &mut AsState) -> std::io::Result<()>;
     fn directive_names(&self) -> &[&str];
     fn handle_directive(&self, dir: &str, state: &mut AsState) -> std::io::Result<()>;
+}
+
+macro_rules! targ_defs{
+    {$(#[cfg($cfg:meta)] arch $arch:ident;)*} => {
+        $(#[cfg($cfg)] mod $arch;)*
+
+        pub fn get_target_def(arch: Architecture) -> Option<&'static dyn TargetMachine>{
+            match arch.canonical_name(){
+                $(stringify!($arch) => Some($arch :: get_target_def()),)*
+                _ => None,
+            }
+        }
+    }
+}
+
+targ_defs! {
+    #[cfg(feature="clever")] arch clever;
 }

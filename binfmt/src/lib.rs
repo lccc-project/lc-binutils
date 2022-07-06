@@ -87,8 +87,12 @@ macro_rules! define_formats{
     }
 }
 
-use std::ops::Deref;
+use std::{
+    io::{Read, Seek},
+    ops::Deref,
+};
 
+use fmt::BinaryFile;
 use target_tuples::Target;
 
 #[rustfmt::skip]
@@ -140,4 +144,20 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
             * => panic!("Unknown Target")
         }
     }
+}
+
+pub fn open_file<R: Read + Seek>(mut read: R) -> std::io::Result<BinaryFile<'static>> {
+    for fmt in crate::formats() {
+        #[allow(clippy::branches_sharing_code)]
+        // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime
+        // So shut it
+        if let Ok(true) = fmt.ident_file(&mut read) {
+            read.rewind()?;
+            let file = fmt.read_file(&mut read)?.unwrap();
+            return Ok(file);
+        } else {
+            read.rewind()?;
+        }
+    }
+    unreachable!("binary should be chosen last")
 }
