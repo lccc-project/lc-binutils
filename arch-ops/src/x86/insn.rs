@@ -1040,7 +1040,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
             ..
         } => {
             output.modrm = match (base, index) {
-                (X86Register::Bx, X86Register::Si) => ((r & 0x7) << 3),
+                (X86Register::Bx, X86Register::Si) => (r & 0x7) << 3,
                 (X86Register::Bx, X86Register::Di) => 0x01 | ((r & 0x7) << 3),
                 (X86Register::Bp, X86Register::Si) => 0x02 | ((r & 0x7) << 3),
                 (X86Register::Bp, X86Register::Di) => 0x03 | ((r & 0x7) << 3),
