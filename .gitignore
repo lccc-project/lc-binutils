@@ -1,3 +1,5 @@
 /target
 /Cargo.lock
 .vscode/
+/a.out
+*.o

@@ -1,5 +1,8 @@
 use arch_ops::traits::InsnWrite;
-use binfmt::fmt::{BinaryFile, FileType, Section};
+use binfmt::{
+    fmt::{BinaryFile, FileType, Section},
+    sym::{Symbol, SymbolKind},
+};
 use lc_as::{
     as_state::{Assembler, AssemblerCallbacks},
     expr::Expression,
@@ -101,7 +104,7 @@ impl AssemblerCallbacks for Callbacks {
                         Expression::Symbol(sym) => {
                             let output = asm.output();
                             output.write_addr(
-                                8,
+                                64,
                                 arch_ops::traits::Address::Symbol { name: sym, disp: 0 },
                                 false,
                             )?;
@@ -392,4 +395,39 @@ fn main() {
             std::process::exit(1)
         }
     }
+
+    let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+
+    let binfile = &mut data.binfile;
+
+    let mut secnos = HashMap::new();
+
+    for (name, sec) in &data.sections {
+        let section = core::mem::take(&mut *sec.borrow_mut());
+
+        let no = binfile.add_section(section).unwrap();
+
+        secnos.insert(name.clone(), no);
+    }
+
+    for (name, (sec, offset)) in &data.syms {
+        let sec = secnos[sec];
+        let sym = Symbol::new(
+            name.clone(),
+            Some(sec),
+            Some(*offset as u128),
+            binfmt::sym::SymbolType::Object,
+            if data.global_syms.contains(name) {
+                SymbolKind::Global
+            } else {
+                SymbolKind::Local
+            },
+        );
+
+        *binfile.get_or_create_symbol(name).unwrap() = sym;
+    }
+
+    let mut output = File::create(output_name).unwrap();
+
+    binfmt.write_file(&mut output, binfile).unwrap();
 }
