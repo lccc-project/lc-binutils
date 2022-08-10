@@ -25,9 +25,10 @@ impl<'a, I: Iterator<Item = char>, A: ?Sized> Lexer<'a, I, A> {
 impl<I: Iterator<Item = char>, A: ?Sized + TargetMachine> Iterator for Lexer<'_, I, A> {
     type Item = Token;
     fn next(&mut self) -> Option<Token> {
-        let mut comment = true;
+        let mut comment = false;
         let c = loop {
-            match self.0.next()? {
+            let c = self.0.next()?;
+            match c {
                 '\r' => match self.0.next() {
                     Some('\n') if self.1.newline_sensitive() => return Some(Token::LineTerminator),
                     Some('\n') => {
@@ -96,6 +97,83 @@ impl<I: Iterator<Item = char>, A: ?Sized + TargetMachine> Iterator for Lexer<'_,
                     x,
                     Lexer(&mut self.0, self.1, Some(end)).collect(),
                 ))
+            }
+            ':' | ',' | ';' | '#' | '?' => {
+                let sigil = String::from(c);
+                Some(Token::Sigil(sigil))
+            }
+            '+' | '-' | '*' | '/' | '!' | '=' | '^' | '~' | '>' => {
+                let mut sigil = String::from(c);
+
+                match self.0.peek() {
+                    Some('=') => {
+                        self.0.next();
+                        sigil.push('=')
+                    }
+                    _ => {}
+                }
+
+                Some(Token::Sigil(sigil))
+            }
+            '<' => {
+                let mut sigil = String::from(c);
+                match self.0.peek() {
+                    Some(c @ ('=' | '>')) => {
+                        let c = *c;
+                        self.0.next();
+                        sigil.push(c);
+                    }
+                    _ => {}
+                }
+
+                Some(Token::Sigil(sigil))
+            }
+            '&' | '|' => {
+                let mut sigil = String::from(c);
+
+                match self.0.peek() {
+                    Some('=') => {
+                        self.0.next();
+                        sigil.push('=')
+                    }
+                    Some(x) if x == &c => {
+                        self.0.next();
+                        sigil.push(c)
+                    }
+                    _ => {}
+                }
+                Some(Token::Sigil(sigil))
+            }
+            '0' => match self.0.peek() {
+                Some('x') => {
+                    self.0.next();
+                    let mut val = 0u128;
+                    while let Some(c @ ('0'..='9' | 'A'..='F' | 'a'..='f')) = self.0.peek() {
+                        val <<= 4;
+                        val |= c.to_digit(16).unwrap() as u128;
+                        self.0.next();
+                    }
+                    Some(Token::IntegerLiteral(val))
+                }
+                Some('0'..='7') => {
+                    let mut val = 0u128;
+                    while let Some(c @ ('0'..='7')) = self.0.peek() {
+                        val <<= 3;
+                        val |= c.to_digit(8).unwrap() as u128;
+                        self.0.next();
+                    }
+                    Some(Token::IntegerLiteral(val))
+                }
+                _ => Some(Token::IntegerLiteral(0)),
+            },
+            '1'..='9' => {
+                let mut val = c.to_digit(10).unwrap() as u128;
+                while let Some(c @ ('0'..='9')) = self.0.peek() {
+                    val *= 10;
+                    val += c.to_digit(10).unwrap() as u128;
+                    self.0.next();
+                }
+                Some(Token::IntegerLiteral(val))
             }
             _ => Some(Token::Error),
         }

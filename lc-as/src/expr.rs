@@ -83,6 +83,7 @@ pub fn parse_binary_expr<I: Iterator<Item = Token>>(
             if lbp < precedence {
                 break;
             }
+            it.next();
             let rhs = parse_binary_expr(it, lbp + 1);
             lhs = Expression::Binary(op, Box::new(lhs), Box::new(rhs));
         } else {

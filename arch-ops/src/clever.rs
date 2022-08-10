@@ -452,7 +452,7 @@ impl HBitRange<u32> for Range<u32> {
     }
 
     fn mask(&self) -> u16 {
-        ((1u16 << ((self.end - 1) - self.start)) - 1) << self.start
+        ((1u16 << (self.end - self.start)) - 1) << self.start
     }
 }
 

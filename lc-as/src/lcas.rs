@@ -1,9 +1,13 @@
 use arch_ops::traits::InsnWrite;
 use binfmt::fmt::{BinaryFile, FileType, Section};
-use lc_as::as_state::{Assembler, AssemblerCallbacks};
+use lc_as::{
+    as_state::{Assembler, AssemblerCallbacks},
+    expr::Expression,
+    lex::Token,
+};
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{Read, Write},
     ptr::NonNull,
@@ -16,6 +20,7 @@ pub struct Data {
     sections: HashMap<String, Rc<RefCell<Section>>>,
     curr_section: String,
     syms: HashMap<String, (String, usize)>,
+    global_syms: HashSet<String>,
 }
 
 pub struct SharedSection(Rc<RefCell<Section>>);
@@ -54,6 +59,141 @@ pub struct Callbacks;
 impl AssemblerCallbacks for Callbacks {
     fn handle_directive(&self, asm: &mut Assembler, dir: &str) -> std::io::Result<()> {
         match dir {
+            ".section" => match asm.iter().next().unwrap() {
+                Token::Identifier(tok) => {
+                    let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+                    let sect = if let Some(sect) = data.sections.get(&tok) {
+                        sect.clone()
+                    } else {
+                        let sect = Section {
+                            name: tok.clone(),
+                            align: asm.machine().def_section_alignment() as usize,
+                            ..Default::default()
+                        };
+                        let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+
+                        let sect = Rc::new(RefCell::new(sect));
+
+                        data.sections.insert(tok.clone(), sect.clone());
+
+                        sect
+                    };
+
+                    let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+
+                    data.curr_section = tok;
+
+                    asm.set_output(Box::new(SharedSection(sect)));
+
+                    Ok(())
+                }
+                tok => panic!(
+                    "Invalid token after .section: Exception an identifier {:?}",
+                    tok
+                ),
+            },
+            ".quad" => {
+                loop {
+                    let expr = lc_as::expr::parse_expression(asm.iter());
+                    let expr = asm.eval_expr(expr);
+
+                    match expr {
+                        Expression::Symbol(sym) => {
+                            let output = asm.output();
+                            output.write_addr(
+                                8,
+                                arch_ops::traits::Address::Symbol { name: sym, disp: 0 },
+                                false,
+                            )?;
+                        }
+                        Expression::Integer(val) => {
+                            let mut bytes = [0u8; 8];
+                            asm.machine().int_to_bytes(val, &mut bytes);
+                            let output = asm.output();
+                            output.write_all(&bytes)?;
+                        }
+                        expr => todo!("{:?}", expr),
+                    }
+
+                    match asm.iter().peek() {
+                        Some(Token::Sigil(s)) if s == "," => {
+                            asm.iter().next();
+                        }
+                        _ => break,
+                    }
+                }
+                Ok(())
+            }
+            ".space" => {
+                let expr = lc_as::expr::parse_expression(asm.iter());
+                let expr = asm.eval_expr(expr);
+
+                match expr {
+                    Expression::Integer(mut i) => {
+                        let output = asm.output();
+                        while i >= 1024 {
+                            let buf = vec![0u8; 1024];
+                            output.write_all(&buf)?;
+                            i -= 1024;
+                        }
+
+                        let buf = vec![0u8; i as usize];
+                        output.write_all(&buf)
+                    }
+                    expr => panic!("Invalid expression for .space: {:?}", expr),
+                }
+            }
+            ".global" | ".globl" => {
+                loop {
+                    match asm.iter().next().unwrap() {
+                        Token::Identifier(id) => {
+                            let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+                            data.global_syms.insert(id);
+                        }
+                        tok => panic!(
+                            "Unexpected token for .global directive: {:?}, expected an identifier",
+                            tok
+                        ),
+                    }
+
+                    match asm.iter().peek() {
+                        Some(Token::Sigil(s)) if s == "," => {
+                            asm.iter().next();
+                            continue;
+                        }
+                        _ => break,
+                    }
+                }
+
+                Ok(())
+            }
+            ".align" => {
+                let expr = lc_as::expr::parse_expression(asm.iter());
+                let expr = asm.eval_expr(expr);
+
+                match expr {
+                    Expression::Integer(mut i) => {
+                        eprintln!(".align {}", i);
+                        let align = i as usize;
+
+                        let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+
+                        let mut sec = data.sections[&data.curr_section].borrow_mut();
+
+                        if sec.align < align {
+                            sec.align = align;
+                        }
+
+                        let off = sec.offset();
+
+                        let nlen = (off + (align - 1)) & !(align - 1);
+
+                        sec.content.resize(nlen, 0);
+                        Ok(())
+                    }
+                    expr => panic!("Invalid expression for .space: {:?}", expr),
+                }
+            }
             x => todo!("Unrecognized directive {}", dir),
         }
     }
@@ -214,7 +354,7 @@ fn main() {
 
     let text = Section {
         name: ".text".to_string(),
-        align: 1024,
+        align: targ_def.def_section_alignment() as usize,
         ..Default::default()
     };
 
@@ -230,22 +370,26 @@ fn main() {
         sections,
         curr_section: ".text".to_string(),
         syms: HashMap::new(),
+        global_syms: HashSet::new(),
     };
 
-    eprintln!("{:?}", lex.collect::<Vec<_>>());
+    let toks = lex.collect::<Vec<_>>();
+    eprintln!("{:?}", toks);
 
-    // let mut asm = Assembler::new(
-    //     targ_def,
-    //     Box::new(SharedSection(text)),
-    //     Box::new(data),
-    //     &Callbacks,
-    //     &mut lex,
-    // );
+    let mut iter = toks.into_iter();
 
-    // while let Some(res) = asm.assemble_instr() {
-    //     if let Err(e) = res {
-    //         eprintln!("Failed to assemble: {}", e);
-    //         std::process::exit(1)
-    //     }
-    // }
+    let mut asm = Assembler::new(
+        targ_def,
+        Box::new(SharedSection(text)),
+        Box::new(data),
+        &Callbacks,
+        &mut iter,
+    );
+
+    while let Some(res) = asm.assemble_instr() {
+        if let Err(e) = res {
+            eprintln!("Failed to assemble: {}", e);
+            std::process::exit(1)
+        }
+    }
 }

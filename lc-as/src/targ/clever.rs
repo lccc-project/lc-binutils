@@ -6,9 +6,12 @@ use crate::{
     lex::Token,
 };
 
-use arch_ops::clever::{
-    CleverEncoder, CleverInstruction, CleverOpcode, CleverOperand, CleverOperandKind,
-    CleverRegister,
+use arch_ops::{
+    clever::{
+        CleverEncoder, CleverImmediate, CleverIndex, CleverInstruction, CleverOpcode,
+        CleverOperand, CleverOperandKind, CleverRegister,
+    },
+    traits::Address,
 };
 
 use super::TargetMachine;
@@ -165,6 +168,10 @@ impl TargetMachine for CleverTargetMachine {
     ) -> std::io::Result<()> {
         todo!()
     }
+
+    fn newline_sensitive(&self) -> bool {
+        false
+    }
 }
 
 fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<CleverOperand> {
@@ -216,6 +223,8 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
             Token::Group('[', group) => {
                 let mut inner_size = None::<u16>;
 
+                let mut iter = group.into_iter().peekable();
+
                 match iter.peek()? {
                     Token::Identifier(id) => match &**id {
                         "byte" => {
@@ -254,15 +263,195 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
                     _ => {}
                 }
 
-                let expr = crate::expr::parse_expression(iter);
+                let expr = crate::expr::parse_expression(&mut iter);
 
                 let expr = convert_expr(expr, isrel.is_some());
 
-                todo!("memory op")
+                match expr {
+                    CleverExpr::Immediate(imm) if isrel == Some(true) => {
+                        Some(CleverOperand::Immediate(CleverImmediate::LongMemRel(
+                            inner_size.unwrap_or(64),
+                            Address::Disp(imm as i64),
+                            size.unwrap_or(64),
+                        )))
+                    }
+                    CleverExpr::Immediate(imm) => {
+                        Some(CleverOperand::Immediate(CleverImmediate::LongMem(
+                            inner_size.unwrap_or(64),
+                            Address::Abs(imm),
+                            size.unwrap_or(64),
+                        )))
+                    }
+                    CleverExpr::RelImm(disp) => {
+                        Some(CleverOperand::Immediate(CleverImmediate::LongMemRel(
+                            inner_size.unwrap_or(64),
+                            Address::Disp(disp),
+                            size.unwrap_or(64),
+                        )))
+                    }
+                    CleverExpr::Symbol(sym, disp) if isrel == Some(true) => {
+                        Some(CleverOperand::Immediate(CleverImmediate::LongMemRel(
+                            inner_size.unwrap_or(64),
+                            Address::Symbol { name: sym, disp },
+                            size.unwrap_or(64),
+                        )))
+                    }
+                    CleverExpr::Symbol(sym, disp) => {
+                        Some(CleverOperand::Immediate(CleverImmediate::LongMem(
+                            inner_size.unwrap_or(64),
+                            Address::Symbol { name: sym, disp },
+                            size.unwrap_or(64),
+                        )))
+                    }
+                    CleverExpr::RelSym(sym, disp) => {
+                        Some(CleverOperand::Immediate(CleverImmediate::LongMemRel(
+                            inner_size.unwrap_or(64),
+                            Address::Symbol { name: sym, disp },
+                            size.unwrap_or(64),
+                        )))
+                    }
+                    CleverExpr::Register(r) => Some(CleverOperand::Indirect {
+                        size: size.unwrap_or(64),
+                        base: r,
+                        scale: 1,
+                        index: arch_ops::clever::CleverIndex::Abs(0),
+                    }),
+                    CleverExpr::Indexed(reg, idx) => match *idx {
+                        CleverExpr::Register(idx) => Some(CleverOperand::Indirect {
+                            size: size.unwrap_or(64),
+                            base: reg,
+                            scale: 1,
+                            index: CleverIndex::Register(idx),
+                        }),
+                        CleverExpr::Immediate(imm) => {
+                            let scale = imm.trailing_zeros().min(7);
+                            let imm = imm >> scale;
+
+                            Some(CleverOperand::Indirect {
+                                size: size.unwrap_or(64),
+                                base: reg,
+                                scale: scale as u8,
+                                index: CleverIndex::Abs(imm as i16),
+                            })
+                        }
+                        CleverExpr::Scaled(idx, scale) => match *idx {
+                            CleverExpr::Register(idx) => Some(CleverOperand::Indirect {
+                                size: size.unwrap_or(64),
+                                base: reg,
+                                scale,
+                                index: CleverIndex::Register(idx),
+                            }),
+                            CleverExpr::Immediate(imm) => Some(CleverOperand::Indirect {
+                                size: size.unwrap_or(64),
+                                base: reg,
+                                scale,
+                                index: CleverIndex::Abs(imm as i16),
+                            }),
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    _ => None,
+                }
             }
             _ => unreachable!(),
         },
-        _ => todo!("direct op"),
+        _ => {
+            match iter.peek()? {
+                Token::Identifier(id) => match &**id {
+                    "abs" => {
+                        iter.next();
+                        isrel = Some(false);
+                    }
+                    "rel" => {
+                        iter.next();
+                        isrel = Some(true);
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+
+            let expr = crate::expr::parse_expression(iter);
+
+            let expr = convert_expr(expr, isrel.is_some());
+
+            match expr {
+                CleverExpr::Register(reg) => Some(CleverOperand::Register {
+                    size: size.unwrap_or(64),
+                    reg,
+                }),
+                CleverExpr::Immediate(val) => {
+                    let bitsize = 128 - val.leading_zeros();
+
+                    let size = size.unwrap_or_else(|| match bitsize {
+                        0..=12 => 12,
+                        13..=16 => 16,
+                        17..=32 => 32,
+                        _ => 64,
+                    });
+
+                    let imm_val = match (size, isrel) {
+                        (12, Some(true)) => CleverImmediate::ShortRel(val as i16),
+                        (12, _) => CleverImmediate::Short(val as u16),
+                        (16 | 32 | 64, Some(true)) => CleverImmediate::LongRel(size, val as i64),
+                        (16 | 32 | 64, _) => CleverImmediate::Long(size, val as u64),
+                        (128, Some(true)) => None?,
+                        (128, _) => CleverImmediate::Vec(val),
+                        (val, _) => panic!("Impossible immediate size {}", val),
+                    };
+
+                    Some(CleverOperand::Immediate(imm_val))
+                }
+                CleverExpr::RelImm(val) => {
+                    let bitsize = (64 - val.leading_zeros()) + (64 - val.leading_ones());
+
+                    let size = size.unwrap_or_else(|| match bitsize {
+                        0..=12 => 12,
+                        13..=16 => 16,
+                        17..=32 => 32,
+                        _ => 64,
+                    });
+
+                    let imm_val = match size {
+                        12 => CleverImmediate::ShortRel(val as i16),
+                        16 | 32 | 64 => CleverImmediate::LongRel(size, val as i64),
+                        128 => None?,
+                        val => panic!("Impossible immediate size {}", val),
+                    };
+
+                    Some(CleverOperand::Immediate(imm_val))
+                }
+                CleverExpr::Symbol(sym, disp) => {
+                    let addr = Address::Symbol { name: sym, disp };
+                    let size = size.unwrap_or(64);
+
+                    let imm_val = match (size, isrel) {
+                        (12, Some(true)) => CleverImmediate::ShortAddrRel(addr),
+                        (12, _) => CleverImmediate::ShortAddr(addr),
+                        (16 | 32 | 64, Some(true)) => CleverImmediate::LongAddrRel(size, addr),
+                        (16 | 32 | 64, _) => CleverImmediate::LongAddr(size, addr),
+                        (128, _) => None?,
+                        (val, _) => panic!("Impossible immediate size {}", val),
+                    };
+                    Some(CleverOperand::Immediate(imm_val))
+                }
+                CleverExpr::RelSym(sym, disp) => {
+                    let addr = Address::Symbol { name: sym, disp };
+                    let size = size.unwrap_or(64);
+
+                    let imm_val = match size {
+                        12 => CleverImmediate::ShortAddrRel(addr),
+                        16 | 32 | 64 => CleverImmediate::LongAddrRel(size, addr),
+                        128 => None?,
+                        val => panic!("Impossible immediate size {}", val),
+                    };
+
+                    Some(CleverOperand::Immediate(imm_val))
+                }
+                expr => None?,
+            }
+        }
     }
 }
 
@@ -272,7 +461,7 @@ fn parse_insn(
     state: &mut crate::as_state::AsState,
 ) -> Option<CleverInstruction> {
     let opc = parse_mnemonic(opc)?;
-
+    eprintln!("[Clever-ISA] Assembling instruction {:?}", opc);
     match opc.operands() {
         arch_ops::clever::CleverOperandKind::Normal(n) => {
             let operands = (0..n)
@@ -290,7 +479,31 @@ fn parse_insn(
             Some(CleverInstruction::new(opc, operands))
         }
         arch_ops::clever::CleverOperandKind::AbsAddr
-        | arch_ops::clever::CleverOperandKind::RelAddr => todo!(),
+        | arch_ops::clever::CleverOperandKind::RelAddr => {
+            let op = parse_operand(state, true)?;
+            let size = op.size_ss()?;
+            let is_rel = match op.immediate_value()? {
+                CleverImmediate::Long(_, _) | CleverImmediate::LongAddr(_, _) => false,
+                CleverImmediate::LongRel(_, _) | CleverImmediate::LongAddrRel(_, _) => true,
+                _ => None?,
+            };
+
+            let opc = if opc.is_cbranch() {
+                CleverOpcode::cbranch(
+                    opc.branch_condition().unwrap(),
+                    size,
+                    is_rel,
+                    opc.branch_weight().unwrap(),
+                )
+            } else {
+                let opc = (opc.opcode() & 0xfcf0) | (size - 1) | (if is_rel { 0x100 } else { 0 });
+
+                eprintln!("Computed branch opcode {:#X}", opc);
+                CleverOpcode::from_opcode(opc).unwrap()
+            };
+
+            Some(CleverInstruction::new(opc, vec![op]))
+        }
         arch_ops::clever::CleverOperandKind::Size => todo!(),
         arch_ops::clever::CleverOperandKind::Insn => todo!(),
     }
@@ -388,7 +601,17 @@ fn parse_l00f(opc: &mut u16, mnemonic: &str) -> Option<()> {
 }
 
 clever_mnemonics! {
+    ["jmp", 0x7c0, parse_none],
     ["j",0x700,parse_jmp],
     ["und" | "und0",0x000,parse_none],
-    ["add", 0x001, parse_l00f]
+    ["add", 0x001, parse_l00f],
+    ["sub", 0x002, parse_l00f],
+    ["and", 0x003, parse_l00f],
+    ["or" , 0x004, parse_l00f],
+    ["xor", 0x005, parse_l00f],
+    ["mov", 0x008, parse_none],
+    ["lea", 0x009, parse_none],
+    ["cmp", 0x06C, parse_none],
+    ["call",0x7c1, parse_none],
+    ["hlt", 0x801, parse_none],
 }

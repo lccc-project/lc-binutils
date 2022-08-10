@@ -331,7 +331,19 @@ impl InsnWrite for Section {
                 });
                 Ok(())
             }
-            (Address::Symbol { name: _, disp: _ }, false) => todo!(),
+            (Address::Symbol { name, disp }, false) => {
+                let bytes = disp.to_le_bytes();
+                let code = RelocCode::Abs { addr_width: size };
+                let offset = self.content.len() as u64;
+                self.content.extend_from_slice(&bytes[..(size / 8)]);
+                self.relocs.push(Reloc {
+                    code,
+                    symbol: name,
+                    addend: Some(disp - ((size / 8) as i64)),
+                    offset,
+                });
+                Ok(())
+            }
             (Address::PltSym { name }, true) => {
                 let bytes = 0u64.to_le_bytes();
                 let code = RelocCode::RelPlt { addr_width: size };

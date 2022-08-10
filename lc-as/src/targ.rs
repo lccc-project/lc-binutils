@@ -22,6 +22,10 @@ pub trait TargetMachine {
     fn directive_names(&self) -> &[&str];
     fn handle_directive(&self, dir: &str, state: &mut AsState) -> std::io::Result<()>;
 
+    fn def_section_alignment(&self) -> u64 {
+        1024
+    }
+
     /// Whether or not the target assembler cares about newlines in the token stream
     /// If set to false, LineTerminator tokens are stripped from the iterator.
     fn newline_sensitive(&self) -> bool {

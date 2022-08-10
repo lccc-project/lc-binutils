@@ -6,7 +6,7 @@ use std::{
 
 use arch_ops::traits::InsnWrite;
 
-use crate::{lex::Token, targ::TargetMachine};
+use crate::{expr::Expression, lex::Token, targ::TargetMachine};
 
 pub trait PeekToken: Iterator {
     fn peek(&mut self) -> Option<&Self::Item>;
@@ -89,15 +89,16 @@ impl<'a> Assembler<'a> {
     }
 
     pub fn assemble_instr(&mut self) -> Option<std::io::Result<()>> {
-        eprintln!("In assemble_instr");
         let mnemonic;
 
         loop {
             let maybe_mnemonic = self.state.iter.next_ignore_newline()?;
-            eprintln!("Got mnemonic or label {:?}", maybe_mnemonic);
             match maybe_mnemonic {
                 Token::Identifier(id) => match self.state.iter.peek()? {
-                    Token::Sigil(x) if x == ":" => self.as_callbacks.create_symbol_now(self, &id),
+                    Token::Sigil(x) if x == ":" => {
+                        self.state.iter.next();
+                        self.as_callbacks.create_symbol_now(self, &id)
+                    }
                     _ => {
                         mnemonic = id;
                         break;
@@ -160,6 +161,10 @@ impl<'a> AsState<'a> {
 
     pub fn iter(&mut self) -> &mut Peekable<&'a mut (dyn Iterator<Item = Token> + 'a)> {
         &mut self.iter
+    }
+
+    pub fn eval_expr(&mut self, expr: Expression) -> Expression {
+        expr
     }
 }
 
