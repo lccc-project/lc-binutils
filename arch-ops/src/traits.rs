@@ -34,7 +34,22 @@ pub trait InsnRead: Read {
     ) -> std::io::Result<Option<Address>>;
 }
 
-impl<R: InsnRead> InsnRead for &mut R {
+impl<R: InsnRead + ?Sized> InsnRead for &mut R {
+    fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
+        <R as InsnRead>::read_addr(self, size, rel)
+    }
+
+    fn read_reloc(
+        &mut self,
+        size: usize,
+        rel: bool,
+        offset: Option<isize>,
+    ) -> std::io::Result<Option<Address>> {
+        <R as InsnRead>::read_reloc(self, size, rel, offset)
+    }
+}
+
+impl<R: InsnRead + ?Sized> InsnRead for Box<R> {
     fn read_addr(&mut self, size: usize, rel: bool) -> std::io::Result<Address> {
         <R as InsnRead>::read_addr(self, size, rel)
     }
@@ -55,7 +70,20 @@ pub trait InsnWrite: Write {
     fn offset(&self) -> usize;
 }
 
-impl<W: InsnWrite> InsnWrite for &mut W {
+impl<W: InsnWrite + ?Sized> InsnWrite for &mut W {
+    fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
+        <W as InsnWrite>::write_addr(self, size, addr, rel)
+    }
+    fn offset(&self) -> usize {
+        <W as InsnWrite>::offset(self)
+    }
+
+    fn write_reloc(&mut self, reloc: Reloc) -> std::io::Result<()> {
+        <W as InsnWrite>::write_reloc(self, reloc)
+    }
+}
+
+impl<W: InsnWrite + ?Sized> InsnWrite for Box<W> {
     fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()> {
         <W as InsnWrite>::write_addr(self, size, addr, rel)
     }

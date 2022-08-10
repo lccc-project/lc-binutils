@@ -32,4 +32,14 @@ all = ["all-archs","all-formats"]
 [dependencies]
 binfmt = {path = "../binfmt"}
 arch-ops = {path = "../arch-ops"}
-target-tuples = "0.4.1"
+target-tuples = "0.5"
+utf = "0.1.6"
+
+[build-dependencies]
+serde = {version="1",features=["derive"]}
+toml = "0.5"
+target-tuples = "0.5"
+
+[[bin]]
+name = "lcas"
+path = "src/lcas.rs"

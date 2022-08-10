@@ -511,6 +511,7 @@ pub enum CleverOperandKind {
     Normal(u32),
     AbsAddr,
     RelAddr,
+    Size,
     // prefix
     Insn,
 }
@@ -1009,6 +1010,15 @@ impl CleverOpcode {
         }
     }
 
+    pub fn branch_set_relative(&self, isrel: bool) -> Option<CleverOpcode> {
+        if self.is_branch() {
+            let opc = (self.opcode() & !0x100) | (if isrel { 0x100 } else { 0x000 });
+            CleverOpcode::from_opcode(opc)
+        } else {
+            None
+        }
+    }
+
     pub fn branch_condition(&self) -> Option<ConditionCode> {
         match self.opcode() & 0xFE00 {
             0x7000 | 0x7400 | 0x7800 => Some(ConditionCode::from_bits((self.opcode() & 0xf0) >> 4)),
@@ -1491,6 +1501,9 @@ impl<W: InsnWrite> CleverEncoder<W> {
         }
         self.write_all(&insn.opcode().opcode().to_be_bytes())?;
         match insn.opcode().operands(){
+            CleverOperandKind::Size => {
+                assert_eq!(insn.operands().len(),0);
+            }
             CleverOperandKind::Normal(n) => {
                 assert_eq!(insn.operands().len(), n as usize);
 
@@ -1627,6 +1640,7 @@ impl<R: InsnRead> CleverDecoder<R> {
                 }
                 Ok(inner)
             }
+            CleverOperandKind::Size => Ok(CleverInstruction::new(op, Vec::new())),
             kind @ (CleverOperandKind::AbsAddr | CleverOperandKind::RelAddr) => {
                 let bytes = 8 << (op.branch_width().unwrap() as u32);
                 let rel = kind == CleverOperandKind::RelAddr;

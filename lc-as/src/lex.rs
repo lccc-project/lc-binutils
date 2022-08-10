@@ -5,7 +5,7 @@ static GROUP_PAIRS: [[char; 2]; 4] = [['{', '}'], ['(', ')'], ['[', ']'], ['<', 
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub enum Token {
-    LineTerminator, // Sentinel for EOL - not passed to assemblers
+    LineTerminator,
     Error,
     Group(char, Vec<Token>),
     Identifier(String),
@@ -14,31 +14,42 @@ pub enum Token {
     IntegerLiteral(u128),
 }
 
-pub struct Lexer<'a, I: Iterator, A>(Peekable<I>, &'a A, Option<char>);
+pub struct Lexer<'a, I: Iterator, A: ?Sized>(&'a mut Peekable<I>, &'a A, Option<char>);
 
-impl<I: Iterator<Item = char>, A: TargetMachine> Iterator for Lexer<'_, I, A> {
+impl<'a, I: Iterator<Item = char>, A: ?Sized> Lexer<'a, I, A> {
+    pub fn new(mach: &'a A, it: &'a mut Peekable<I>) -> Self {
+        Self(it, mach, None)
+    }
+}
+
+impl<I: Iterator<Item = char>, A: ?Sized + TargetMachine> Iterator for Lexer<'_, I, A> {
     type Item = Token;
     fn next(&mut self) -> Option<Token> {
         let mut comment = true;
         let c = loop {
             match self.0.next()? {
-                '\r' => {
-                    self.0.next();
-                    match self.0.next() {
-                        Some('\n') => return Some(Token::LineTerminator),
-                        _ => return Some(Token::Error),
+                '\r' => match self.0.next() {
+                    Some('\n') if self.1.newline_sensitive() => return Some(Token::LineTerminator),
+                    Some('\n') => {
+                        comment = false;
+                        continue;
                     }
-                }
-                '\n' => {
-                    self.0.next();
+                    _ => return Some(Token::Error),
+                },
+                '\n' if self.1.newline_sensitive() => {
                     return Some(Token::LineTerminator);
                 }
-                c if self.1.comment_chars().contains(&c) => {}
+                '\n' => {
+                    comment = false;
+                    continue;
+                }
+                c if self.1.comment_chars().contains(&c) => {
+                    comment = true;
+                }
                 c if comment || c.is_whitespace() => {}
                 '/' => match self.0.peek() {
                     Some('/') => {
                         comment = true;
-                        self.0.next();
                     }
                     _ => break '/',
                 },
@@ -83,7 +94,7 @@ impl<I: Iterator<Item = char>, A: TargetMachine> Iterator for Lexer<'_, I, A> {
 
                 Some(Token::Group(
                     x,
-                    Lexer((&mut self.0).peekable(), self.1, Some(end)).collect(),
+                    Lexer(&mut self.0, self.1, Some(end)).collect(),
                 ))
             }
             _ => Some(Token::Error),

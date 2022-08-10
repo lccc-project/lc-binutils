@@ -18,9 +18,15 @@ pub trait TargetMachine {
     fn int_to_bytes<'a>(&self, val: u128, buf: &'a mut [u8]) -> &'a mut [u8];
     fn float_to_bytes<'a>(&self, val: f64, buf: &'a mut [u8]) -> &'a mut [u8];
 
-    fn assemble_insn(&self, state: &mut AsState) -> std::io::Result<()>;
+    fn assemble_insn(&self, opc: &str, state: &mut AsState) -> std::io::Result<()>;
     fn directive_names(&self) -> &[&str];
     fn handle_directive(&self, dir: &str, state: &mut AsState) -> std::io::Result<()>;
+
+    /// Whether or not the target assembler cares about newlines in the token stream
+    /// If set to false, LineTerminator tokens are stripped from the iterator.
+    fn newline_sensitive(&self) -> bool {
+        true
+    }
 }
 
 macro_rules! targ_defs{
