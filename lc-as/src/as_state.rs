@@ -114,7 +114,17 @@ impl<'a> Assembler<'a> {
             if self.mach.directive_names().contains(&(&*mnemonic)) {
                 Some(self.mach.handle_directive(&mnemonic, self))
             } else {
-                Some(self.as_callbacks.handle_directive(self, &mnemonic))
+                match &*mnemonic {
+                    ".asciz" => {
+                        let mut buf = match self.state.iter.next_ignore_newline()? {
+                            Token::StringLiteral(x) => x.bytes().collect::<Vec<_>>(),
+                            tok => panic!("Unexpected token {:?}. Expected a string literal", tok),
+                        };
+                        buf.push(0);
+                        Some(self.state.output.write_all(&buf))
+                    },
+                    _ => Some(self.as_callbacks.handle_directive(self, &mnemonic)),
+                }
             }
         } else {
             Some(self.mach.assemble_insn(&mnemonic, self))
