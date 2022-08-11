@@ -167,6 +167,84 @@ impl<I: Iterator<Item = char>, A: ?Sized + TargetMachine> Iterator for Lexer<'_,
                 }
                 Some(Token::IntegerLiteral(val))
             }
+            '"' => {
+                let mut str = String::from('"');
+
+                loop {
+                    match self.0.next() {
+                        None => break Some(Token::Error),
+                        Some('"') => {
+                            str.push('"');
+                            break Some(Token::StringLiteral(str));
+                        }
+                        Some('\\') => {
+                            str.push('\\');
+                            match self.0.next() {
+                                None => break Some(Token::Error),
+                                Some(c @ ('\\' | '\'' | 'b' | 'r' | 'n' | 'a' | 'e' | '"')) => {
+                                    str.push(c)
+                                }
+                                Some('x') => {
+                                    str.push(c);
+                                    match self.0.next() {
+                                        Some(c @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
+                                            str.push(c)
+                                        }
+                                        _ => break Some(Token::Error),
+                                    }
+                                    match self.0.next() {
+                                        Some(c @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
+                                            str.push(c)
+                                        }
+                                        _ => break Some(Token::Error),
+                                    }
+                                }
+                                Some('u') => match self.0.peek() {
+                                    Some('{') => {
+                                        self.0.next();
+                                        str.push('{');
+                                        loop {
+                                            match self.0.next() {
+                                                Some(c @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
+                                                    str.push(c)
+                                                }
+                                                Some('}') => {
+                                                    str.push('}');
+                                                    break;
+                                                }
+                                                _ => return Some(Token::Error),
+                                            }
+                                        }
+                                    }
+                                    Some('0'..='9' | 'A'..='F' | 'a'..='f') => {
+                                        for i in 0..4 {
+                                            match self.0.next() {
+                                                Some(c @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
+                                                    str.push(c)
+                                                }
+                                                _ => return Some(Token::Error),
+                                            }
+                                        }
+                                    }
+                                    _ => break Some(Token::Error),
+                                },
+                                Some('U') => {
+                                    for i in 0..8 {
+                                        match self.0.next() {
+                                            Some(c @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
+                                                str.push(c)
+                                            }
+                                            _ => return Some(Token::Error),
+                                        }
+                                    }
+                                }
+                                _ => break Some(Token::Error),
+                            }
+                        }
+                        Some(c) => str.push(c),
+                    }
+                }
+            }
             _ => Some(Token::Error),
         }
     }
