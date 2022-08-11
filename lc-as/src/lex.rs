@@ -30,19 +30,11 @@ impl<I: Iterator<Item = char>, A: ?Sized + TargetMachine> Iterator for Lexer<'_,
             let c = self.0.next()?;
             match c {
                 '\r' => match self.0.next() {
-                    Some('\n') if self.1.newline_sensitive() => return Some(Token::LineTerminator),
-                    Some('\n') => {
-                        comment = false;
-                        continue;
-                    }
+                    Some('\n') => return Some(Token::LineTerminator),
                     _ => return Some(Token::Error),
                 },
-                '\n' if self.1.newline_sensitive() => {
-                    return Some(Token::LineTerminator);
-                }
                 '\n' => {
-                    comment = false;
-                    continue;
+                    return Some(Token::LineTerminator);
                 }
                 c if self.1.comment_chars().contains(&c) => {
                     comment = true;

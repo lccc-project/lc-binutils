@@ -153,18 +153,11 @@ impl AssemblerCallbacks for Callbacks {
                             let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
                             data.global_syms.insert(id);
                         }
+                        Token::LineTerminator => break,
                         tok => panic!(
                             "Unexpected token for .global directive: {:?}, expected an identifier",
                             tok
                         ),
-                    }
-
-                    match asm.iter().peek() {
-                        Some(Token::Sigil(s)) if s == "," => {
-                            asm.iter().next();
-                            continue;
-                        }
-                        _ => break,
                     }
                 }
 
