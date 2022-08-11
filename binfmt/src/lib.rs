@@ -140,6 +140,7 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
             // x86_64-*-*-newlib => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             // x86_64-*-*-uclibc => &*BINARY_FORMATS_BY_NAME["elf64-x86_64"],
             clever-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
+            clever-*-cleveros => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
             clever-*-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
             * => panic!("Unknown Target")
         }
