@@ -69,6 +69,7 @@ define_clever_features! {
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
 pub struct CleverRegister(pub u8);
 
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct RegisterFromStrError;
 
 macro_rules! clever_registers{
@@ -512,6 +513,8 @@ pub enum CleverOperandKind {
     AbsAddr,
     RelAddr,
     Size,
+    HRegister,
+    HImmediate,
     // prefix
     Insn,
 }
@@ -860,19 +863,19 @@ clever_instructions! {
     [FcallA, "fcall", 0x7C2, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16}],
     [Ret, "ret", 0x7C3, CleverOperandKind::Normal(0), Main],
     [Scall, "scall", 0x7C4, CleverOperandKind::Normal(0), Main],
-    [Int, "int", 0x7C5, CleverOperandKind::Normal(0), Main, {i @ .. => u16}],
-    [IjmpA, "ijmp", 0x7C8, CleverOperandKind::Normal(0), Main, {r @ .. => CleverRegister}],
-    [IcallA, "icall", 0x7C9, CleverOperandKind::Normal(0), Main, {r @ .. => CleverRegister}],
-    [IfcallA, "ifcall", 0x7CA, CleverOperandKind::Normal(0), Main],
+    [Int, "int", 0x7C5, CleverOperandKind::HImmediate, Main, {i @ .. => u16}],
+    [IjmpA, "ijmp", 0x7C8, CleverOperandKind::HRegister, Main, {r @ .. => CleverRegister}],
+    [IcallA, "icall", 0x7C9, CleverOperandKind::HRegister, Main, {r @ .. => CleverRegister}],
+    [IfcallA, "ifcall", 0x7CA, CleverOperandKind::HRegister, Main],
     [JmpSM, "jsm", 0x7CB, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16}],
     [CallSM, "callsm", 0x7CC, CleverOperandKind::AbsAddr, Main, {v @ 3 => bool, ss @ 0..2 => u16}],
     [RetRSM, "retrsm", 0x7CD, CleverOperandKind::Normal(0), Main],
     [JmpR, "jmp", 0x7D0, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16}],
     [CallR, "call", 0x7D1, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16}],
     [FcallR, "fcall", 0x7D2, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16}],
-    [IjmpR, "ijmp", 0x7D8, CleverOperandKind::Normal(0), Main, {r @ .. => CleverRegister}],
-    [IcallR, "icall", 0x7D9, CleverOperandKind::Normal(0), Main, {r @ .. => CleverRegister}],
-    [IfcallR, "ifcall", 0x7DA, CleverOperandKind::Normal(0), Main],
+    [IjmpR, "ijmp", 0x7D8, CleverOperandKind::HRegister, Main, {r @ .. => CleverRegister}],
+    [IcallR, "icall", 0x7D9, CleverOperandKind::HRegister, Main, {r @ .. => CleverRegister}],
+    [IfcallR, "ifcall", 0x7DA, CleverOperandKind::HRegister, Main],
     [JmpSMR, "jsm", 0x7DB, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16}],
     [CallSMR, "callsm", 0x7DC, CleverOperandKind::AbsAddr, Main, {ss @ 0..2 => u16, v @ 3 => bool}],
 
@@ -1501,7 +1504,7 @@ impl<W: InsnWrite> CleverEncoder<W> {
         }
         self.write_all(&insn.opcode().opcode().to_be_bytes())?;
         match insn.opcode().operands(){
-            CleverOperandKind::Size => {
+            CleverOperandKind::Size | CleverOperandKind::HRegister | CleverOperandKind::HImmediate => {
                 assert_eq!(insn.operands().len(),0);
             }
             CleverOperandKind::Normal(n) => {
@@ -1640,7 +1643,9 @@ impl<R: InsnRead> CleverDecoder<R> {
                 }
                 Ok(inner)
             }
-            CleverOperandKind::Size => Ok(CleverInstruction::new(op, Vec::new())),
+            CleverOperandKind::Size
+            | CleverOperandKind::HRegister
+            | CleverOperandKind::HImmediate => Ok(CleverInstruction::new(op, Vec::new())),
             kind @ (CleverOperandKind::AbsAddr | CleverOperandKind::RelAddr) => {
                 let bytes = 8 << (op.branch_width().unwrap() as u32);
                 let rel = kind == CleverOperandKind::RelAddr;

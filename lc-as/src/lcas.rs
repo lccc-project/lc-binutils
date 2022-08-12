@@ -62,6 +62,33 @@ pub struct Callbacks;
 impl AssemblerCallbacks for Callbacks {
     fn handle_directive(&self, asm: &mut Assembler, dir: &str) -> std::io::Result<()> {
         match dir {
+            ".text" | ".rodata" | ".data" | ".bss" => {
+                let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+                let sect = if let Some(sect) = data.sections.get(dir) {
+                    sect.clone()
+                } else {
+                    let sect = Section {
+                        name: dir.to_string(),
+                        align: asm.machine().def_section_alignment() as usize,
+                        ..Default::default()
+                    };
+                    let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+
+                    let sect = Rc::new(RefCell::new(sect));
+
+                    data.sections.insert(dir.to_string(), sect.clone());
+
+                    sect
+                };
+
+                let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+
+                data.curr_section = dir.to_string();
+
+                asm.set_output(Box::new(SharedSection(sect)));
+
+                Ok(())
+            }
             ".section" => match asm.iter().next().unwrap() {
                 Token::Identifier(tok) => {
                     let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();

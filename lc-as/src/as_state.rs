@@ -122,7 +122,14 @@ impl<'a> Assembler<'a> {
                         };
                         buf.push(0);
                         Some(self.state.output.write_all(&buf))
-                    },
+                    }
+                    ".ascii" => {
+                        let mut buf = match self.state.iter.next_ignore_newline()? {
+                            Token::StringLiteral(x) => x.bytes().collect::<Vec<_>>(),
+                            tok => panic!("Unexpected token {:?}. Expected a string literal", tok),
+                        };
+                        Some(self.state.output.write_all(&buf))
+                    }
                     _ => Some(self.as_callbacks.handle_directive(self, &mnemonic)),
                 }
             }

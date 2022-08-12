@@ -167,18 +167,16 @@ impl TargetMachine for CleverTargetMachine {
         state: &mut crate::as_state::AsState,
     ) -> std::io::Result<()> {
         match dir {
-            ".byte" => {
-                match state.iter().next_ignore_newline().unwrap() {
-                    Token::IntegerLiteral(x) => state.output().write_all(&[u8::try_from(x).unwrap()]),
-                    _ => todo!(),
-                }
-            }
-            ".long" => {
-                match state.iter().next_ignore_newline().unwrap() {
-                    Token::IntegerLiteral(x) => state.output().write_all(&u64::try_from(x).unwrap().to_le_bytes()),
-                    _ => todo!(),
-                }
-            }
+            ".byte" => match state.iter().next_ignore_newline().unwrap() {
+                Token::IntegerLiteral(x) => state.output().write_all(&[u8::try_from(x).unwrap()]),
+                _ => todo!(),
+            },
+            ".long" => match state.iter().next_ignore_newline().unwrap() {
+                Token::IntegerLiteral(x) => state
+                    .output()
+                    .write_all(&u64::try_from(x).unwrap().to_le_bytes()),
+                _ => todo!(),
+            },
             _ => unreachable!(),
         }
     }
@@ -523,8 +521,8 @@ fn parse_insn(
             Some(CleverInstruction::new(opc, vec![op]))
         }
         arch_ops::clever::CleverOperandKind::Size => {
-            let size = match state.iter().peek()? {
-                Token::Identifier(id) => match &**id {
+            let size = match state.iter().next()? {
+                Token::Identifier(id) => match &*id {
                     "byte" => {
                         state.iter().next();
                         0
@@ -549,9 +547,46 @@ fn parse_insn(
             let opc = (opc.opcode() & 0xfff0) | size;
             eprintln!("Computed sized opcode {:#X}", opc);
 
-            Some(CleverInstruction::new(CleverOpcode::from_opcode(opc).unwrap(), Vec::new()))
-        },
+            Some(CleverInstruction::new(
+                CleverOpcode::from_opcode(opc).unwrap(),
+                Vec::new(),
+            ))
+        }
         arch_ops::clever::CleverOperandKind::Insn => todo!(),
+        CleverOperandKind::HRegister => {
+            let reg = match state.iter().next()? {
+                Token::Identifier(id) => id
+                    .parse::<CleverRegister>()
+                    .expect("Expected a register name"),
+                tok => panic!("Unexpected Token, expected a register name, got {:?}", tok),
+            };
+
+            if reg.0 > 15 {
+                panic!("Expected a general purpose register, got {}", reg)
+            }
+            let opc = (opc.opcode() & 0xfff0) | (reg.0 as u16);
+
+            Some(CleverInstruction::new(
+                CleverOpcode::from_opcode(opc).unwrap(),
+                Vec::new(),
+            ))
+        }
+        CleverOperandKind::HImmediate => {
+            let imm = match state.iter().next()? {
+                Token::IntegerLiteral(lit) => lit,
+                tok => panic!("Unexpected Token, expected an integer, got {:?}", tok),
+            };
+
+            if imm > 15 {
+                panic!("Expected a value less than 16, got {}", imm)
+            }
+            let opc = (opc.opcode() & 0xfff0) | (imm as u16);
+
+            Some(CleverInstruction::new(
+                CleverOpcode::from_opcode(opc).unwrap(),
+                Vec::new(),
+            ))
+        }
     }
 }
 
@@ -667,6 +702,7 @@ clever_mnemonics! {
     ["test", 0x06d, parse_none],
     ["call",0x7c1, parse_none],
     ["ret",0x7c3, parse_none],
+    ["icall",0x7c9,parse_none],
     ["hlt", 0x801, parse_none],
     ["in", 0x806, parse_none],
     ["out", 0x807, parse_none],
