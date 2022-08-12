@@ -641,6 +641,8 @@ fn parse_l00f(opc: &mut u16, mnemonic: &str) -> Option<()> {
         }
 
         Some(())
+    } else if mnemonic.is_empty() {
+        Some(())
     } else {
         None
     }
