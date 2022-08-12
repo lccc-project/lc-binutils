@@ -886,8 +886,8 @@ clever_instructions! {
     [Iflush, "iflush", 0x805, CleverOperandKind::Normal(1), Main],
 
     // I/O Transfers
-    [In, "in", 0x806, CleverOperandKind::Normal(0), Main, {ss @ 0..2 => u16}],
-    [Out, "out", 0x807, CleverOperandKind::Normal(0), Main, {ss @ 0..2 => u16}],
+    [In, "in", 0x806, CleverOperandKind::Size, Main, {ss @ 0..2 => u16}],
+    [Out, "out", 0x807, CleverOperandKind::Size, Main, {ss @ 0..2 => u16}],
 
     // Mass Register Storage
     [StoRegF, "storegf", 0x808, CleverOperandKind::Normal(1), Main],

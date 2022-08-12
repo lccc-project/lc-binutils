@@ -113,7 +113,7 @@ impl TargetMachine for CleverTargetMachine {
     }
 
     fn comment_chars(&self) -> &[char] {
-        &[]
+        &[';']
     }
 
     fn extra_sym_chars(&self) -> &[char] {
@@ -522,7 +522,35 @@ fn parse_insn(
 
             Some(CleverInstruction::new(opc, vec![op]))
         }
-        arch_ops::clever::CleverOperandKind::Size => todo!(),
+        arch_ops::clever::CleverOperandKind::Size => {
+            let size = match state.iter().peek()? {
+                Token::Identifier(id) => match &**id {
+                    "byte" => {
+                        state.iter().next();
+                        0
+                    }
+                    "half" => {
+                        state.iter().next();
+                        1
+                    }
+                    "single" => {
+                        state.iter().next();
+                        2
+                    }
+                    "double" => {
+                        state.iter().next();
+                        3
+                    }
+                    _ => panic!("Missing size specifier"),
+                },
+                _ => panic!("Missing size specifier"),
+            };
+
+            let opc = (opc.opcode() & 0xfff0) | size;
+            eprintln!("Computed sized opcode {:#X}", opc);
+
+            Some(CleverInstruction::new(CleverOpcode::from_opcode(opc).unwrap(), Vec::new()))
+        },
         arch_ops::clever::CleverOperandKind::Insn => todo!(),
     }
 }
@@ -632,4 +660,6 @@ clever_mnemonics! {
     ["cmp", 0x06C, parse_none],
     ["call",0x7c1, parse_none],
     ["hlt", 0x801, parse_none],
+    ["in", 0x806, parse_none],
+    ["out", 0x807, parse_none],
 }
