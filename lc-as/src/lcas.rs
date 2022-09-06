@@ -122,57 +122,6 @@ impl AssemblerCallbacks for Callbacks {
                     tok
                 ),
             },
-            ".quad" => {
-                loop {
-                    let expr = lc_as::expr::parse_expression(asm.iter());
-                    let expr = asm.eval_expr(expr);
-
-                    match expr {
-                        Expression::Symbol(sym) => {
-                            let output = asm.output();
-                            output.write_addr(
-                                64,
-                                arch_ops::traits::Address::Symbol { name: sym, disp: 0 },
-                                false,
-                            )?;
-                        }
-                        Expression::Integer(val) => {
-                            let mut bytes = [0u8; 8];
-                            asm.machine().int_to_bytes(val, &mut bytes);
-                            let output = asm.output();
-                            output.write_all(&bytes)?;
-                        }
-                        expr => todo!("{:?}", expr),
-                    }
-
-                    match asm.iter().peek() {
-                        Some(Token::Sigil(s)) if s == "," => {
-                            asm.iter().next();
-                        }
-                        _ => break,
-                    }
-                }
-                Ok(())
-            }
-            ".space" => {
-                let expr = lc_as::expr::parse_expression(asm.iter());
-                let expr = asm.eval_expr(expr);
-
-                match expr {
-                    Expression::Integer(mut i) => {
-                        let output = asm.output();
-                        while i >= 1024 {
-                            let buf = vec![0u8; 1024];
-                            output.write_all(&buf)?;
-                            i -= 1024;
-                        }
-
-                        let buf = vec![0u8; i as usize];
-                        output.write_all(&buf)
-                    }
-                    expr => panic!("Invalid expression for .space: {:?}", expr),
-                }
-            }
             ".global" | ".globl" => {
                 loop {
                     match asm.iter().next().unwrap() {
