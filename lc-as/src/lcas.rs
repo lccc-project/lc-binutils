@@ -24,6 +24,7 @@ pub struct Data {
     curr_section: String,
     syms: HashMap<String, (String, usize)>,
     global_syms: HashSet<String>,
+    weak_syms: HashSet<String>,
 }
 
 pub struct SharedSection(Rc<RefCell<Section>>);
@@ -139,13 +140,29 @@ impl AssemblerCallbacks for Callbacks {
 
                 Ok(())
             }
+            ".weak" => {
+                loop {
+                    match asm.iter().next().unwrap() {
+                        Token::Identifier(id) => {
+                            let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
+                            data.weak_syms.insert(id);
+                        }
+                        Token::LineTerminator => break,
+                        tok => panic!(
+                            "Unexpected token for .weak directive: {:?}, expected an identifier",
+                            tok
+                        ),
+                    }
+                }
+
+                Ok(())
+            }
             ".align" => {
                 let expr = lc_as::expr::parse_expression(asm.iter());
                 let expr = asm.eval_expr(expr);
 
                 match expr {
                     Expression::Integer(mut i) => {
-                        eprintln!(".align {}", i);
                         let align = i as usize;
 
                         let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
@@ -230,6 +247,18 @@ fn main() {
                 eprintln!("lcas v{}", std::env!("CARGO_PKG_VERSION"));
                 eprintln!("Copyright (c) 2022 Lightning Creations");
                 eprintln!("Released under the terms of the BSD 2 Clause + Patent License");
+                eprintln!();
+
+                eprint!("lcas is compiled with support for the following binfmts: ");
+
+                let mut sep = "";
+
+                for i in binfmt::formats(){
+                    eprint!("{}{}",sep,i.name());
+                    sep = ", ";
+                }
+
+                eprintln!();
 
                 std::process::exit(0);
             }
@@ -245,6 +274,17 @@ fn main() {
                     "\t--output-fmt <binfmt>: Specify the output format (default {})",
                     binfmt::def_vec_for(targ.as_ref().unwrap_or(&deftarg)).name()
                 );
+
+                eprint!("lcas is compiled with support for the following binfmts: ");
+
+                let mut sep = "";
+
+                for i in binfmt::formats(){
+                    eprint!("{}{}",sep,i.name());
+                    sep = ", ";
+                }
+
+                eprintln!();
 
                 std::process::exit(0);
             }
@@ -275,10 +315,12 @@ fn main() {
 
     eprintln!();
 
-    if targ.is_none() {
-        targ = Some(deftarg);
-    }
-    let targ = targ.unwrap();
+    let targ = match targ{
+        Some(targ) => targ,
+        None => deftarg,
+    };
+
+    eprintln!("Targetting: {}",targ);
 
     let binfmt = if let Some(fmt) = binfmt {
         binfmt::format_by_name(&fmt).unwrap_or_else(|| {
@@ -343,10 +385,10 @@ fn main() {
         curr_section: ".text".to_string(),
         syms: HashMap::new(),
         global_syms: HashSet::new(),
+        weak_syms: HashSet::new(),
     };
 
     let toks = lex.collect::<Vec<_>>();
-    eprintln!("{:?}", toks);
 
     let mut iter = toks.into_iter();
 
@@ -394,6 +436,10 @@ fn main() {
         );
 
         *binfile.get_or_create_symbol(name).unwrap() = sym;
+    }
+
+    for (name) in &data.weak_syms{
+        *binfile.get_or_create_symbol(name).unwrap().kind_mut() = SymbolKind::Weak;
     }
 
     let mut output = File::create(output_name).unwrap();

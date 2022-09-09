@@ -4,7 +4,7 @@ use std::{
     ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive},
 };
 
-use crate::traits::{Address, InsnRead, InsnWrite};
+use crate::traits::{Address, InsnRead, InsnWrite, RelocCode, Reloc};
 
 #[derive(Debug)]
 pub struct CleverExtensionFromStrError;
@@ -1519,8 +1519,42 @@ impl<W: InsnWrite> CleverEncoder<W> {
                         match imm{
                             CleverImmediate::ShortAddr(Address::Abs(addr)) => self.write_all(&(operand | u16::try_from(*addr).unwrap()).to_be_bytes())?,
                             CleverImmediate::ShortAddrRel(Address::Disp(addr)) => self.write_all(&(operand | u16::try_from(*addr).unwrap()).to_be_bytes())?,
-                            CleverImmediate::ShortAddr(_) => todo!("short imm with relocation"),
-                            CleverImmediate::ShortAddrRel(_) => todo!("short relative imm with relocation"),
+                            CleverImmediate::ShortAddr(addr) => {
+                                let relocc = RelocCode::CleverShort;
+                                let reloc = match addr{
+                                    Address::Abs(_) => unreachable!(),
+                                    Address::Disp(_) => todo!("Non-symbol short relocation"),
+                                    Address::Symbol { name, disp } => {
+                                        Reloc{
+                                            code: relocc,
+                                            symbol: name.clone(),
+                                            addend: Some(*disp),
+                                            offset: self.offset() as u64
+                                        }
+                                    },
+                                    Address::PltSym { name: _ } => panic!("Cannot use explicit short relocation against GOT or PLT"),
+                                };
+                                self.write_all(&(operand.to_be_bytes()))?;
+                                self.write_reloc(reloc)?;
+                            },
+                            CleverImmediate::ShortAddrRel(addr) => {
+                                let relocc = RelocCode::CleverShortPcrel;
+                                let reloc = match addr{
+                                    Address::Abs(val) => Reloc { code: relocc, symbol: "*ABS*".to_string(), addend: Some(*val as i64), offset: self.offset() as u64},
+                                    Address::Disp(_) => unreachable!(),
+                                    Address::Symbol { name, disp } => {
+                                        Reloc{
+                                            code: relocc,
+                                            symbol: name.clone(),
+                                            addend: Some(*disp),
+                                            offset: self.offset() as u64
+                                        }
+                                    },
+                                    Address::PltSym { name: _ } => panic!("Cannot use explicit short relocation against GOT or PLT"),
+                                };
+                                self.write_all(&(operand.to_be_bytes()))?;
+                                self.write_reloc(reloc)?;
+                            },
                             CleverImmediate::Long(size, val) => {
                                 let val_bytes = &(*val).to_le_bytes()[..((*size/8) as usize)];
                                 self.write_all(&operand.to_be_bytes())?;
@@ -1553,22 +1587,39 @@ impl<W: InsnWrite> CleverEncoder<W> {
             CleverOperandKind::AbsAddr => {
                 assert_eq!(insn.operands().len(),1);
 
-                let (_,addr,_) = insn.operands()[0].immediate_value()
-                    .and_then(|imm|imm.addr()).unwrap();
+                let imm = insn.operands()[0].immediate_value()
+                    .unwrap();
 
                 let width = insn.opcode().branch_width().unwrap();
-
-                self.write_addr(8<<(width as u32),addr.clone(),false)?;
+                match imm{
+                    CleverImmediate::Long(_, a) => {
+                        self.write_all(&((*a).to_be_bytes()[..(1<<width)]))?;
+                    }
+                    CleverImmediate::LongAddr(_, addr) => {
+                        self.write_addr((8<<width) as usize, addr.clone(), false)?;
+                    }
+                    CleverImmediate::LongAddrRel(_, addr) => {
+                        self.write_addr((8<<width) as usize, addr.clone(), false)?;
+                    }
+                    a => panic!("Got wrong operand type for a branch {:?}",a)
+                }
             },
             CleverOperandKind::RelAddr => {
                 assert_eq!(insn.operands().len(),1);
-
-                let (_,addr,_) = insn.operands()[0].immediate_value()
-                    .and_then(|imm|imm.addr()).unwrap();
+                let imm = insn.operands()[0].immediate_value()
+                    .unwrap();
 
                 let width = insn.opcode().branch_width().unwrap();
 
-                self.write_addr(8<<(width as u32),addr.clone(),true)?;
+                match imm{
+                    CleverImmediate::LongRel(_, a) => {
+                        self.write_all(&((*a).to_be_bytes()[..(1<<width)]))?;
+                    }
+                    CleverImmediate::LongAddrRel(_, addr) => {
+                        self.write_addr((8<<width) as usize, addr.clone(), false)?;
+                    }
+                    a => panic!("Got wrong operand type for a branch {:?}",a)
+                }
             },
             CleverOperandKind::Insn => panic!("Cannot write a prefix as a primary instruction, use `CleverInstruction::new_with_prefix` instead"),
         }

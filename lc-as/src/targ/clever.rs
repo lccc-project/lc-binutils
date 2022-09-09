@@ -151,7 +151,6 @@ impl TargetMachine for CleverTargetMachine {
                 "Could not parse instruction",
             )
         })?;
-
         let mut enc = CleverEncoder::new(state.output());
 
         enc.write_instruction(insn)
@@ -346,7 +345,7 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
                             Some(CleverOperand::Indirect {
                                 size: size.unwrap_or(64),
                                 base: reg,
-                                scale: scale as u8,
+                                scale: (1<<scale) as u8,
                                 index: CleverIndex::Abs(imm as i16),
                             })
                         }
@@ -477,7 +476,6 @@ fn parse_insn(
     state: &mut crate::as_state::AsState,
 ) -> Option<CleverInstruction> {
     let opc = parse_mnemonic(opc)?;
-    eprintln!("[Clever-ISA] Assembling instruction {:?}", opc);
     match opc.operands() {
         arch_ops::clever::CleverOperandKind::Normal(n) => {
             let operands = (0..n)

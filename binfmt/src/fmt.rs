@@ -339,7 +339,7 @@ impl InsnWrite for Section {
                 self.relocs.push(Reloc {
                     code,
                     symbol: name,
-                    addend: Some(disp - ((size / 8) as i64)),
+                    addend: Some(disp),
                     offset,
                 });
                 Ok(())
