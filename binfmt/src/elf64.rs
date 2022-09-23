@@ -15,6 +15,7 @@ pub mod genericle {
             super::consts::ELFDATA2LSB,
             "elf64-genericle",
             None,
+            None,
         )
     }
 }
@@ -25,6 +26,7 @@ pub mod genericbe {
             super::consts::EM_NONE,
             super::consts::ELFDATA2MSB,
             "elf64-genericbe",
+            None,
             None,
         )
     }

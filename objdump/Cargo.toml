@@ -9,6 +9,7 @@ license = "BSD-2-Clause-Patent"
 
 [dependencies]
 binfmt = {path="../binfmt", features=["all-archs"]}
+target-tuples = "0.5.5"
 
 [features]
 elf = ["binfmt/elf"]

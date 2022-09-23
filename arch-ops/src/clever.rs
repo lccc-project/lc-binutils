@@ -4,7 +4,7 @@ use std::{
     ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive},
 };
 
-use crate::traits::{Address, InsnRead, InsnWrite, RelocCode, Reloc};
+use crate::{traits::{Address, InsnRead, InsnWrite, RelocCode, Reloc}, disasm::OpcodePrinter};
 
 #[derive(Debug)]
 pub struct CleverExtensionFromStrError;
@@ -963,6 +963,27 @@ macro_rules! gpr_specializations{
                     _ => None
                 }
             }
+
+            pub fn is_gpr_left_spec(&self) -> bool{
+                match self{
+                    $(Self::$left_spec {..} => {true},)*
+                    _ => false
+                }
+            }
+            pub fn is_gpr_right_spec(&self) -> bool{
+                match self{
+                    $($(Self::$right_spec {..} => {true},)?)*
+                    _ => false
+                }
+            }
+
+            pub fn get_spec_register(&self) -> Option<CleverRegister>{
+                match self{
+                    $(Self::$left_spec {r} => {Some(*r)},)*
+                    $($(Self::$right_spec {r} => {Some(*r)},)?)*
+                    _ => None
+                }
+            }
         }
     }
 }
@@ -995,6 +1016,28 @@ macro_rules! nop_instructions{
 }
 
 nop_instructions!(NOP0: Nop10, NOP1: Nop11, NOP2: Nop12, NOP3: Nop13);
+
+
+macro_rules! print_h_field{
+    [$(($enum:ident {$($h:pat,)* $(, ..)?} => |$fmt:pat| $e:expr)),* $(,)?] => {
+        impl core::fmt::Display for CleverOpcode{
+            fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result{
+                f.write_str(self.name())?;
+
+                match self{
+                    $(Self:: $enum {$($h,)* ..} => (match f{
+                        $fmt => $e
+                    }),)*
+                    _ => Ok(())
+                }
+            }
+        }
+    }
+}
+
+print_h_field![
+    
+];
 
 impl CleverOpcode {
     pub fn is_branch(&self) -> bool {
@@ -1451,6 +1494,57 @@ impl CleverInstruction {
     }
 }
 
+impl core::fmt::Display for CleverInstruction{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        self.opcode().fmt(f)?;
+        
+        match self.opcode().operands(){
+            CleverOperandKind::Size => {
+                let ss = self.opcode().opcode()&0x3;
+                match ss{
+                    0 => f.write_str(" byte")?,
+                    1 => f.write_str(" half")?,
+                    2 => f.write_str(" single")?,
+                    3 => f.write_str(" double")?,
+                    _ => unreachable!()
+                }
+            }
+            CleverOperandKind::HImmediate => {
+                let h = self.opcode().opcode()&0xf;
+                f.write_str(" ")?;
+                h.fmt(f)?;
+            }
+            CleverOperandKind::HRegister => {
+                let h = self.opcode().opcode()&0xf;
+                let r = CleverRegister(h as u8);
+                f.write_str(" ")?;
+                r.fmt(f)?;
+            }
+            _ => {
+                let mut sep = " ";
+
+                if self.opcode().is_gpr_left_spec(){
+                    sep = ", ";
+                    f.write_str(" ")?;
+                    self.opcode().get_spec_register().unwrap().fmt(f)?;
+                }
+                for opr in self.operands(){
+                    f.write_str(sep)?;
+                    sep = ", ";
+                    opr.fmt(f)?;
+                }
+                if self.opcode().is_gpr_right_spec(){
+                    f.write_str(sep)?;
+                    self.opcode().get_spec_register().unwrap().fmt(f)?;
+                }
+            }
+        }
+        
+        
+        Ok(())
+    }
+}
+
 pub struct CleverEncoder<W> {
     inner: W,
 }
@@ -1817,25 +1911,24 @@ impl<R: InsnRead> CleverDecoder<R> {
     }
 }
 
-pub struct CleverPrinter<W> {
-    inner: W,
+#[non_exhaustive]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct CleverPrinter{
+    
 }
 
-impl<W> CleverPrinter<W> {
-    pub const fn new(inner: W) -> Self {
-        Self { inner }
+impl CleverPrinter{
+    pub fn new() -> Self{
+        Self{}
     }
+}
 
-    pub fn into_inner(self) -> W {
-        self.inner
-    }
+impl OpcodePrinter for CleverPrinter{
+    fn print_opcode(&self, f: &mut core::fmt::Formatter, read: &mut dyn InsnRead) -> std::io::Result<()> {
+        let insn = CleverDecoder::new(read).read_insn()?;
 
-    pub fn inner(&self) -> &W {
-        &self.inner
-    }
-
-    pub fn inner_mut(&mut self) -> &mut W {
-        &mut self.inner
+        <CleverInstruction as core::fmt::Display>::fmt(&insn,f).unwrap();
+        Ok(())
     }
 }
 

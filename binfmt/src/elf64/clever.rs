@@ -1,3 +1,5 @@
+use arch_ops::clever::CleverPrinter;
+
 use crate::howto::HowTo;
 
 use super::Elf64Format;
@@ -157,5 +159,6 @@ pub fn create_format() -> Elf64Format<Elf64CleverHowTo> {
         super::consts::ELFDATA2LSB,
         "elf64-clever",
         None,
+        Some(Box::new(CleverPrinter::new())),
     )
 }

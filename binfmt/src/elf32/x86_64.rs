@@ -8,5 +8,6 @@ pub fn create_format() -> super::Elf32Format<Elf64X86_64HowTo> {
         consts::ELFDATA2LSB,
         "elf32-x86_64",
         None,
+        None,
     )
 }

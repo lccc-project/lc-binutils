@@ -272,5 +272,6 @@ pub fn create_format() -> super::Elf32Format<Elf32W65HowTo> {
         consts::ELFDATA2LSB,
         "elf32-w65",
         None,
+        None,
     )
 }

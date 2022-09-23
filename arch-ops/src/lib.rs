@@ -3,6 +3,9 @@
 
 pub mod traits;
 
+
+pub mod disasm;
+
 #[cfg(feature = "w65")]
 pub mod w65;
 
@@ -17,3 +20,4 @@ pub mod clever;
 
 #[cfg(test)]
 pub(crate) mod test;
+

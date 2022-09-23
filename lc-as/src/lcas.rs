@@ -215,10 +215,10 @@ fn main() {
         s
     });
 
-    let name = args.next().unwrap();
+    let prg_name = args.next().unwrap();
 
-    if let Some(pos) = name.rfind("-") {
-        let begin = &name[..pos];
+    if let Some(pos) = prg_name.rfind("-") {
+        let begin = &prg_name[..pos];
 
         targ = begin.parse::<Target>().ok();
     }
@@ -263,7 +263,7 @@ fn main() {
                 std::process::exit(0);
             }
             "--help" => {
-                eprintln!("USAGE: lcas [OPTIONS] [--] [input files]..");
+                eprintln!("USAGE: {} [OPTIONS] [--] [input files]..",prg_name);
                 eprintln!("Assembles give assembly source files into binary files");
                 eprintln!("Options:");
                 eprintln!(

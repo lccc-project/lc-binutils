@@ -11,7 +11,7 @@ use crate::{
     traits::ReadSeek,
 };
 
-use arch_ops::traits::{Address, InsnWrite};
+use arch_ops::{traits::{Address, InsnWrite}, disasm::OpcodePrinter};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CallbackError {
@@ -33,6 +33,8 @@ pub trait Binfmt {
     fn write_file(&self, file: &mut (dyn Write + '_), bfile: &BinaryFile) -> io::Result<()>;
 
     fn has_sections(&self) -> bool;
+
+    fn disassembler(&self) -> Option<&dyn OpcodePrinter>{None}
 
     fn create_section(&self, _section: &mut Section) -> Result<(), CallbackError> {
         Ok(())
