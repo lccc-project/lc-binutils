@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use target_tuples::Target;
 
 fn main() {
@@ -5,7 +7,6 @@ fn main() {
 
     let prg_name = args.next().unwrap();
 
-    let mut target = None::<Target>;
     let mut binfmt_name = None::<String>;
 
     let mut input_file = None::<String>;
@@ -36,9 +37,6 @@ fn main() {
                 eprintln!("Prints ");
                 eprintln!("Options:");
                 eprintln!(
-                    "\t--target <target>: Specify the target to use for the disassembler (default detected)"
-                );
-                eprintln!(
                     "\t--input-fmt <binfmt>: Specify the input object format (default detected)",
                 );
 
@@ -60,5 +58,41 @@ fn main() {
                 break;
             }
         }
+    }
+
+    let input_file = input_file.unwrap_or_else(||{
+        eprintln!("USAGE: {} [OPTIONS] [--] [input files]..",prg_name);
+        std::process::exit(1);
+    });
+
+    let mut file = File::open(&input_file).unwrap_or_else(|e| {
+        eprintln!("{}: Failed to open {}: {}",prg_name,input_file,e);
+        std::process::exit(1)
+    });
+    
+    let file = if let Some(binfmt) = &binfmt_name{
+        let binfmt = binfmt::format_by_name(binfmt).unwrap_or_else(||{
+            eprintln!("Invalid binfmt name {}. Run {} --help for list of supported binfmts",binfmt,prg_name);
+            std::process::exit(1)
+        });
+
+        binfmt.read_file(&mut file).unwrap_or_else(|e| {
+            eprintln!("{}: Failed to read {}: {}",prg_name,input_file,e);
+            std::process::exit(1)
+        }).unwrap_or_else(||{
+            eprintln!("{}: Failed to read {}: Invalid format",prg_name,input_file);
+            std::process::exit(1)
+        })
+    }else{
+        binfmt::open_file(file).unwrap_or_else(|e| {
+            eprintln!("{}: Failed to read {}: {}",prg_name,input_file,e);
+            std::process::exit(1)
+        })
+    };
+    println!("Sections");
+    println!();
+    println!("        Name            Size      Align");
+    for sec in file.sections(){
+        println!("{:^20} {:^10} {:^8}",sec.name,sec.content.len(),sec.align);
     }
 }
