@@ -1710,7 +1710,7 @@ impl<W: InsnWrite> CleverEncoder<W> {
                         self.write_all(&((*a).to_be_bytes()[..(1<<width)]))?;
                     }
                     CleverImmediate::LongAddrRel(_, addr) => {
-                        self.write_addr((8<<width) as usize, addr.clone(), false)?;
+                        self.write_addr((8<<width) as usize, addr.clone(), true)?;
                     }
                     a => panic!("Got wrong operand type for a branch {:?}",a)
                 }
@@ -1999,6 +1999,7 @@ mod test {
     }
 
     #[test]
+
     pub fn test_encode_branch() {
         let mut encoder = CleverEncoder::new(TestWriter { inner: Vec::new() });
         encoder
