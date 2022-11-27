@@ -92,7 +92,7 @@ use std::{
     ops::Deref,
 };
 
-use fmt::BinaryFile;
+use fmt::{BinaryFile, Binfmt};
 use target_tuples::Target;
 
 #[rustfmt::skip]
@@ -116,15 +116,15 @@ define_formats![
     binary
 ];
 
-pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt + Sync + Send + 'static)>
+pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt)>
 {
-    BINARY_FORMATS.iter().copied()
+    BINARY_FORMATS.iter().copied().map(|x|x as &dyn crate::fmt::Binfmt)
 }
 
 pub fn format_by_name(
     name: &str,
-) -> Option<&'static (dyn crate::fmt::Binfmt + Sync + Send + 'static)> {
-    BINARY_FORMATS_BY_NAME.get(name).map(Deref::deref)
+) -> Option<&'static (dyn crate::fmt::Binfmt)> {
+    BINARY_FORMATS_BY_NAME.get(name).map(Deref::deref).map(|x|x as &dyn crate::fmt::Binfmt)
 }
 
 pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + Send + 'static) {
@@ -147,17 +147,39 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
     }
 }
 
+pub fn identify_file<R: Read + Seek>(mut read: R) -> std::io::Result<Option<&'static dyn Binfmt>>{
+    let begin = read.seek(std::io::SeekFrom::Current(0))?;
+    for fmt in crate::formats() {
+        if fmt==format_by_name("binary").unwrap(){
+            break
+        }
+        #[allow(clippy::branches_sharing_code)]
+        // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime
+        // So shut it
+        if let Ok(true) = fmt.ident_file(&mut read) {
+            read.seek(std::io::SeekFrom::Start(begin))?;
+            
+            return Ok(Some(fmt));
+        } else {
+            read.seek(std::io::SeekFrom::Start(begin))?;
+        }
+    }
+
+    Ok(None)
+}
+
 pub fn open_file<R: Read + Seek>(mut read: R) -> std::io::Result<BinaryFile<'static>> {
+    let begin = read.seek(std::io::SeekFrom::Current(0))?;
     for fmt in crate::formats() {
         #[allow(clippy::branches_sharing_code)]
         // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime
         // So shut it
         if let Ok(true) = fmt.ident_file(&mut read) {
-            read.rewind()?;
+            read.seek(std::io::SeekFrom::Start(begin))?;
             let file = fmt.read_file(&mut read)?.unwrap();
             return Ok(file);
         } else {
-            read.rewind()?;
+            read.seek(std::io::SeekFrom::Start(begin))?;
         }
     }
     unreachable!("binary should be chosen last")

@@ -475,6 +475,29 @@ fn parse_insn(
     opc: &str,
     state: &mut crate::as_state::AsState,
 ) -> Option<CleverInstruction> {
+    if opc=="nop"{
+        let mut oprs = Vec::new();
+        if let Some(Token::LineTerminator) | None = state.iter().peek(){
+        }else{
+            for _ in 0..3{
+                oprs.push(parse_operand(state, false)?);
+                match state.iter().peek(){
+                    Some(Token::Sigil(s)) if s=="," => continue,
+                    _ => break,
+                }
+            }
+        }
+        let opc = 0x010 | (oprs.len() as u16);
+        let opc = CleverOpcode::from_opcode(opc).unwrap();
+
+        return Some(CleverInstruction::new(opc, oprs));
+    }else if opc=="ifjmp"{
+        let opc = 0x7c8f;
+        return Some(CleverInstruction::new(CleverOpcode::from_opcode(opc).unwrap(), vec![]));
+    }else if opc=="fret"{
+        let opc = 0x7c8e;
+        return Some(CleverInstruction::new(CleverOpcode::from_opcode(opc).unwrap(), vec![]));
+    }
     let opc = parse_mnemonic(opc)?;
     match opc.operands() {
         arch_ops::clever::CleverOperandKind::Normal(n) => {
@@ -616,6 +639,29 @@ macro_rules! clever_mnemonics{
     }
 }
 
+fn parse_cc(opc: &mut u16, mnemonic: &str) -> Option<()>{
+    match mnemonic {
+        "p" | "po" => (),
+        "c" | "b" => *opc |= 0x1,
+        "v" => *opc |= 0x2,
+        "z" | "e" | "eq" => *opc |= 0x3,
+        "lt" => *opc |= 0x4,
+        "le" => *opc |= 0x5,
+        "be" => *opc |= 0x6,
+        "mi" | "s" => *opc |= 0x7,
+        "pl" | "ns" => *opc |= 0x8,
+        "a" => *opc |= 0x9,
+        "gt" => *opc |= 0xA,
+        "ge" => *opc |= 0xB,
+        "nz" | "ne" => *opc |= 0xC,
+        "nv" => *opc |= 0xD,
+        "nc" | "ae" => *opc |= 0xE,
+        "np" | "pe" => *opc |= 0xF,
+        _ => None?,
+    }
+    Some(())
+}
+
 fn parse_jmp(opc: &mut u16, mnemonic: &str) -> Option<()> {
     let pos = mnemonic.find(".");
 
@@ -681,6 +727,57 @@ fn parse_l00f(opc: &mut u16, mnemonic: &str) -> Option<()> {
     }
 }
 
+fn parse_uf(opc: &mut u16, mnemonic: &str) -> Option<()> {
+    if mnemonic.starts_with('.') {
+        for c in mnemonic.chars().skip(1) {
+            match c {
+                'u' => *opc |= 0x2,
+                'f' => *opc |= 0x1,
+                _ => None?,
+            }
+        }
+
+        Some(())
+    } else if mnemonic.is_empty() {
+        Some(())
+    } else {
+        None
+    }
+}
+
+fn parse_size_suffix(opc: &mut u16, mnemonic: &str) -> Option<()>{
+    if mnemonic.starts_with('.') {
+        let suffix = &mnemonic[1..];
+        match suffix{
+            "8" | "byte" => (),
+            "16" | "half" => *opc |= 0x01,
+            "32" | "single" => *opc |= 0x02,
+            "64" | "double" => *opc |= 0x03,
+            _ => None?
+        }
+        Some(())
+    }else{
+        None
+    }
+}
+
+fn parse_callsm(opc: &mut u16, mnemonic: &str) -> Option<()>{
+    if mnemonic.starts_with('.') {
+        let suffix = &mnemonic[1..];
+        if suffix=="v"{
+            *opc |= 0x01;
+        }else{
+            None?
+        }
+        Some(())
+    }else if mnemonic.is_empty() {
+        Some(())
+    }
+    else{
+        None
+    }
+}
+
 clever_mnemonics! {
     ["jmp", 0x7c0, parse_none],
     ["j",0x700,parse_jmp],
@@ -690,18 +787,102 @@ clever_mnemonics! {
     ["and", 0x003, parse_l00f],
     ["or" , 0x004, parse_l00f],
     ["xor", 0x005, parse_l00f],
-    ["mul", 0x006, parse_l00f],
     ["mov", 0x008, parse_none],
     ["lea", 0x009, parse_none],
     ["push", 0x014, parse_none],
     ["pop", 0x015, parse_none],
-    ["lsh", 0x030, parse_none],
+    ["stogpr",0x018,parse_none],
+    ["stoar",0x019,parse_none],
+    ["rstogpr",0x01a,parse_none],
+    ["rstoar",0x01b,parse_none],
+    ["pushgpr",0x01c,parse_none],
+    ["pushar",0x01d,parse_none],
+    ["popgpr",0x01e,parse_none],
+    ["popar",0x01f,parse_none],
+    ["movsx",0x020,parse_l00f],
+    ["bswap",0x021,parse_l00f],
+    ["movif",0x022,parse_uf],
+    ["movfi",0x024,parse_uf],
+    ["cvtf",0x026,parse_l00f],
+    ["repc",0x028,parse_none],
+    ["repi",0x029,parse_cc],
+    ["bcpy",0x02a,parse_none],
+    ["bsto",0x02b,parse_none],
+    ["bsca",0x02c,parse_none],
+    ["bcmp",0x02d,parse_none],
+    ["btst",0x02e,parse_none],
+    ["lsh", 0x030, parse_l00f],
+    ["rsh",0x031, parse_l00f],
+    ["arsh",0x032,parse_l00f],
+    ["lshc",0x033,parse_l00f],
+    ["rshc",0x034,parse_l00f],
+    ["lrot",0x035,parse_l00f],
+    ["rrot",0x036,parse_l00f],
+    ["bnot",0x046,parse_l00f],
+    ["neg",0x047,parse_l00f],
+
+    ["cmovt",0x068,parse_cc],
+    ["cmov",0x069,parse_cc],
     ["cmp", 0x06c, parse_none],
     ["test", 0x06d, parse_none],
+
+    ["round",0x100,parse_l00f],
+    ["ceil",0x101,parse_l00f],
+    ["floor",0x102,parse_l00f],
+    ["fabs",0x103,parse_l00f],
+    ["fneg",0x104,parse_l00f],
+    ["finv",0x105,parse_l00f],
+    ["fadd",0x106,parse_l00f],
+    ["fsub",0x107,parse_l00f],
+    ["fmul",0x108,parse_l00f],
+    ["fdiv",0x109,parse_l00f],
+    ["frem",0x10a,parse_l00f],
+    ["fma",0x10b,parse_l00f],
+    ["fcmpz",0x118,parse_none],
+    ["fcmp",0x119,parse_none],
+    ["exp",0x120,parse_l00f],
+    ["ln",0x121,parse_l00f],
+    
+    ["fraiseexcept",0x130,parse_none],
+    ["ftriggerexcept",0x131,parse_none],
+
+    ["xchg",0x200,parse_none],
+    ["cmpxchg",0x201,parse_none],
+    ["wcmpxchg",0x202,parse_none],
+    ["fence",0x203,parse_none],
+
+    ["rpoll",0x230,parse_none],
+
+    ["vec",0x400,parse_size_suffix],
+    ["vmov",0x401,parse_none],
+    ["vshuffle",0x402,parse_size_suffix],
+    ["vextract",0x403,parse_none],
+    ["vcmp",0x404,parse_none],
+    ["vtest",0x405,parse_none],
+    ["vfcmp",0x406,parse_none],
+
     ["call",0x7c1, parse_none],
+    ["fcall",0x7c2,parse_none],
     ["ret",0x7c3, parse_none],
+    ["int",0x7c4, parse_none],
+    ["ijmp",0x7c8,parse_none],
     ["icall",0x7c9,parse_none],
+    ["ifcall",0x7ca,parse_none],
+    ["jmpsm",0x7cb,parse_none],
+    ["callsm",0x7cc,parse_callsm],
+    ["retrsm",0x7cd,parse_none],
+    
     ["hlt", 0x801, parse_none],
     ["in", 0x806, parse_none],
     ["out", 0x807, parse_none],
+    ["storegf",0x808,parse_none],
+    ["rstregf",0x809,parse_none],
+    ["vmcreate",0xe00,parse_none],
+    ["vmdestroy",0xe01,parse_none],
+    
+    ["scret",0xfc6,parse_none],
+    ["reti",0xfc7,parse_none],
+    ["hcall",0xfcb,parse_none],
+    ["hret",0xfd6,parse_none],
+    ["hresume",0xfd7,parse_none],
 }

@@ -1,3 +1,18 @@
-[paths]
-search_prefixes=["/","/usr","/usr/local"]
+allow-sysroot=true
 
+[target]
+#default-target="<host>"
+#host-target="<host>"
+
+
+
+[target.default.paths]
+search-paths=["/","/usr","/usr/local"]
+use-target=true
+libdirs=["lib"]
+
+[target.'x86_86-*-windows-msvc'.paths]
+search-paths=["/"]
+use-target=false
+libdirs=["lib"]
+find-msvc=true

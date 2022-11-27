@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Connor Horman <chorman64@gmail.com>", "Ray Redondo <rdrpenguin04@gmail.com>"]
 edition = "2018"
 license = "BSD-2-Clause-Patent"
+build = "build/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -39,9 +40,15 @@ sosigning = []
 lto = ["lto-formats"]
 
 [dependencies]
-target-tuples = "0.5.5"
+target-tuples = "0.5.10"
 binfmt = {path = "../binfmt", features = ["ar"]}
 arch-ops = {path = "../arch-ops"}
+
+[build-dependencies]
+target-tuples = "0.5.10"
+serde = {version="1.0.147",features=["derive"]}
+toml = "0.5"
+unix_path={version="1.0.1",features=["serde"]}
 
 [package.metadata.install-targets.lcld]
 aliases = ["ld.lc","lc-link","ld64.lc"]
