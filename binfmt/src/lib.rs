@@ -116,15 +116,18 @@ define_formats![
     binary
 ];
 
-pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt)>
-{
-    BINARY_FORMATS.iter().copied().map(|x|x as &dyn crate::fmt::Binfmt)
+pub fn formats() -> impl Iterator<Item = &'static (dyn crate::fmt::Binfmt)> {
+    BINARY_FORMATS
+        .iter()
+        .copied()
+        .map(|x| x as &dyn crate::fmt::Binfmt)
 }
 
-pub fn format_by_name(
-    name: &str,
-) -> Option<&'static (dyn crate::fmt::Binfmt)> {
-    BINARY_FORMATS_BY_NAME.get(name).map(Deref::deref).map(|x|x as &dyn crate::fmt::Binfmt)
+pub fn format_by_name(name: &str) -> Option<&'static (dyn crate::fmt::Binfmt)> {
+    BINARY_FORMATS_BY_NAME
+        .get(name)
+        .map(Deref::deref)
+        .map(|x| x as &dyn crate::fmt::Binfmt)
 }
 
 pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + Send + 'static) {
@@ -147,18 +150,18 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
     }
 }
 
-pub fn identify_file<R: Read + Seek>(mut read: R) -> std::io::Result<Option<&'static dyn Binfmt>>{
+pub fn identify_file<R: Read + Seek>(mut read: R) -> std::io::Result<Option<&'static dyn Binfmt>> {
     let begin = read.seek(std::io::SeekFrom::Current(0))?;
     for fmt in crate::formats() {
-        if fmt==format_by_name("binary").unwrap(){
-            break
+        if fmt == format_by_name("binary").unwrap() {
+            break;
         }
         #[allow(clippy::branches_sharing_code)]
         // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime
         // So shut it
         if let Ok(true) = fmt.ident_file(&mut read) {
             read.seek(std::io::SeekFrom::Start(begin))?;
-            
+
             return Ok(Some(fmt));
         } else {
             read.seek(std::io::SeekFrom::Start(begin))?;

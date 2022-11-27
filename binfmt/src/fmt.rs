@@ -11,7 +11,10 @@ use crate::{
     traits::ReadSeek,
 };
 
-use arch_ops::{traits::{Address, InsnWrite}, disasm::OpcodePrinter};
+use arch_ops::{
+    disasm::OpcodePrinter,
+    traits::{Address, InsnWrite},
+};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CallbackError {
@@ -34,7 +37,9 @@ pub trait Binfmt {
 
     fn has_sections(&self) -> bool;
 
-    fn disassembler(&self) -> Option<&dyn OpcodePrinter>{None}
+    fn disassembler(&self) -> Option<&dyn OpcodePrinter> {
+        None
+    }
 
     fn create_section(&self, _section: &mut Section) -> Result<(), CallbackError> {
         Ok(())
@@ -48,23 +53,23 @@ pub trait Binfmt {
     fn before_relocate(&self, _reloc: &mut Reloc, _symbol: &Symbol) {}
 }
 
-impl core::fmt::Debug for dyn Binfmt{
+impl core::fmt::Debug for dyn Binfmt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.name())
     }
 }
 
-impl core::cmp::PartialEq for dyn Binfmt{
-    fn eq(&self, rhs: &Self) -> bool{
+impl core::cmp::PartialEq for dyn Binfmt {
+    fn eq(&self, rhs: &Self) -> bool {
         core::ptr::eq(self, rhs) // Binary Formats are unique and singleton
     }
 }
 
-impl core::cmp::Eq for dyn Binfmt{}
+impl core::cmp::Eq for dyn Binfmt {}
 
-impl core::hash::Hash for dyn Binfmt{
+impl core::hash::Hash for dyn Binfmt {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        core::ptr::hash(self,state)
+        core::ptr::hash(self, state)
     }
 }
 

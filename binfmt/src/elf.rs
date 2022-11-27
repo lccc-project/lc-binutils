@@ -887,7 +887,7 @@ pub struct ElfFormat<Class: ElfClass, Howto> {
     name: &'static str,
     _cl: PhantomData<Class>,
     _howto: PhantomData<fn() -> Howto>,
-    disassembler: Option<Box<dyn OpcodePrinter + Sync + Send>>
+    disassembler: Option<Box<dyn OpcodePrinter + Sync + Send>>,
 }
 
 impl<Class: ElfClass, Howto> ElfFormat<Class, Howto> {
@@ -896,7 +896,7 @@ impl<Class: ElfClass, Howto> ElfFormat<Class, Howto> {
         data: consts::EiData,
         name: &'static str,
         create_header: Option<fn(&mut ElfHeader<Class>)>,
-        disassembler: Option<Box<dyn OpcodePrinter+Sync+Send>>
+        disassembler: Option<Box<dyn OpcodePrinter + Sync + Send>>,
     ) -> Self {
         Self {
             em,
@@ -1414,7 +1414,8 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
     }
 
     fn disassembler(&self) -> Option<&dyn OpcodePrinter> {
-        self.disassembler.as_deref()
+        self.disassembler
+            .as_deref()
             .map(|d| d as &dyn OpcodePrinter)
     }
 }
