@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+
+
 use crate::input::InputFileType;
 
 
@@ -36,8 +38,3 @@ pub enum SymbolDef{
 }
 
 
-#[derive(Debug)]
-pub struct Linker{
-    input_file: Vec<InputFile>,
-
-}

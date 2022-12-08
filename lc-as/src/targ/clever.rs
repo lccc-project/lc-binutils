@@ -185,7 +185,7 @@ impl TargetMachine for CleverTargetMachine {
     }
 
     fn def_section_alignment(&self) -> u64 {
-        1024
+        8
     }
 }
 
