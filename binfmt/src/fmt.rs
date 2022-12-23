@@ -324,9 +324,11 @@ pub struct Section {
     pub align: usize,
     pub ty: SectionType,
     pub content: Vec<u8>,
+    pub tail_size: usize,
     pub relocs: Vec<Reloc>,
     pub info: u64,
     pub link: u64,
+    #[doc(hidden)]
     pub __private: (),
 }
 
@@ -396,10 +398,18 @@ impl InsnWrite for Section {
         self.relocs.push(reloc);
         Ok(())
     }
+    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()> {
+        self.tail_size += count;
+        Ok(())
+    }
 }
 
 impl Write for Section {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if self.tail_size == 0 {
+            arch_ops::traits::default_write_zeroes(&mut self.content, self.tail_size)?;
+            self.tail_size = 0;
+        }
         self.content.write(buf)
     }
 

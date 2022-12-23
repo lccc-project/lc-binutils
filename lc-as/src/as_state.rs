@@ -2,6 +2,7 @@ use std::{
     any::Any,
     iter::Peekable,
     ops::{Deref, DerefMut},
+    convert::TryInto,
 };
 
 use arch_ops::traits::InsnWrite;
@@ -174,17 +175,8 @@ impl<'a> Assembler<'a> {
                         match expr {
                             Expression::Integer(mut i) => {
                                 let output = self.output();
-                                while i >= 1024 {
-                                    let buf = [0u8; 1024];
-                                    match output.write_all(&buf){
-                                        Ok(_) => {},
-                                        Err(e) => return Some(Err(e))
-                                    }
-                                    i -= 1024;
-                                }
-        
-                                let buf = vec![0u8; i as usize];
-                                Some(output.write_all(&buf))
+                                
+                                Some(output.write_zeroes(i.try_into().unwrap()))
                             }
                             expr => panic!("Invalid expression for .space: {:?}", expr),
                         }
