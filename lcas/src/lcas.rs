@@ -68,9 +68,9 @@ impl AssemblerCallbacks for Callbacks {
                 let sect = if let Some(sect) = data.sections.get(dir) {
                     sect.clone()
                 } else {
-                    let ty = if dir==".bss"{
+                    let ty = if dir == ".bss" {
                         SectionType::NoBits
-                    }else{
+                    } else {
                         SectionType::ProgBits
                     };
                     let sect = Section {
