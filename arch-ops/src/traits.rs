@@ -64,9 +64,9 @@ impl<R: InsnRead + ?Sized> InsnRead for Box<R> {
     }
 }
 
-pub fn default_write_zeroes<W: Write>(mut out: W, mut count: usize) -> std::io::Result<()>{
-    let val: [u8;1024] = [0;1024];
-    while count >= 1024{
+pub fn default_write_zeroes<W: Write>(mut out: W, mut count: usize) -> std::io::Result<()> {
+    let val: [u8; 1024] = [0; 1024];
+    while count >= 1024 {
         out.write_all(&val)?;
         count -= 1024;
     }
@@ -77,8 +77,8 @@ pub trait InsnWrite: Write {
     fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()>;
     fn write_reloc(&mut self, reloc: Reloc) -> std::io::Result<()>;
     fn offset(&self) -> usize;
-    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()>{
-        default_write_zeroes(self,count)
+    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()> {
+        default_write_zeroes(self, count)
     }
 }
 
@@ -93,7 +93,7 @@ impl<W: InsnWrite + ?Sized> InsnWrite for &mut W {
     fn write_reloc(&mut self, reloc: Reloc) -> std::io::Result<()> {
         <W as InsnWrite>::write_reloc(self, reloc)
     }
-    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()>{
+    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()> {
         <W as InsnWrite>::write_zeroes(self, count)
     }
 }
@@ -109,7 +109,7 @@ impl<W: InsnWrite + ?Sized> InsnWrite for Box<W> {
     fn write_reloc(&mut self, reloc: Reloc) -> std::io::Result<()> {
         <W as InsnWrite>::write_reloc(self, reloc)
     }
-    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()>{
+    fn write_zeroes(&mut self, count: usize) -> std::io::Result<()> {
         <W as InsnWrite>::write_zeroes(self, count)
     }
 }

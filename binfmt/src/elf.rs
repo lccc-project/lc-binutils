@@ -1191,8 +1191,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_entsize: Class::Size::from_usize(0),
         });
         for section in bfile.sections() {
-
-            let is_nobits = section.ty==SectionType::NoBits || section.content.len()==0;
+            let is_nobits = section.ty == SectionType::NoBits || section.content.len() == 0;
             #[allow(clippy::needless_borrow)]
             shdrs.push(ElfSectionHeader::<Class> {
                 sh_name: Class::Word::from_usize(add_to_strtab(
@@ -1201,7 +1200,13 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 )),
                 sh_type: match section.ty {
                     SectionType::NoBits => consts::SHT_NOBITS,
-                    SectionType::ProgBits => {if section.content.len()==0{consts::SHT_NOBITS}else{consts::SHT_PROGBITS}},
+                    SectionType::ProgBits => {
+                        if section.content.len() == 0 {
+                            consts::SHT_NOBITS
+                        } else {
+                            consts::SHT_PROGBITS
+                        }
+                    }
                     SectionType::SymbolTable => consts::SHT_SYMTAB,
                     SectionType::StringTable => consts::SHT_STRTAB,
                     SectionType::Dynamic => consts::SHT_DYNAMIC,
@@ -1215,13 +1220,17 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 sh_flags: Class::Offset::from_usize(7),
                 sh_addr: Class::Addr::from_usize(0),
                 sh_offset: Class::Offset::from_usize(offset),
-                sh_size: Class::Size::from_usize(section.content.len()+section.tail_size),
+                sh_size: Class::Size::from_usize(section.content.len() + section.tail_size),
                 sh_link: Class::Word::from_usize(0),
                 sh_info: Class::Word::from_usize(0),
                 sh_addralign: Class::Addr::from_usize(section.align),
                 sh_entsize: Class::Size::from_usize(0),
             });
-            offset += if is_nobits{section.content.len()+section.tail_size}else{0};
+            offset += if is_nobits {
+                section.content.len() + section.tail_size
+            } else {
+                0
+            };
         }
         let mut new_symbol_list: Vec<_> = bfile.symbols().cloned().collect();
         new_symbol_list.sort_by_key(|s1| s1.kind());
@@ -1376,11 +1385,11 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         header.e_shstrndx = Class::Half::from_usize(shdrs.len() - 1);
         file.write_all(bytemuck::bytes_of(&header))?;
         for section in bfile.sections() {
-            if section.ty==SectionType::NoBits || section.content.len()==0{
-                continue
+            if section.ty == SectionType::NoBits || section.content.len() == 0 {
+                continue;
             }
             file.write_all(&section.content)?;
-            arch_ops::traits::default_write_zeroes(&mut *file,section.tail_size)?;
+            arch_ops::traits::default_write_zeroes(&mut *file, section.tail_size)?;
         }
         file.write_all(&symbols_sec)?;
         file.write_all(&all_relocs)?;

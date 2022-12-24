@@ -2,13 +2,13 @@
 
 use std::io::{Error as IOError, ErrorKind};
 
-pub mod targ;
 pub mod driver;
+pub mod input;
+pub mod link;
+pub mod lto;
 pub mod output;
 pub mod script;
-pub mod input;
-pub mod lto;
-pub mod link;
+pub mod targ;
 
 pub enum Mode {
     Unix,
@@ -18,12 +18,11 @@ pub enum Mode {
 }
 
 fn main() {
-
     let mut args = std::env::args();
-    
+
     let mut exe_name = args.next().unwrap();
 
-    if exe_name.ends_with(".exe"){
+    if exe_name.ends_with(".exe") {
         exe_name.truncate(exe_name.len() - 4);
     }
 
@@ -34,25 +33,24 @@ fn main() {
         _ => None,
     };
 
-    match args.next().as_deref(){
+    match args.next().as_deref() {
         Some(x @ ("-flavor" | "-flavour" | "--flavor" | "--flavour")) => {
-            driver = match args.next().as_deref().unwrap_or_else(||{
-                eprintln!("{}: Expected an argument for {}",exe_name,x);
+            driver = match args.next().as_deref().unwrap_or_else(|| {
+                eprintln!("{}: Expected an argument for {}", exe_name, x);
                 std::process::exit(1)
-            }){
+            }) {
                 "ld" | "ld.lc" | "gnu" | "unix" => Some(Mode::Unix),
                 "ld64" | "ld64.lc" | "darwin" => Some(Mode::Darwin),
                 "link" | "lc-link" | "windows" => Some(Mode::Windows),
                 "wasm" | "wasm-ld" | "wasm-ld.lc" => Some(Mode::Wasm),
                 x => {
-                    eprintln!("{}: Unknown flavor {}",exe_name,x);
+                    eprintln!("{}: Unknown flavor {}", exe_name, x);
                     std::process::exit(1)
                 }
             }
         }
         _ => {}
     }
-
 
     match driver{
         Some(Mode::Unix) => {

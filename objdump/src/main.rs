@@ -11,10 +11,10 @@ fn main() {
 
     let mut input_file = None::<String>;
 
-    while let Some(arg) = args.next(){
-        match &*arg{
+    while let Some(arg) = args.next() {
+        match &*arg {
             "--version" => {
-                eprintln!("objdump (lc-binutils {})",std::env!("CARGO_PKG_VERSION"));
+                eprintln!("objdump (lc-binutils {})", std::env!("CARGO_PKG_VERSION"));
                 eprintln!("Copyright (c) 2022 Lightning Creations");
                 eprintln!("Released under the terms of the BSD 2 Clause + Patent License");
                 eprintln!();
@@ -23,8 +23,8 @@ fn main() {
 
                 let mut sep = "";
 
-                for i in binfmt::formats(){
-                    eprint!("{}{}",sep,i.name());
+                for i in binfmt::formats() {
+                    eprint!("{}{}", sep, i.name());
                     sep = ", ";
                 }
 
@@ -33,7 +33,7 @@ fn main() {
                 std::process::exit(0);
             }
             "--help" => {
-                eprintln!("USAGE: {} [OPTIONS] [--] [input files]..",prg_name);
+                eprintln!("USAGE: {} [OPTIONS] [--] [input files]..", prg_name);
                 eprintln!("Prints ");
                 eprintln!("Options:");
                 eprintln!(
@@ -44,8 +44,8 @@ fn main() {
 
                 let mut sep = "";
 
-                for i in binfmt::formats(){
-                    eprint!("{}{}",sep,i.name());
+                for i in binfmt::formats() {
+                    eprint!("{}{}", sep, i.name());
                     sep = ", ";
                 }
 
@@ -60,39 +60,53 @@ fn main() {
         }
     }
 
-    let input_file = input_file.unwrap_or_else(||{
-        eprintln!("USAGE: {} [OPTIONS] [--] [input files]..",prg_name);
+    let input_file = input_file.unwrap_or_else(|| {
+        eprintln!("USAGE: {} [OPTIONS] [--] [input files]..", prg_name);
         std::process::exit(1);
     });
 
     let mut file = File::open(&input_file).unwrap_or_else(|e| {
-        eprintln!("{}: Failed to open {}: {}",prg_name,input_file,e);
+        eprintln!("{}: Failed to open {}: {}", prg_name, input_file, e);
         std::process::exit(1)
     });
-    
-    let file = if let Some(binfmt) = &binfmt_name{
-        let binfmt = binfmt::format_by_name(binfmt).unwrap_or_else(||{
-            eprintln!("Invalid binfmt name {}. Run {} --help for list of supported binfmts",binfmt,prg_name);
+
+    let file = if let Some(binfmt) = &binfmt_name {
+        let binfmt = binfmt::format_by_name(binfmt).unwrap_or_else(|| {
+            eprintln!(
+                "Invalid binfmt name {}. Run {} --help for list of supported binfmts",
+                binfmt, prg_name
+            );
             std::process::exit(1)
         });
 
-        binfmt.read_file(&mut file).unwrap_or_else(|e| {
-            eprintln!("{}: Failed to read {}: {}",prg_name,input_file,e);
-            std::process::exit(1)
-        }).unwrap_or_else(||{
-            eprintln!("{}: Failed to read {}: Invalid format",prg_name,input_file);
-            std::process::exit(1)
-        })
-    }else{
+        binfmt
+            .read_file(&mut file)
+            .unwrap_or_else(|e| {
+                eprintln!("{}: Failed to read {}: {}", prg_name, input_file, e);
+                std::process::exit(1)
+            })
+            .unwrap_or_else(|| {
+                eprintln!(
+                    "{}: Failed to read {}: Invalid format",
+                    prg_name, input_file
+                );
+                std::process::exit(1)
+            })
+    } else {
         binfmt::open_file(file).unwrap_or_else(|e| {
-            eprintln!("{}: Failed to read {}: {}",prg_name,input_file,e);
+            eprintln!("{}: Failed to read {}: {}", prg_name, input_file, e);
             std::process::exit(1)
         })
     };
     println!("Sections");
     println!();
     println!("        Name            Size      Align");
-    for sec in file.sections(){
-        println!("{:^20} {:^10} {:^8}",sec.name,sec.content.len(),sec.align);
+    for sec in file.sections() {
+        println!(
+            "{:^20} {:^10} {:^8}",
+            sec.name,
+            sec.content.len(),
+            sec.align
+        );
     }
 }

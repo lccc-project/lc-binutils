@@ -1,8 +1,8 @@
 use std::{
     any::Any,
+    convert::TryInto,
     iter::Peekable,
     ops::{Deref, DerefMut},
-    convert::TryInto,
 };
 
 use arch_ops::traits::InsnWrite;
@@ -133,32 +133,32 @@ impl<'a> Assembler<'a> {
                         loop {
                             let expr = crate::expr::parse_expression(self.iter());
                             let expr = self.eval_expr(expr);
-        
+
                             match expr {
                                 Expression::Symbol(sym) => {
                                     let output = self.output();
-                                    
+
                                     match output.write_addr(
                                         64,
                                         arch_ops::traits::Address::Symbol { name: sym, disp: 0 },
                                         false,
-                                    ){
-                                        Ok(_) => {},
-                                        Err(e) => return Some(Err(e))
+                                    ) {
+                                        Ok(_) => {}
+                                        Err(e) => return Some(Err(e)),
                                     }
                                 }
                                 Expression::Integer(val) => {
                                     let mut bytes = [0u8; 8];
                                     self.machine().int_to_bytes(val, &mut bytes);
                                     let output = self.output();
-                                    match output.write_all(&bytes){
-                                        Ok(_) => {},
-                                        Err(e) => return Some(Err(e))
+                                    match output.write_all(&bytes) {
+                                        Ok(_) => {}
+                                        Err(e) => return Some(Err(e)),
                                     }
                                 }
                                 expr => todo!("{:?}", expr),
                             }
-        
+
                             match self.iter().peek() {
                                 Some(Token::Sigil(s)) if s == "," => {
                                     self.iter().next();
@@ -171,11 +171,11 @@ impl<'a> Assembler<'a> {
                     ".space" => {
                         let expr = crate::expr::parse_expression(self.iter());
                         let expr = self.eval_expr(expr);
-        
+
                         match expr {
                             Expression::Integer(mut i) => {
                                 let output = self.output();
-                                
+
                                 Some(output.write_zeroes(i.try_into().unwrap()))
                             }
                             expr => panic!("Invalid expression for .space: {:?}", expr),

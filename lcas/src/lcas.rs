@@ -3,7 +3,7 @@ use binfmt::{
     fmt::{BinaryFile, FileType, Section},
     sym::{Symbol, SymbolKind},
 };
-use lc_as::{
+use lcas_core::{
     as_state::{Assembler, AssemblerCallbacks},
     expr::Expression,
     lex::Token,
@@ -158,7 +158,7 @@ impl AssemblerCallbacks for Callbacks {
                 Ok(())
             }
             ".align" => {
-                let expr = lc_as::expr::parse_expression(asm.iter());
+                let expr = lcas_core::expr::parse_expression(asm.iter());
                 let expr = asm.eval_expr(expr);
 
                 match expr {
@@ -253,8 +253,8 @@ fn main() {
 
                 let mut sep = "";
 
-                for i in binfmt::formats(){
-                    eprint!("{}{}",sep,i.name());
+                for i in binfmt::formats() {
+                    eprint!("{}{}", sep, i.name());
                     sep = ", ";
                 }
 
@@ -263,7 +263,7 @@ fn main() {
                 std::process::exit(0);
             }
             "--help" => {
-                eprintln!("USAGE: {} [OPTIONS] [--] [input files]..",prg_name);
+                eprintln!("USAGE: {} [OPTIONS] [--] [input files]..", prg_name);
                 eprintln!("Assembles give assembly source files into binary files");
                 eprintln!("Options:");
                 eprintln!(
@@ -279,8 +279,8 @@ fn main() {
 
                 let mut sep = "";
 
-                for i in binfmt::formats(){
-                    eprint!("{}{}",sep,i.name());
+                for i in binfmt::formats() {
+                    eprint!("{}{}", sep, i.name());
                     sep = ", ";
                 }
 
@@ -315,12 +315,12 @@ fn main() {
 
     eprintln!();
 
-    let targ = match targ{
+    let targ = match targ {
         Some(targ) => targ,
         None => deftarg,
     };
 
-    eprintln!("Targetting: {}",targ);
+    eprintln!("Targetting: {}", targ);
 
     let binfmt = if let Some(fmt) = binfmt {
         binfmt::format_by_name(&fmt).unwrap_or_else(|| {
@@ -337,7 +337,7 @@ fn main() {
         std::process::exit(1)
     }
 
-    let targ_def = lc_as::targ::get_target_def(targ.arch()).unwrap_or_else(|| {
+    let targ_def = lcas_core::targ::get_target_def(targ.arch()).unwrap_or_else(|| {
         eprintln!("Unknown target {}", targ);
         std::process::exit(1)
     });
@@ -364,7 +364,7 @@ fn main() {
     .map(|e| e.unwrap())
     .peekable();
 
-    let mut lex = lc_as::lex::Lexer::new(targ_def, &mut input);
+    let mut lex = lcas_core::lex::Lexer::new(targ_def, &mut input);
 
     let text = Section {
         name: ".text".to_string(),
@@ -438,7 +438,7 @@ fn main() {
         *binfile.get_or_create_symbol(name).unwrap() = sym;
     }
 
-    for (name) in &data.weak_syms{
+    for name in &data.weak_syms {
         *binfile.get_or_create_symbol(name).unwrap().kind_mut() = SymbolKind::Weak;
     }
 

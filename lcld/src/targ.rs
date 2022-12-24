@@ -1,10 +1,9 @@
-
 use target_tuples::Target;
 
 use crate::output::OutputType;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct TargetConfig<'a>{
+pub struct TargetConfig<'a> {
     pub search_paths: &'a [&'a str],
     pub libdirs: &'a [&'a str],
     pub use_target: bool,
@@ -13,7 +12,7 @@ pub struct TargetConfig<'a>{
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct TargetInfo<'a>{
+pub struct TargetInfo<'a> {
     pub objsuffix: &'a str,
     pub libprefix: &'a str,
     pub staticsuffixes: &'a [&'a str],
@@ -21,7 +20,6 @@ pub struct TargetInfo<'a>{
     pub output_dynsuffix: &'a str,
     pub default_output: OutputType,
     pub need_dylib_link: bool,
-
 }
 
 macro_rules! construct_cfg{
@@ -38,13 +36,12 @@ macro_rules! construct_cfg{
 
 include!(env!("config_targ_generated"));
 
-
-pub static ELF_TARG: TargetInfo = TargetInfo{
+pub static ELF_TARG: TargetInfo = TargetInfo {
     objsuffix: ".o",
     libprefix: "lib",
     staticsuffixes: &[".a"],
     dynamicsuffixes: &[".so"],
     output_dynsuffix: ".so",
     default_output: OutputType::PieExecutable,
-    need_dylib_link: false
+    need_dylib_link: false,
 };

@@ -9,7 +9,7 @@ members = [
     "lto",
     "binfmt-test",
     "arch-ops",
-    "lc-as",
+    "lcas",
     "dbg-info",
     "lccc-mangle"
 ]
