@@ -1,6 +1,6 @@
 use arch_ops::traits::InsnWrite;
 use binfmt::{
-    fmt::{BinaryFile, FileType, Section},
+    fmt::{BinaryFile, FileType, Section, SectionType},
     sym::{Symbol, SymbolKind},
 };
 use lcas_core::{
@@ -68,9 +68,15 @@ impl AssemblerCallbacks for Callbacks {
                 let sect = if let Some(sect) = data.sections.get(dir) {
                     sect.clone()
                 } else {
+                    let ty = if dir==".bss"{
+                        SectionType::NoBits
+                    }else{
+                        SectionType::ProgBits
+                    };
                     let sect = Section {
                         name: dir.to_string(),
                         align: asm.machine().def_section_alignment() as usize,
+                        ty,
                         ..Default::default()
                     };
                     let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
@@ -99,6 +105,7 @@ impl AssemblerCallbacks for Callbacks {
                         let sect = Section {
                             name: tok.clone(),
                             align: asm.machine().def_section_alignment() as usize,
+                            ty: SectionType::ProgBits,
                             ..Default::default()
                         };
                         let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
