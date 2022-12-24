@@ -1226,7 +1226,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 sh_addralign: Class::Addr::from_usize(section.align),
                 sh_entsize: Class::Size::from_usize(0),
             });
-            offset += if is_nobits {
+            offset += if !is_nobits {
                 section.content.len() + section.tail_size
             } else {
                 0
