@@ -573,7 +573,17 @@ fn parse_insn(
                 Vec::new(),
             ))
         }
-        arch_ops::clever::CleverOperandKind::Insn => todo!(),
+        arch_ops::clever::CleverOperandKind::Insn => {
+            if prefix.is_some(){
+                return None
+            }
+             match state.iter().next()?{
+                Token::Identifier(id) => {
+                    parse_insn(Some(opc),&id,state)
+                }
+                tok => panic!("Unexpected token, excepted an instruction, got {:?}",tok)
+            }
+        },
         CleverOperandKind::HRegister => {
             let reg = match state.iter().next()? {
                 Token::Identifier(id) => id
