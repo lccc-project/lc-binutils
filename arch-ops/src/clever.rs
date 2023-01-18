@@ -1311,7 +1311,7 @@ impl CleverOperand {
                         size => panic!("Invalid Immediate size {:?}", size),
                     };
 
-                    0x6000 | (ss << 8)
+                    0xC000 | (ss << 8)
                 }
                 CleverImmediate::LongRel(size, _) => {
                     let ss = match size {
@@ -1321,7 +1321,7 @@ impl CleverOperand {
                         size => panic!("Invalid Immediate size {:?}", size),
                     };
 
-                    0x6400 | (ss << 8)
+                    0xC400 | (ss << 8)
                 }
                 CleverImmediate::LongAddr(size, _) => {
                     let ss = match size {
@@ -1331,7 +1331,7 @@ impl CleverOperand {
                         size => panic!("Invalid Immediate size {:?}", size),
                     };
 
-                    0x6000 | (ss << 8)
+                    0xC000 | (ss << 8)
                 }
                 CleverImmediate::LongAddrRel(size, _) => {
                     let ss = match size {
@@ -1341,7 +1341,7 @@ impl CleverOperand {
                         size => panic!("Invalid Immediate size {:?}", size),
                     };
 
-                    0x6400 | (ss << 8)
+                    0xC400 | (ss << 8)
                 }
                 CleverImmediate::LongMem(size, _, refsize) => {
                     let ss = match size {
@@ -1360,7 +1360,7 @@ impl CleverOperand {
                         size => panic!("Invalid reference size {:?}", size),
                     };
 
-                    0x7000 | (ss << 8) | (zz << 4)
+                    0xE000 | (ss << 8) | (zz << 4)
                 }
                 CleverImmediate::LongMemRel(size, _, refsize) => {
                     let ss = match size {
@@ -1379,9 +1379,9 @@ impl CleverOperand {
                         size => panic!("Invalid reference size {:?}", size),
                     };
 
-                    0x7400 | (ss << 8) | (zz << 4)
+                    0xE400 | (ss << 8) | (zz << 4)
                 }
-                CleverImmediate::Vec(_) => 0x6300,
+                CleverImmediate::Vec(_) => 0xC300,
             },
             CleverOperand::VecPair { size, lo } => {
                 let ss = match size {
