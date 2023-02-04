@@ -825,6 +825,24 @@ pub struct W65Instruction {
     opr: W65Operand,
 }
 
+macro_rules! implied_instructions{
+    [$($instr:ident),* $(,)?] => {
+        #[allow(non_upper_case_globals)]
+        impl W65Instruction{
+            $(pub const $instr: Self = Self{mode: None, opc: W65Opcode::$instr, opr: W65Operand::Implied};)*
+        }
+    }
+}
+
+implied_instructions![
+    Dex, Dey, Rtl, Rts, Brk, Rti, Clc, Cld, Cli, Clv, Sec, Sed, Sei, Nop, Wdm, Pha, Phx, Phy, Pla, Plx, Ply,
+    Phb, Phd, Phk, Php,
+    Plb, Pld, Plp, Stp, Wai,
+    Tax, Tay, Tsx, Txa, Txs, Txy, Tya, Tyx,
+    Tad, Tas, Tda, Tsa,
+    Xba, Xce,
+];
+
 impl W65Instruction {
     pub fn new(opc: W65Opcode, opr: W65Operand) -> Self {
         Self {
@@ -967,6 +985,7 @@ w65_synthetic_instructions! {
     [W65Opcode::Tr, W65Operand::RegPair(W65Register::S, W65Register::S) => W65Opcode::Tsx, W65Operand::Implied]
     [W65Opcode::Brk, W65Operand::Implied => W65Opcode::Brk, W65Operand::Immediate(0)]
     [W65Opcode::Brl, W65Operand::Address(addr) => W65Opcode::Bra, W65Operand::Address(addr)]
+    [W65Opcode::Wdm, W65Operand::Implied => W65Opcode::Wdm, W65Operand::Immediate(0)]
     [W65Opcode::Ph, W65Operand::Register(W65Register::A) => W65Opcode::Pha, W65Operand::Implied]
     [W65Opcode::Ph, W65Operand::Register(W65Register::X) => W65Opcode::Phx, W65Operand::Implied]
     [W65Opcode::Ph, W65Operand::Register(W65Register::Y) => W65Opcode::Phy, W65Operand::Implied]
@@ -989,9 +1008,9 @@ pub struct W65Mode {
 
 impl W65Mode {
     pub const NONE: W65Mode = W65Mode { bits: 0 };
-    pub const M: W65Mode = W65Mode { bits: 1 };
-    pub const X: W65Mode = W65Mode { bits: 2 };
-    pub const E: W65Mode = W65Mode { bits: 4 };
+    pub const M: W65Mode = W65Mode { bits: 0x10 };
+    pub const X: W65Mode = W65Mode { bits: 0x20 };
+    pub const E: W65Mode = W65Mode { bits: 0x100 };
 
     pub fn is_acc16(self) -> bool {
         !self.is_emu() && ((self.bits & 1) == 0)
@@ -1013,6 +1032,10 @@ impl W65Mode {
             W65AddrMode::ImmX | W65AddrMode::ImmY => Some(1 + (self.is_idx16() as usize)),
             _ => None,
         }
+    }
+
+    pub const fn bits(&self) -> u16{
+        self.bits
     }
 }
 

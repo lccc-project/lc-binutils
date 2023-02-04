@@ -1305,7 +1305,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_link: Class::Word::from_usize(shdrs.len() + 1 + num_reloc_sections),
             sh_info: Class::Word::from_usize(local_syms),
             sh_addralign: Class::Addr::from_usize(8),
-            sh_entsize: Class::Size::from_usize(24),
+            sh_entsize: Class::Size::from_usize(size_of::<Class::Symbol>()),
         });
         offset += symbols_sec.len();
         let mut all_relocs: Vec<u8> = Vec::new();
@@ -1343,7 +1343,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                     sh_link: Class::Word::from_usize(symbols_sec_id),
                     sh_info: Class::Word::from_usize(target_section),
                     sh_addralign: Class::Addr::from_usize(8),
-                    sh_entsize: Class::Size::from_usize(24),
+                    sh_entsize: Class::Size::from_usize(size_of::<Class::Rela>()),
                 });
                 offset += relocs.len();
                 all_relocs.append(&mut relocs);
