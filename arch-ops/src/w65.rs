@@ -835,12 +835,9 @@ macro_rules! implied_instructions{
 }
 
 implied_instructions![
-    Dex, Dey, Rtl, Rts, Brk, Rti, Clc, Cld, Cli, Clv, Sec, Sed, Sei, Nop, Wdm, Pha, Phx, Phy, Pla, Plx, Ply,
-    Phb, Phd, Phk, Php,
-    Plb, Pld, Plp, Stp, Wai,
-    Tax, Tay, Tsx, Txa, Txs, Txy, Tya, Tyx,
-    Tad, Tas, Tda, Tsa,
-    Xba, Xce,
+    Dex, Dey, Rtl, Rts, Brk, Rti, Clc, Cld, Cli, Clv, Sec, Sed, Sei, Nop, Wdm, Pha, Phx, Phy, Pla,
+    Plx, Ply, Phb, Phd, Phk, Php, Plb, Pld, Plp, Stp, Wai, Tax, Tay, Tsx, Txa, Txs, Txy, Tya, Tyx,
+    Tad, Tas, Tda, Tsa, Xba, Xce,
 ];
 
 impl W65Instruction {
@@ -1034,7 +1031,7 @@ impl W65Mode {
         }
     }
 
-    pub const fn bits(&self) -> u16{
+    pub const fn bits(&self) -> u16 {
         self.bits
     }
 }
