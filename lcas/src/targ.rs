@@ -18,6 +18,8 @@ pub trait TargetMachine {
     fn int_to_bytes<'a>(&self, val: u128, buf: &'a mut [u8]) -> &'a mut [u8];
     fn float_to_bytes<'a>(&self, val: f64, buf: &'a mut [u8]) -> &'a mut [u8];
 
+    fn long_width(&self) -> usize;
+
     fn assemble_insn(&self, opc: &str, state: &mut AsState) -> std::io::Result<()>;
     fn directive_names(&self) -> &[&str];
     fn handle_directive(&self, dir: &str, state: &mut AsState) -> std::io::Result<()>;
@@ -47,5 +49,6 @@ macro_rules! targ_defs{
 }
 
 targ_defs! {
-    #[cfg(feature="clever")] arch clever;
+    #[cfg(feature = "clever")] arch clever;
+    #[cfg(feature = "clever")] arch w65;
 }

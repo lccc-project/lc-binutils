@@ -123,11 +123,52 @@ impl<'a> Assembler<'a> {
                         Some(self.state.output.write_all(&buf))
                     }
                     ".ascii" => {
-                        let mut buf = match self.state.iter.next_ignore_newline()? {
+                        let buf = match self.state.iter.next_ignore_newline()? {
                             Token::StringLiteral(x) => x.bytes().collect::<Vec<_>>(),
                             tok => panic!("Unexpected token {:?}. Expected a string literal", tok),
                         };
                         Some(self.state.output.write_all(&buf))
+                    }
+                    ".long" => {
+                        loop {
+                            let expr = crate::expr::parse_expression(self.iter());
+                            let expr = self.eval_expr(expr);
+
+                            let len = self.state.mach.long_width();
+
+                            match expr {
+                                Expression::Symbol(sym) => {
+                                    let output = self.output();
+
+                                    match output.write_addr(
+                                        len*8,
+                                        arch_ops::traits::Address::Symbol { name: sym, disp: 0 },
+                                        false,
+                                    ) {
+                                        Ok(_) => {}
+                                        Err(e) => return Some(Err(e)),
+                                    }
+                                }
+                                Expression::Integer(val) => {
+                                    let mut bytes = [0u8; 16];
+                                    self.machine().int_to_bytes(val, &mut bytes[..len]);
+                                    let output = self.output();
+                                    match output.write_all(&bytes[..len]) {
+                                        Ok(_) => {}
+                                        Err(e) => return Some(Err(e)),
+                                    }
+                                }
+                                expr => todo!("{:?}", expr),
+                            }
+
+                            match self.iter().peek() {
+                                Some(Token::Sigil(s)) if s == "," => {
+                                    self.iter().next();
+                                }
+                                _ => break,
+                            }
+                        }
+                        Some(Ok(()))
                     }
                     ".quad" => {
                         loop {

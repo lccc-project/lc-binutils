@@ -140,6 +140,10 @@ impl TargetMachine for CleverTargetMachine {
         todo!("float_to_bytes")
     }
 
+    fn long_width(&self) -> usize{
+        8
+    }
+
     fn assemble_insn(
         &self,
         opc: &str,
@@ -157,7 +161,7 @@ impl TargetMachine for CleverTargetMachine {
     }
 
     fn directive_names(&self) -> &[&str] {
-        &[".byte", ".long"]
+        &[]
     }
 
     fn handle_directive(
@@ -166,16 +170,6 @@ impl TargetMachine for CleverTargetMachine {
         state: &mut crate::as_state::AsState,
     ) -> std::io::Result<()> {
         match dir {
-            ".byte" => match state.iter().next_ignore_newline().unwrap() {
-                Token::IntegerLiteral(x) => state.output().write_all(&[u8::try_from(x).unwrap()]),
-                _ => todo!(),
-            },
-            ".long" => match state.iter().next_ignore_newline().unwrap() {
-                Token::IntegerLiteral(x) => state
-                    .output()
-                    .write_all(&u64::try_from(x).unwrap().to_le_bytes()),
-                _ => todo!(),
-            },
             _ => unreachable!(),
         }
     }
