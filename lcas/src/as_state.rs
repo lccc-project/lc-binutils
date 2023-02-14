@@ -141,7 +141,7 @@ impl<'a> Assembler<'a> {
                                     let output = self.output();
 
                                     match output.write_addr(
-                                        len*8,
+                                        len * 8,
                                         arch_ops::traits::Address::Symbol { name: sym, disp: 0 },
                                         false,
                                     ) {

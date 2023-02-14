@@ -61,7 +61,7 @@ pub trait ElfProgramHeader: Sealed {
     fn flags(&self) -> ElfWord<Self::Class>;
 }
 
-pub trait ElfClass: Sealed + Sized + Copy + 'static {
+pub trait ElfClass: Sealed + Sized + Copy + core::fmt::Debug + 'static {
     type Byte: Numeric;
     const EI_CLASS: consts::EiClass;
     type Half: Numeric;
@@ -87,6 +87,8 @@ pub trait ElfClass: Sealed + Sized + Copy + 'static {
         st_other: u8,
         st_shndx: Self::Half,
     ) -> Self::Symbol;
+
+    fn mk_rinfo(symno: usize, relcode: usize) -> Self::Size;
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -292,6 +294,10 @@ impl ElfClass for Elf64 {
             st_size,
         }
     }
+
+    fn mk_rinfo(symno: usize, relcode: usize) -> Self::Size {
+        ((symno as u64) << 32) + (relcode as u64)
+    }
 }
 
 impl ElfRelocationExtractHelpers for Elf64 {
@@ -346,6 +352,11 @@ impl ElfClass for Elf32 {
             st_other,
             st_shndx,
         }
+    }
+
+    fn mk_rinfo(symno: usize, relcode: usize) -> Self::Size {
+        eprintln!("symno");
+        ((symno as u32) << 8) + (relcode as u32)
     }
 }
 
@@ -1314,19 +1325,20 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 let mut relocs = Vec::new();
                 for reloc in &section.relocs {
                     eprintln!("Handling reloc {:?}", reloc);
-                    relocs.push(ElfRela::<Class> {
+                    let reloc = ElfRela::<Class> {
                         r_offset: Class::Addr::from_usize(reloc.offset as usize),
-                        r_info: Class::Size::from_usize(
-                            ((new_symbol_list
+                        r_info: Class::mk_rinfo(
+                            new_symbol_list
                                 .iter()
                                 .position(|x| x.name() == reloc.symbol)
                                 .unwrap()
-                                + 1)
-                                << 32)
-                                + Howto::from_reloc_code(reloc.code).unwrap().reloc_num() as usize,
+                                + 1
+                                , Howto::from_reloc_code(reloc.code).unwrap().reloc_num() as usize,
                         ),
                         r_addend: Class::Offset::from_usize(reloc.addend.map_or(0, |x| x as usize)),
-                    });
+                    };
+                    eprintln!("\t>Elf Relocation {:?}",reloc);
+                    relocs.push(reloc);
                 }
                 let mut relocs = Vec::from(bytemuck::cast_slice(&relocs));
                 let target_section = i + 1;

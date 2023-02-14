@@ -80,15 +80,15 @@ impl HowTo for Elf32W65HowTo {
     {
         match code {
             crate::howto::RelocCode::None => Self::from_relnum(0),
-            crate::howto::RelocCode::Abs { addr_width: 3 } => Self::from_relnum(1),
-            crate::howto::RelocCode::Abs { addr_width: 2 } => Self::from_relnum(2),
-            crate::howto::RelocCode::Rel { addr_width: 1 } => Self::from_relnum(3),
-            crate::howto::RelocCode::Rel { addr_width: 2 } => Self::from_relnum(4),
+            crate::howto::RelocCode::Abs { addr_width: 24 } => Self::from_relnum(1),
+            crate::howto::RelocCode::Abs { addr_width: 16 } => Self::from_relnum(2),
+            crate::howto::RelocCode::Rel { addr_width: 8 } => Self::from_relnum(3),
+            crate::howto::RelocCode::Rel { addr_width: 16 } => Self::from_relnum(4),
             crate::howto::RelocCode::AbsShifted {
                 addr_width: 3,
                 shift: 8,
             } => Self::from_relnum(5),
-            crate::howto::RelocCode::Abs { addr_width: 1 } => Self::from_relnum(6),
+            crate::howto::RelocCode::Abs { addr_width: 8 } => Self::from_relnum(6),
             crate::howto::RelocCode::W65Direct => Self::from_relnum(7),
             crate::howto::RelocCode::W65RelaxJsl => Self::from_relnum(10),
             crate::howto::RelocCode::W65RelaxJml => Self::from_relnum(11),
