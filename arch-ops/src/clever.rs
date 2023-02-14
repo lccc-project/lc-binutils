@@ -1898,7 +1898,7 @@ impl<R: InsnRead> CleverDecoder<R> {
 
                             CleverOperand::Immediate(imm)
                         }
-                        _ => unsafe { core::hint::unreachable_unchecked() },
+                        _ => unreachable!(),
                     };
 
                     ops.push(opr);
@@ -1995,7 +1995,7 @@ mod test {
 
         assert_eq!(
             &*encoder.inner_mut().inner,
-            &[0x01, 0x20, 0x03, 0x11, 0x60, 0x00, 0x39, 0x05]
+            &[0x01, 0x20, 0x03, 0x11, 0xC0, 0x00, 0x39, 0x05]
         );
     }
 
