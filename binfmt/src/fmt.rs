@@ -61,7 +61,7 @@ impl core::fmt::Debug for dyn Binfmt {
 
 impl core::cmp::PartialEq for dyn Binfmt {
     fn eq(&self, rhs: &Self) -> bool {
-        core::ptr::eq(self, rhs) // Binary Formats are unique and singleton
+        core::ptr::eq(self as *const _ as *const u8, rhs as *const _ as *const u8) // Binary Formats are unique and singleton
     }
 }
 
@@ -69,7 +69,7 @@ impl core::cmp::Eq for dyn Binfmt {}
 
 impl core::hash::Hash for dyn Binfmt {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        core::ptr::hash(self, state)
+        core::ptr::hash(self as *const _ as *const u8, state)
     }
 }
 
