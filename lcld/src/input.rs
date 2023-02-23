@@ -29,7 +29,7 @@ impl core::fmt::Display for InputFileType {
     }
 }
 
-#[allow(clippy::unused_io_amount)] 
+#[allow(clippy::unused_io_amount)]
 pub fn ident_input(p: &Path) -> std::io::Result<InputFileType> {
     let file = File::open(p)?;
 
