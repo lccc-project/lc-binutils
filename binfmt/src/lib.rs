@@ -1,5 +1,5 @@
 #![deny(warnings)]
-#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::wrong_self_convention, clippy::extra_unused_type_parameters)]
 
 pub mod traits;
 
@@ -151,7 +151,7 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
 }
 
 pub fn identify_file<R: Read + Seek>(mut read: R) -> std::io::Result<Option<&'static dyn Binfmt>> {
-    let begin = read.seek(std::io::SeekFrom::Current(0))?;
+    let begin = read.stream_position()?;
     for fmt in crate::formats() {
         if fmt == format_by_name("binary").unwrap() {
             break;
@@ -172,7 +172,7 @@ pub fn identify_file<R: Read + Seek>(mut read: R) -> std::io::Result<Option<&'st
 }
 
 pub fn open_file<R: Read + Seek>(mut read: R) -> std::io::Result<BinaryFile<'static>> {
-    let begin = read.seek(std::io::SeekFrom::Current(0))?;
+    let begin = read.stream_position()?;
     for fmt in crate::formats() {
         #[allow(clippy::branches_sharing_code)]
         // As much as I'd love to follow your suggestion clippy, I'd rather have the correct behaviour at runtime

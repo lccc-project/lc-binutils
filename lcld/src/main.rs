@@ -34,7 +34,7 @@ fn main() {
     };
 
     match args.next().as_deref() {
-        Some(x @ ("-flavor" | "-flavour" | "--flavor" | "--flavour")) => {
+        Some(x @ ("-flavor" | "-flavour" | "--flavor" | "--flavour" | "/flavour")) => {
             driver = match args.next().as_deref().unwrap_or_else(|| {
                 eprintln!("{}: Expected an argument for {}", exe_name, x);
                 std::process::exit(1)

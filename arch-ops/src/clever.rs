@@ -1915,8 +1915,14 @@ impl<R: InsnRead> CleverDecoder<R> {
 pub struct CleverPrinter {}
 
 impl CleverPrinter {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for CleverPrinter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

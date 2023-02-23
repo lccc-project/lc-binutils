@@ -1,3 +1,5 @@
+#![allow(clippy::explicit_auto_deref)] // I want to be explicit because I have walked into it not actually derefing before
+
 use core::{
     char::CharTryFromError,
     convert::TryFrom,
@@ -194,7 +196,7 @@ impl TryFrom<StringEntry> for String {
         match value {
             StringEntry::Bytes(b) => String::from_utf8(b).map_err(Into::into),
             StringEntry::Utf8(s) => Ok(s),
-            StringEntry::Utf16(v) => String::from_utf16(&*v).map_err(Into::into),
+            StringEntry::Utf16(v) => String::from_utf16(&v).map_err(Into::into),
             StringEntry::Utf32(v) => v
                 .into_iter()
                 .map(char::try_from)

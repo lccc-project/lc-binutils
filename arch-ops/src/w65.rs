@@ -1187,7 +1187,7 @@ impl<W: InsnWrite> W65Encoder<W> {
                 } else {
                     let size = addr.size();
                     let rel = addr.is_rel();
-                    self.write_addr(8*size, addr.into_addr().unwrap(), rel)
+                    self.write_addr(8 * size, addr.into_addr().unwrap(), rel)
                 }
             }
             _ => Ok(()),

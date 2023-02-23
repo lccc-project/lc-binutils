@@ -1028,7 +1028,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
     // Finally, construct the ModRM (and possibly SIB) byte(s) + displacement
     match modrm {
         ModRM::Direct(reg) => {
-            if reg.class() == X86RegisterClass::Byte && reg.regnum() > 3 && output.rex != None {
+            if reg.class() == X86RegisterClass::Byte && reg.regnum() > 3 && output.rex.is_some() {
                 panic!("Cannot encode register {:?} with a REX prefix", reg);
             } else if reg.class() == X86RegisterClass::ByteRex {
                 output.rex.get_or_insert(0x40);
@@ -1179,7 +1179,7 @@ pub fn encode_modrm(modrm: ModRM, r: u8, mode: X86Mode) -> ModRMAndPrefixes {
                 output.disp = Some((1, 0));
             } else {
                 output.sib = Some(
-                    (((scale.trailing_zeros() as u8 + 1) as u8) << 6)
+                    ((scale.trailing_zeros() as u8 + 1) << 6)
                         | ((index.regnum() & 0x7) << 3)
                         | (base.regnum()),
                 )

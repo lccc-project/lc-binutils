@@ -61,7 +61,8 @@ impl core::fmt::Debug for dyn Binfmt {
 
 impl core::cmp::PartialEq for dyn Binfmt {
     fn eq(&self, rhs: &Self) -> bool {
-        core::ptr::eq(self as *const _ as *const u8, rhs as *const _ as *const u8) // Binary Formats are unique and singleton
+        core::ptr::eq(self as *const _ as *const u8, rhs as *const _ as *const u8)
+        // Binary Formats are unique and singleton
     }
 }
 

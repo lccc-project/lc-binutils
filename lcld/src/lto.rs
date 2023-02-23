@@ -10,7 +10,10 @@ impl core::fmt::Debug for dyn LtoProvider {
 
 impl core::cmp::PartialEq for dyn LtoProvider {
     fn eq(&self, other: &Self) -> bool {
-        core::ptr::eq(self as *const _ as *const u8, other as *const _ as *const u8)
+        core::ptr::eq(
+            self as *const _ as *const u8,
+            other as *const _ as *const u8,
+        )
     }
 }
 

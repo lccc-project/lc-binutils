@@ -1011,6 +1011,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         crate::fmt::BinaryFile::create(self, Box::new(data), ty)
     }
 
+    #[allow(clippy::single_match)]
     fn read_file(
         &self,
         file: &mut (dyn ReadSeek + '_),
@@ -1083,10 +1084,12 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         file.read_exact(&mut strings)?;
 
         for shdr in &shdrs[1..] {
-            let mut sect = Section::default();
+            let mut sect = Section {
+                align: Numeric::as_usize(shdr.sh_addralign),
+                ty: elf_shtype_to_file_type(shdr.sh_type),
+                ..Section::default()
+            };
 
-            sect.align = Numeric::as_usize(shdr.sh_addralign);
-            sect.ty = elf_shtype_to_file_type(shdr.sh_type);
             let noff = Numeric::as_usize(shdr.sh_name);
             let name = &strings[noff..];
 
@@ -1202,7 +1205,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_entsize: Class::Size::from_usize(0),
         });
         for section in bfile.sections() {
-            let is_nobits = section.ty == SectionType::NoBits || section.content.len() == 0;
+            let is_nobits = section.ty == SectionType::NoBits || section.content.is_empty();
             #[allow(clippy::needless_borrow)]
             shdrs.push(ElfSectionHeader::<Class> {
                 sh_name: Class::Word::from_usize(add_to_strtab(
@@ -1212,7 +1215,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 sh_type: match section.ty {
                     SectionType::NoBits => consts::SHT_NOBITS,
                     SectionType::ProgBits => {
-                        if section.content.len() == 0 {
+                        if section.content.is_empty() {
                             consts::SHT_NOBITS
                         } else {
                             consts::SHT_PROGBITS
@@ -1332,12 +1335,12 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                                 .iter()
                                 .position(|x| x.name() == reloc.symbol)
                                 .unwrap()
-                                + 1
-                                , Howto::from_reloc_code(reloc.code).unwrap().reloc_num() as usize,
+                                + 1,
+                            Howto::from_reloc_code(reloc.code).unwrap().reloc_num() as usize,
                         ),
                         r_addend: Class::Offset::from_usize(reloc.addend.map_or(0, |x| x as usize)),
                     };
-                    eprintln!("\t>Elf Relocation {:?}",reloc);
+                    eprintln!("\t>Elf Relocation {:?}", reloc);
                     relocs.push(reloc);
                 }
                 let mut relocs = Vec::from(bytemuck::cast_slice(&relocs));
@@ -1397,7 +1400,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         header.e_shstrndx = Class::Half::from_usize(shdrs.len() - 1);
         file.write_all(bytemuck::bytes_of(&header))?;
         for section in bfile.sections() {
-            if section.ty == SectionType::NoBits || section.content.len() == 0 {
+            if section.ty == SectionType::NoBits || section.content.is_empty() {
                 continue;
             }
             file.write_all(&section.content)?;
