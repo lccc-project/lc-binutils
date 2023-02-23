@@ -29,6 +29,7 @@ impl core::fmt::Display for InputFileType {
     }
 }
 
+#[allow(clippy::unused_io_amount)] 
 pub fn ident_input(p: &Path) -> std::io::Result<InputFileType> {
     let file = File::open(p)?;
 
@@ -36,7 +37,7 @@ pub fn ident_input(p: &Path) -> std::io::Result<InputFileType> {
         Ok(InputFileType::Object(binfmt))
     } else {
         let mut arch_buf = [0u8; 8];
-        (&file).read(&mut arch_buf)?;
+        (&file).read(&mut arch_buf)?; // If this doesn't complete, then `arch_buf` will not be filled with the correct value - it is not an error to be given an 6-byte file
         (&file).seek(SeekFrom::Start(0))?;
         if arch_buf == *b"!<arch>\n" {
             Ok(InputFileType::Archive)

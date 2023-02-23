@@ -11,11 +11,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-        rust-channel: [1.56.0, stable, beta,nightly]
-        exclude:
-          - os: [windows-latest, macos-latest]
-            rust-channel: [beta, nightly]
+        os: [ubuntu-latest]
+        rust-channel: [nightly]
 
     steps:
       - uses: actions/checkout@v2
@@ -27,6 +24,4 @@ jobs:
           rustup component add clippy
       - name: Build
         run: |
-           cargo build --all-features
-           cargo test --all-features
            cargo clippy --all-features

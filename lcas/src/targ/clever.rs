@@ -624,13 +624,11 @@ macro_rules! clever_mnemonics{
         fn parse_mnemonic(x: &str) -> Option<CleverOpcode>{
             $(
                 {
-                    if x.starts_with($mnemonic){
-                        let next = &x[($mnemonic.len())..];
+                    if let Some(next) =  x.strip_prefix($mnemonic){
                         let mut opc = ($opcode)<<4;
                         ($parse_h)(&mut opc,next)?;
                         return CleverOpcode::from_opcode(opc);
-                    } $( else if x.starts_with($altopcs) {
-                        let next = &x[($altopcs.len())..];
+                    } $( else if let Some(next) =  x.strip_prefix($altopcs) {
                         let mut opc = ($opcode)<<4;
                         ($parse_h)(&mut opc,next)?;
                         return CleverOpcode::from_opcode(opc);

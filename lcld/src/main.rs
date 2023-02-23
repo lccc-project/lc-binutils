@@ -17,6 +17,7 @@ pub enum Mode {
     Wasm,
 }
 
+#[allow(clippy::single_match)] // May get more arms added in the future
 fn main() {
     let mut args = std::env::args();
 

@@ -140,7 +140,7 @@ pub fn main() -> Result<(), IOError> {
 
     let mut add_search_dirs = Vec::new();
 
-    if let Some((left, _)) = prg_name.rsplit_once("-") {
+    if let Some((left, _)) = prg_name.rsplit_once('-') {
         if let Ok(targ) = left.parse() {
             default_targ = targ;
         }
@@ -232,7 +232,7 @@ pub fn main() -> Result<(), IOError> {
             "--flavour" | "-flavour" | "--flavor" | "-flavor" => {
                 args.next(); // consume the argument to flavour, but we're committed on the unix driver now
             }
-            x if x.starts_with("-") => todo!("opts"),
+            x if x.starts_with('-') => todo!("opts"),
             _ => {
                 if let Some(group) = &mut cur_group {
                     group.push(InputSet::Single(PathBuf::from(arg)))
@@ -266,9 +266,9 @@ pub fn main() -> Result<(), IOError> {
     let mut search_dirs = Vec::new();
     cfg.search_paths
         .iter()
-        .map(|&r| r)
+        .copied()
         .map(Path::new)
-        .flat_map(|p| core::iter::repeat(p).zip(cfg.libdirs.iter().map(|&r| r)))
+        .flat_map(|p| core::iter::repeat(p).zip(cfg.libdirs.iter().copied()))
         .for_each(|pair| {
             if cfg.use_target {
                 search_dirs.extend(
