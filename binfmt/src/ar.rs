@@ -176,7 +176,7 @@ impl ArchiveMember {
             write!((&mut self.header.ar_name) as &mut [_], "/$              ").unwrap();
         } else {
             self.long_name = None;
-            write!((&mut self.header.ar_name) as &mut [_], "{:<20}", st).unwrap();
+            write!((&mut self.header.ar_name) as &mut [_], "{:<16}", st).unwrap();
         }
     }
 
