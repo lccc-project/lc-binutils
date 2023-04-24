@@ -215,7 +215,7 @@ impl ArchiveMember {
 
     pub fn truncate(&mut self) {
         self.bytes.clear();
-        write!((&mut self.header.ar_size) as &mut [u8], "{:<12}", 0).unwrap();
+        write!((&mut self.header.ar_size) as &mut [u8], "{:<10}", 0).unwrap();
     }
 }
 
