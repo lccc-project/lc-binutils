@@ -178,7 +178,7 @@ impl ArchiveMember {
             self.long_name = None;
             let mut name = format!("{}/", st);
             name += &" ".repeat(16 - name.len());
-            write!((&mut self.header.ar_name) as &mut [_], "{name}").unwrap();
+            write!((&mut self.header.ar_name) as &mut [_], "{}", name).unwrap();
         }
     }
 
