@@ -171,9 +171,9 @@ impl ArchiveMember {
     }
 
     pub fn set_name(&mut self, st: &str) {
-        if st.len() > 15 {
+        if st.len() > 16 {
             self.long_name = Some(OsString::from(st));
-            write!((&mut self.header.ar_name) as &mut [_], "/$              ").unwrap();
+            write!((&mut self.header.ar_name) as &mut [_], "/{:<15}", st.len()).unwrap();
         } else {
             self.long_name = None;
             write!((&mut self.header.ar_name) as &mut [_], "{:<16}", st).unwrap();
