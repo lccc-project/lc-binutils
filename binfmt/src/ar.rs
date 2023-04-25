@@ -10,8 +10,6 @@ use std::{
 };
 
 pub const ARMAG: [u8; 8] = *b"!<arch>\n";
-pub const STRTAB: &str = "//              ";
-pub const SYMTAB: &str = "/               ";
 pub const FMAG: [u8; 2] = [0x60, 0x0A];
 #[repr(C, align(1))]
 #[derive(Copy, Clone, Debug)]
@@ -264,7 +262,7 @@ impl Archive {
         } else {
             self.esymtab.get_or_insert_with(|| {
                 let mut esymtab = ArchiveMember::new();
-                esymtab.set_name(SYMTAB);
+                esymtab.set_name("");
                 esymtab
             })
         }
@@ -273,7 +271,7 @@ impl Archive {
     pub fn ranlib(&mut self) -> &mut ArchiveMember {
         if self.symtab.is_none() {
             let mut symtab = ArchiveMember::new();
-            symtab.set_name(SYMTAB);
+            symtab.set_name("");
             self.symtab = Some(symtab);
         }
         let mut sym_entries = Vec::new();
@@ -314,7 +312,7 @@ impl Archive {
         if !names.is_empty() {
             if self.strtab.is_none() {
                 let mut strtab = ArchiveMember::new();
-                strtab.set_name(STRTAB);
+                strtab.set_name("/");
                 self.strtab = Some(strtab);
             }
             let strtab = self.strtab.as_mut().unwrap();
@@ -338,8 +336,8 @@ impl Archive {
         if let Some(esymtab) = &self.esymtab {
             esymtab.write(&mut w)?;
         }
-        if let Some(symtab) = &self.strtab {
-            symtab.write(&mut w)?;
+        if let Some(strtab) = &self.strtab {
+            strtab.write(&mut w)?;
         }
 
         for member in &self.members {
@@ -364,7 +362,7 @@ impl Archive {
         loop {
             match ArchiveMember::read(&mut r) {
                 Ok(mut m) => {
-                    if m.header.ar_name == SYMTAB.as_bytes() {
+                    if m.header.ar_name == "".as_bytes() {
                         if symtab.is_none() {
                             symtab = Some(m);
                         } else if esymtab.is_none() {
@@ -376,7 +374,7 @@ impl Archive {
                             ));
                         }
                         continue;
-                    } else if m.header.ar_name == STRTAB.as_bytes() {
+                    } else if m.header.ar_name == "".as_bytes() {
                         if strtab.is_none() {
                             strtab = Some(m);
                         } else {
