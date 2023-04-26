@@ -298,6 +298,8 @@ impl Archive {
             bytes.write_all(sym.as_bytes()).unwrap();
         }
 
+        mem.write(&[]).unwrap(); // Because we appended bytes in a bit of a hacky way, use this to trigger correct size setting
+
         mem
     }
 
