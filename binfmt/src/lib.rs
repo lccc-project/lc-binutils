@@ -110,9 +110,9 @@ define_formats![
     #[cfg(feature = "elf32")]
     elf32-genericbe,
     #[cfg(feature = "elf64")]
-    elf32-genericle,
+    elf64-genericle,
     #[cfg(feature = "elf64")]
-    elf32-genericbe,
+    elf64-genericbe,
     binary
 ];
 
