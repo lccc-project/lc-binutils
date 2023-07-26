@@ -67,6 +67,7 @@ define_clever_features! {
     (Vec, "vec"),
     (Rand, "rand"),
     (Virtualization, "virtualization"),
+    (HashAccel, "hash-accel"),
 }
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq)]
@@ -354,14 +355,14 @@ impl core::fmt::Display for CleverIndex {
     }
 }
 
-trait HBits {
-    fn from_bits(bits: u16) -> Self;
+trait HBits: Sized {
+    fn from_bits(bits: u16) -> Option<Self>;
     fn to_hbits(self) -> u16;
 }
 
 impl HBits for bool {
-    fn from_bits(bits: u16) -> Self {
-        bits != 0
+    fn from_bits(bits: u16) -> Option<Self> {
+        Some(bits & 1 != 0)
     }
 
     fn to_hbits(self) -> u16 {
@@ -370,8 +371,8 @@ impl HBits for bool {
 }
 
 impl HBits for u8 {
-    fn from_bits(bits: u16) -> Self {
-        bits as u8
+    fn from_bits(bits: u16) -> Option<Self> {
+        Some(bits as u8)
     }
     fn to_hbits(self) -> u16 {
         self as u16
@@ -379,8 +380,8 @@ impl HBits for u8 {
 }
 
 impl HBits for i8 {
-    fn from_bits(bits: u16) -> Self {
-        (bits as i8) | ((bits & 0x8).wrapping_neg() as i8)
+    fn from_bits(bits: u16) -> Option<Self> {
+        Some((bits as i8) | ((bits & 0x8).wrapping_neg() as i8))
     }
     fn to_hbits(self) -> u16 {
         (self & 0xf) as u16
@@ -389,8 +390,8 @@ impl HBits for i8 {
 
 // Because ss is typically represented as `u16` for reasons
 impl HBits for u16 {
-    fn from_bits(bits: u16) -> Self {
-        bits
+    fn from_bits(bits: u16) -> Option<Self> {
+        Some(bits)
     }
     fn to_hbits(self) -> u16 {
         self
@@ -398,8 +399,8 @@ impl HBits for u16 {
 }
 
 impl HBits for CleverRegister {
-    fn from_bits(bits: u16) -> Self {
-        Self(bits as u8)
+    fn from_bits(bits: u16) -> Option<Self> {
+        Some(Self(bits as u8))
     }
 
     fn to_hbits(self) -> u16 {
@@ -408,24 +409,24 @@ impl HBits for CleverRegister {
 }
 
 impl HBits for ConditionCode {
-    fn from_bits(bits: u16) -> Self {
+    fn from_bits(bits: u16) -> Option<Self> {
         match bits {
-            0 => ConditionCode::Parity,
-            1 => ConditionCode::Carry,
-            2 => ConditionCode::Overflow,
-            3 => ConditionCode::Zero,
-            4 => ConditionCode::LessThan,
-            5 => ConditionCode::LessEq,
-            6 => ConditionCode::BelowEq,
-            7 => ConditionCode::Minus,
-            8 => ConditionCode::Plus,
-            9 => ConditionCode::Above,
-            10 => ConditionCode::Greater,
-            11 => ConditionCode::GreaterEq,
-            12 => ConditionCode::NotZero,
-            13 => ConditionCode::NoOverflow,
-            14 => ConditionCode::NoCarry,
-            15 => ConditionCode::NoParity,
+            0 => Some(ConditionCode::Parity),
+            1 => Some(ConditionCode::Carry),
+            2 => Some(ConditionCode::Overflow),
+            3 => Some(ConditionCode::Zero),
+            4 => Some(ConditionCode::LessThan),
+            5 => Some(ConditionCode::LessEq),
+            6 => Some(ConditionCode::BelowEq),
+            7 => Some(ConditionCode::Minus),
+            8 => Some(ConditionCode::Plus),
+            9 => Some(ConditionCode::Above),
+            10 => Some(ConditionCode::Greater),
+            11 => Some(ConditionCode::GreaterEq),
+            12 => Some(ConditionCode::NotZero),
+            13 => Some(ConditionCode::NoOverflow),
+            14 => Some(ConditionCode::NoCarry),
+            15 => Some(ConditionCode::NoParity),
             _ => unreachable!(),
         }
     }
@@ -511,6 +512,35 @@ impl HBitRange<u32> for RangeFull {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[repr(u16)]
+pub enum AluOp {
+    Nop = 0,
+    Add = 1,
+    Sub = 2,
+    And = 3,
+    Or = 4,
+    Xor = 5,
+}
+
+impl HBits for AluOp {
+    fn from_bits(bits: u16) -> Option<Self> {
+        match bits & 7 {
+            0 => Some(Self::Nop),
+            1 => Some(Self::Add),
+            2 => Some(Self::Sub),
+            3 => Some(Self::And),
+            4 => Some(Self::Or),
+            5 => Some(Self::Xor),
+            _ => None,
+        }
+    }
+
+    fn to_hbits(self) -> u16 {
+        self as u16
+    }
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum CleverOperandKind {
     Normal(u32),
     AbsAddr,
@@ -548,7 +578,7 @@ macro_rules! clever_instructions{
                                 }
                                 let range = range();
                                 hmask |= HBitRange::mask(&range)<<HBitRange::shift(&range);
-                                HBits::from_bits((opc&HBitRange::mask(&range))>>HBitRange::shift(&range))
+                                HBits::from_bits((opc&HBitRange::mask(&range))>>HBitRange::shift(&range))?
                             }),*
                         );)?
                         if ((opc&0xf)&!hmask)!=0{
@@ -598,7 +628,7 @@ macro_rules! clever_instructions{
     }
 }
 
-use CleverExtension::{Float, FloatExt, Main, Rand, Virtualization};
+use CleverExtension::{Float, FloatExt, HashAccel, Main, Rand, Virtualization};
 
 clever_instructions! {
     // Undefined Instruction 0
@@ -705,6 +735,8 @@ clever_instructions! {
     [CmpR, "cmp", 0x06C, CleverOperandKind::Normal(1), Main, {r @ 0..4 => CleverRegister}],
     [TestR, "test", 0x06D, CleverOperandKind::Normal(1), Main, {r @ 0..4 => CleverRegister}],
 
+    [Pload, "pload", 0x070, CleverOperandKind::Normal(3), HashAccel],
+
     // Floating-Point Operations
     [Round, "round", 0x100, CleverOperandKind::Normal(1), Float, {f @ 0 => bool}],
     [Ceil, "ceil", 0x101, CleverOperandKind::Normal(1), Float, {f @ 0 => bool}],
@@ -751,6 +783,11 @@ clever_instructions! {
 
     // Random Device Polling
     [RPoll, "rpoll", 0x230, CleverOperandKind::Normal(0), Rand, {r @ .. => CleverRegister}],
+
+    [SipRound, "sipround", 0x238, CleverOperandKind::Normal(2), HashAccel],
+
+    [FusedMul, "fusedmul", 0x23A, CleverOperandKind::Normal(3), HashAccel, { o @ ..4 => AluOp}],
+    [FusedIMul, "fusedimul", 0x23B, CleverOperandKind::Normal(3), HashAccel, {o @ ..4 => AluOp}],
 
     // Vector Instructions
     [Vec, "vec", 0x400, CleverOperandKind::Insn, CleverExtension::Vec],
@@ -1067,14 +1104,14 @@ impl CleverOpcode {
 
     pub fn branch_condition(&self) -> Option<ConditionCode> {
         match self.opcode() & 0xFE00 {
-            0x7000 | 0x7400 | 0x7800 => Some(ConditionCode::from_bits((self.opcode() & 0xf0) >> 4)),
+            0x7000 | 0x7400 | 0x7800 => ConditionCode::from_bits((self.opcode() & 0xf0) >> 4),
             _ => None,
         }
     }
 
     pub fn branch_weight(&self) -> Option<i8> {
         match self.opcode() & 0xFE00 {
-            0x7000 | 0x7400 | 0x7800 => Some(i8::from_bits(self.opcode() & 0xf)),
+            0x7000 | 0x7400 | 0x7800 => i8::from_bits(self.opcode() & 0xf),
             _ => None,
         }
     }
