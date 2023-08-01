@@ -1986,7 +1986,10 @@ impl<W: InsnWrite> X86Encoder<W> {
                     | (X86RegisterClass::Double, X86Mode::Real | X86Mode::Virtual8086) => {
                         Some(0x66)
                     }
-                    (X86RegisterClass::Quad, X86Mode::Long) => None,
+                    (X86RegisterClass::Quad, X86Mode::Long) => {
+                        *rex.get_or_insert(0x40) |= 0x8;
+                        None
+                    }
                     (class, mode) => {
                         panic!("Unsupported register class {:?} in mode {:?}", class, mode)
                     }
