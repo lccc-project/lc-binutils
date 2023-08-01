@@ -13,6 +13,7 @@ pub enum Prefix {
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+
 pub enum X86Mode {
     Real,
     Protected,
@@ -43,6 +44,14 @@ impl X86Mode {
             Self::Real | Self::Virtual8086 => X86RegisterClass::Word,
             Self::Protected | Self::Compatibility => X86RegisterClass::Double,
             Self::Long => X86RegisterClass::Quad,
+        }
+    }
+
+    pub fn width(&self) -> u16 {
+        match self {
+            Self::Real | Self::Virtual8086 => 16,
+            Self::Protected | Self::Compatibility => 32,
+            Self::Long => 64,
         }
     }
 }
