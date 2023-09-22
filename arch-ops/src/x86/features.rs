@@ -142,5 +142,10 @@ define_x86_features! {
     (Sahf, "sahf"),
     (MovBe, "movbe"),
     (Adcx, "adcx"),
-    (PrefecthW, "prefetchw")
+    (PrefecthW, "prefetchw"),
+    (Apx, "apx"),
+    (Avx10, "avx10"),
+    (Avx10_128, "avx10-128"),
+    (Avx10_256, "avx10-256"),
+    (Avx10_512, "avx10-512"),
 }

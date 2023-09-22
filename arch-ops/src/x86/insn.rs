@@ -12,49 +12,7 @@ pub enum Prefix {
     Repz,
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-
-pub enum X86Mode {
-    Real,
-    Protected,
-    Virtual8086,
-    Compatibility,
-    Long,
-}
-
-impl X86Mode {
-    pub fn default_mode_for(target: &Target) -> Option<X86Mode> {
-        match target.arch() {
-            target_tuples::Architecture::I86 => Some(X86Mode::Real),
-            target_tuples::Architecture::I8086 => Some(X86Mode::Real),
-            target_tuples::Architecture::I086 => Some(X86Mode::Real),
-            target_tuples::Architecture::I186 => Some(X86Mode::Real),
-            target_tuples::Architecture::I286 => Some(X86Mode::Real),
-            target_tuples::Architecture::I386 => Some(X86Mode::Protected),
-            target_tuples::Architecture::I486 => Some(X86Mode::Protected),
-            target_tuples::Architecture::I586 => Some(X86Mode::Protected),
-            target_tuples::Architecture::I686 => Some(X86Mode::Protected),
-            target_tuples::Architecture::X86_64 => Some(X86Mode::Long),
-            _ => None,
-        }
-    }
-
-    pub fn largest_gpr(&self) -> X86RegisterClass {
-        match self {
-            Self::Real | Self::Virtual8086 => X86RegisterClass::Word,
-            Self::Protected | Self::Compatibility => X86RegisterClass::Double,
-            Self::Long => X86RegisterClass::Quad,
-        }
-    }
-
-    pub fn width(&self) -> u16 {
-        match self {
-            Self::Real | Self::Virtual8086 => 16,
-            Self::Protected | Self::Compatibility => 32,
-            Self::Long => 64,
-        }
-    }
-}
+pub use super::X86Mode;
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum X86OperandType {
@@ -234,7 +192,6 @@ macro_rules! define_x86_instructions {
     }
 }
 
-use target_tuples::Target;
 use X86OperandType::*;
 use X86RegisterClass::*;
 

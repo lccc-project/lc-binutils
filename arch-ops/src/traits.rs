@@ -64,6 +64,7 @@ impl<R: InsnRead + ?Sized> InsnRead for Box<R> {
     }
 }
 
+/// Writes `count` zeroes to `out` using the default block, in blocks of 1024.
 pub fn default_write_zeroes<W: Write>(mut out: W, mut count: usize) -> std::io::Result<()> {
     let val: [u8; 1024] = [0; 1024];
     while count >= 1024 {
@@ -74,9 +75,11 @@ pub fn default_write_zeroes<W: Write>(mut out: W, mut count: usize) -> std::io::
 }
 
 pub trait InsnWrite: Write {
+    /// Writes an address of `size` (in bits) to the writer. This will typically generate a relocation
     fn write_addr(&mut self, size: usize, addr: Address, rel: bool) -> std::io::Result<()>;
     fn write_reloc(&mut self, reloc: Reloc) -> std::io::Result<()>;
     fn offset(&self) -> usize;
+    /// Writes `count` zero bytes. This is provided as some writer types (such as sections) may implement this more efficiently then the default
     fn write_zeroes(&mut self, count: usize) -> std::io::Result<()> {
         default_write_zeroes(self, count)
     }

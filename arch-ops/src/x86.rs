@@ -1,3 +1,4 @@
+use target_tuples::Target;
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 #[non_exhaustive]
 pub enum X86RegisterClass {
@@ -34,6 +35,19 @@ impl X86RegisterClass {
             Self::Cr => 4,
             Self::St => 10,
             Self::AvxMask => 8,
+        }
+    }
+
+    /// Whether or not register numbers >16 can be encoded using REX2 (else use EVEX)
+    pub fn use_rex2(&self) -> bool {
+        match self {
+            Self::ByteRex => true,
+            Self::Word => true,
+            Self::Double => true,
+            Self::Quad => true,
+            Self::Cr => true,
+            Self::Dr => true,
+            _ => false,
         }
     }
 
@@ -129,7 +143,7 @@ pub enum X86Register {
     Rsi,
     Rdi,
 
-    // r64 high (REX.B/REX.R)
+    // r64 high (REX.B/REX.R/REX.X)
     R8,
     R9,
     R10,
@@ -138,6 +152,15 @@ pub enum X86Register {
     R13,
     R14,
     R15,
+
+    // r64 extended
+    R(u8),
+    // r32 extended,
+    Rd(u8),
+    // r16 extended
+    Rw(u8),
+    // r8 extended
+    Rl(u8),
 
     Mmx(u8),
 
@@ -184,14 +207,60 @@ macro_rules! define_x86_registers{
 
 use X86Register::*;
 
-use self::insn::X86Mode;
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+
+pub enum X86Mode {
+    Real,
+    Protected,
+    Virtual8086,
+    Compatibility,
+    Long,
+}
+
+impl X86Mode {
+    pub fn default_mode_for(target: &Target) -> Option<X86Mode> {
+        match target.arch() {
+            target_tuples::Architecture::I86 => Some(X86Mode::Real),
+            target_tuples::Architecture::I8086 => Some(X86Mode::Real),
+            target_tuples::Architecture::I086 => Some(X86Mode::Real),
+            target_tuples::Architecture::I186 => Some(X86Mode::Real),
+            target_tuples::Architecture::I286 => Some(X86Mode::Real),
+            target_tuples::Architecture::I386 => Some(X86Mode::Protected),
+            target_tuples::Architecture::I486 => Some(X86Mode::Protected),
+            target_tuples::Architecture::I586 => Some(X86Mode::Protected),
+            target_tuples::Architecture::I686 => Some(X86Mode::Protected),
+            target_tuples::Architecture::X86_64 => Some(X86Mode::Long),
+            _ => None,
+        }
+    }
+
+    pub fn largest_gpr(&self) -> X86RegisterClass {
+        match self {
+            Self::Real | Self::Virtual8086 => X86RegisterClass::Word,
+            Self::Protected | Self::Compatibility => X86RegisterClass::Double,
+            Self::Long => X86RegisterClass::Quad,
+        }
+    }
+
+    pub fn width(&self) -> u16 {
+        match self {
+            Self::Real | Self::Virtual8086 => 16,
+            Self::Protected | Self::Compatibility => 32,
+            Self::Long => 64,
+        }
+    }
+}
 
 define_x86_registers! {
     regs [Al, Cl, Dl, Bl, Ah, Ch, Dh, Bh]: Byte;
-    regs [Al, Cl, Dl, Bl, Spl, Bpl, Sil, Dil, R8b, R9b, R10b, R11b, R12b, R13b, R14b, R15b]: ByteRex;
-    regs [Ax, Cx, Dx, Bx, Sp, Bp, Si, Di, R8w, R9w, R10w, R11w, R12w, R13w, R14w, R15w]: Word;
-    regs [Eax, Ecx, Edx, Ebx, Esp, Ebp, Esi, Edi, R8d, R9d, R10d, R11d, R12d, R13d, R14d, R15d]: Double;
-    regs [Rax, Rcx, Rdx, Rbx, Rsp, Rbp, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15]: Quad;
+    regs [Al, Cl, Dl, Bl, Spl, Bpl, Sil, Dil, R8b, R9b, R10b, R11b, R12b, R13b, R14b, R15b,
+        Rl(16), Rl(17), Rl(18), Rl(19), Rl(20), Rl(21), Rl(22), Rl(23),Rl(24), Rl(25), Rl(26), Rl(27), Rl(28), Rl(29), Rl(30), Rl(31)]: ByteRex;
+    regs [Ax, Cx, Dx, Bx, Sp, Bp, Si, Di, R8w, R9w, R10w, R11w, R12w, R13w, R14w, R15w,
+        Rw(16), Rw(17), Rw(18), Rw(19), Rw(20), Rw(21), Rw(22), Rw(23), Rw(24), Rw(25), Rw(26), Rw(27), Rw(28), Rw(29), Rw(30), Rw(31)]: Word;
+    regs [Eax, Ecx, Edx, Ebx, Esp, Ebp, Esi, Edi, R8d, R9d, R10d, R11d, R12d, R13d, R14d, R15d,
+        Rd(16), Rd(17), Rd(18), Rd(19), Rd(20), Rd(21), Rd(22), Rd(23), Rd(24), Rd(25), Rd(26), Rd(27), Rd(28), Rd(29), Rd(30), Rd(31)]: Double;
+    regs [Rax, Rcx, Rdx, Rbx, Rsp, Rbp, Rsi, Rdi, R8, R9, R10, R11, R12, R13, R14, R15,
+        R(16), R(17), R(18), R(19), R(20), R(21), R(22), R(23), R(24), R(25), R(26), R(27), R(28), R(29), R(30), R(31)]: Quad;
     regs [Mmx(0), Mmx(1), Mmx(2), Mmx(3), Mmx(4), Mmx(5), Mmx(6), Mmx(7), Mmx(0), Mmx(1), Mmx(2), Mmx(3), Mmx(4), Mmx(5), Mmx(6), Mmx(7)]: Mmx;
     regs [Xmm(0), Xmm(1), Xmm(2), Xmm(3), Xmm(4), Xmm(5), Xmm(6), Xmm(7), Xmm(8), Xmm(9), Xmm(10), Xmm(11), Xmm(12), Xmm(13), Xmm(14), Xmm(15),
         Xmm(16), Xmm(17), Xmm(18), Xmm(19), Xmm(20), Xmm(21), Xmm(22), Xmm(23), Xmm(24), Xmm(25), Xmm(26), Xmm(27), Xmm(28), Xmm(29), Xmm(30), Xmm(31)]: Xmm;
@@ -283,6 +352,10 @@ impl X86Register {
             R13 => 13,
             R14 => 14,
             R15 => 15,
+            R(m) => m,
+            Rd(m) => m,
+            Rw(m) => m,
+            Rl(m) => m,
             Mmx(m) => m,
             Xmm(m) => m,
             Ymm(m) => m,
@@ -325,6 +398,7 @@ impl X86Register {
             R13b => X86RegisterClass::ByteRex,
             R14b => X86RegisterClass::ByteRex,
             R15b => X86RegisterClass::ByteRex,
+            Rl(_) => X86RegisterClass::ByteRex,
             Ax => X86RegisterClass::Word,
             Cx => X86RegisterClass::Word,
             Dx => X86RegisterClass::Word,
@@ -341,6 +415,7 @@ impl X86Register {
             R13w => X86RegisterClass::Word,
             R14w => X86RegisterClass::Word,
             R15w => X86RegisterClass::Word,
+            Rw(_) => X86RegisterClass::Word,
             Eax => X86RegisterClass::Double,
             Ecx => X86RegisterClass::Double,
             Edx => X86RegisterClass::Double,
@@ -357,6 +432,7 @@ impl X86Register {
             R13d => X86RegisterClass::Double,
             R14d => X86RegisterClass::Double,
             R15d => X86RegisterClass::Double,
+            Rd(_) => X86RegisterClass::Double,
             Rax => X86RegisterClass::Quad,
             Rcx => X86RegisterClass::Quad,
             Rdx => X86RegisterClass::Quad,
@@ -373,6 +449,7 @@ impl X86Register {
             R13 => X86RegisterClass::Quad,
             R14 => X86RegisterClass::Quad,
             R15 => X86RegisterClass::Quad,
+            R(_) => X86RegisterClass::Quad,
             Mmx(_) => X86RegisterClass::Mmx,
             Xmm(_) => X86RegisterClass::Xmm,
             Ymm(_) => X86RegisterClass::Ymm,
@@ -417,6 +494,7 @@ impl Display for X86Register {
             R13b => f.write_str("r13b"),
             R14b => f.write_str("r14b"),
             R15b => f.write_str("r15b"),
+            Rl(m) => f.write_fmt(format_args!("r{}b", m)),
             Ax => f.write_str("ax"),
             Cx => f.write_str("cx"),
             Dx => f.write_str("dx"),
@@ -433,6 +511,7 @@ impl Display for X86Register {
             R13w => f.write_str("r13w"),
             R14w => f.write_str("r14w"),
             R15w => f.write_str("r15w"),
+            Rw(m) => f.write_fmt(format_args!("r{}w", m)),
             Eax => f.write_str("eax"),
             Ecx => f.write_str("ecx"),
             Edx => f.write_str("edx"),
@@ -449,6 +528,7 @@ impl Display for X86Register {
             R13d => f.write_str("r13d"),
             R14d => f.write_str("r14d"),
             R15d => f.write_str("r15d"),
+            Rd(m) => f.write_fmt(format_args!("r{}d", m)),
             Rax => f.write_str("rax"),
             Rcx => f.write_str("rcx"),
             Rdx => f.write_str("rdx"),
@@ -465,6 +545,7 @@ impl Display for X86Register {
             R13 => f.write_str("r13"),
             R14 => f.write_str("r14"),
             R15 => f.write_str("r15"),
+            R(m) => f.write_fmt(format_args!("r{}", m)),
             Mmx(n) => f.write_fmt(format_args!("mm{}", n)),
             Xmm(n) => f.write_fmt(format_args!("xmm{}", n)),
             Ymm(n) => f.write_fmt(format_args!("ymm{}", n)),
@@ -489,5 +570,6 @@ impl Display for X86Register {
 pub mod cpu;
 pub mod features;
 
+pub mod codegen;
 pub mod insn;
 pub mod printer;
