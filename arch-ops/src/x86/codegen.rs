@@ -735,7 +735,6 @@ impl<W> X86Encoder<W> {
 
 impl<W: io::Write> io::Write for X86Encoder<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        eprintln!("write {:x?}", buf);
         self.writer.write(buf)
     }
 
@@ -744,7 +743,6 @@ impl<W: io::Write> io::Write for X86Encoder<W> {
     }
 
     fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
-        eprintln!("write_all {:#02x?}", buf);
         self.writer.write_all(buf)
     }
 }
