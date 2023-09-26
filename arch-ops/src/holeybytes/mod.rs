@@ -40,6 +40,10 @@ macro_rules! operands {
 macro_rules! verify_ops {
     ($($_o:expr, $mnemonic:ident, $ty:ident, $_d:literal;)*) => {
         mod __verify_ops {
+            #![allow(
+                clippy::upper_case_acronyms,
+                unused,
+            )]
             paste::paste!($(type $mnemonic = super::[<Ops $ty>];)*);
         }
     };
@@ -86,3 +90,19 @@ define_operands! {
 }
 
 invoke_with_def!(verify_ops);
+
+/// Validate if passed [`Operands`] is correct for passed [`Opcode`]
+pub fn validate_ops_for_opcode(opcode: Opcode, operands: &Operands) -> bool {
+    macro_rules! generate {
+        ($($_o:expr, $mnemonic:ident, $ty:ident, $_d:literal;)*) => {
+            paste::paste! {
+                match opcode {
+                    $(Opcode::[<$mnemonic:camel>] =>
+                        matches!(operands, Operands::[<Ops $ty>] { .. })),*
+                }
+            }
+        };
+    }
+
+    invoke_with_def! { generate }
+}
