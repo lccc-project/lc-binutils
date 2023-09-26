@@ -1,0 +1,64 @@
+// OPCODE, MNEMONIC, TYPE, DOC;
+ 
+ 0, UN,    N,    "Cause an unreachable code trap"        ;
+ 1, TX,    N,    "Termiante execution"                   ;
+ 2, NOP,   N,    "Do nothing"                            ;
+
+ 3, ADD,   RRR,  "Addition"                              ;
+ 4, SUB,   RRR,  "Subtraction"                           ;
+ 5, MUL,   RRR,  "Multiplication"                        ;
+ 6, AND,   RRR,  "Bitand"                                ;
+ 7, OR,    RRR,  "Bitor"                                 ;
+ 8, XOR,   RRR,  "Bitxor"                                ;
+ 9, SL,    RRR,  "Unsigned left bitshift"                ;
+10, SR,    RRR,  "Unsigned right bitshift"               ;
+11, SRS,   RRR,  "Signed right bitshift"                 ;
+12, CMP,   RRR,  "Signed comparsion"                     ;
+13, CMPU,  RRR,  "Unsigned comparsion"                   ;
+14, DIR,   RRRR, "Merged divide-remainder"               ;
+15, NOT,   RR,   "Logical negation"                      ;
+16, ADDI,  RRD,  "Addition with immediate"               ;
+17, MULI,  RRD,  "Multiplication with immediate"         ;
+18, ANDI,  RRD,  "Bitand with immediate"                 ;
+19, ORI,   RRD,  "Bitor with immediate"                  ;
+20, XORI,  RRD,  "Bitxor with immediate"                 ;
+21, SLI,   RRW,  "Unsigned left bitshift with immedidate";
+22, SRI,   RRW,  "Unsigned right bitshift with immediate";
+23, SRSI,  RRW,  "Signed right bitshift with immediate"  ;
+24, CMPI,  RRD,  "Signed compare with immediate"         ;
+25, CMPUI, RRD,  "Unsigned compare with immediate"       ;
+
+26, CP,    RR,   "Copy register"                         ;
+27, SWA,   RR,   "Swap registers"                        ;
+28, LI,    RD,   "Load immediate"                        ;
+29, LRA,   RRO,  "Load relative address"                 ;
+30, LD,    RRAH, "Load from absolute address"            ;
+31, ST,    RRAH, "Store to absolute address"             ;
+32, LDR,   RROH, "Load from relative address"            ;
+33, STR,   RROH, "Store to absolute address"             ;
+34, BMC,   RRH,  "Copy block of memory"                  ;
+35, BRC,   RRB,  "Copy register block"                   ;
+
+36, JMP,   A,    "Absolute jump"                         ;
+37, JMPR,  O,    "Relative jump"                         ;
+38, JAL,   RRA,  "Linking absolute jump"                 ;
+39, JALR,  RRO,  "Linking relative jump"                 ;
+40, JEQ,   RRP,  "Branch on equal"                       ;
+41, JNE,   RRP,  "Branch on nonequal"                    ;
+42, JLT,   RRP,  "Branch on lesser-than (signed)"        ;
+43, JGT,   RRP,  "Branch on greater-than (signed)"       ;
+44, JLTU,  RRP,  "Branch on lesser-than (unsigned)"      ;
+45, JGTU,  RRP,  "Branch on greater-than (unsigned)"     ;
+46, ECALL, N,    "Issue ecall trap"                      ;
+
+47, ADDF,  RRR,  "Floating addition"                     ;
+48, SUBF,  RRR,  "Floating subtraction"                  ;
+49, MULF,  RRR,  "Floating multiply"                     ;
+50, DIRF,  RRRR, "Merged floating divide-remainder"      ;
+51, FMAF,  RRRR, "Fused floating multiply-add"           ;
+52, NEGF,  RR,   "Floating sign negation"                ;
+53, ITF,   RR,   "Int to float"                          ;
+54, FTI,   RR,   "Float to int"                          ;
+
+55, ADDFI, RRD,  "Floating addition with immediate"      ;
+56, MULFI, RRD,  "Floating multiplication with immediate";

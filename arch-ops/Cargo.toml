@@ -13,6 +13,7 @@ license = "BSD-2-Clause-Patent"
 lazy_static = "1"
 target-tuples = "0.5.5"
 paste = "1"
+with_builtin_macros = { version = "0.0.3", optional = true }
 
 [features]
 x86 = []
@@ -26,9 +27,9 @@ m6502 = []
 clever = []
 m68k = []
 z80 = []
+holey-bytes = ["with_builtin_macros"]
 
-
-default-archs = ["x86","arm","aarch64","w65","riscv","propeller","propeller2", "m6502", "clever", "m68k"]
+default-archs = ["x86","arm","aarch64","w65","riscv","propeller","propeller2", "m6502", "clever", "m68k", "holey-bytes"]
 default = ["default-archs"]
 all-archs = ["default-archs"]
 all = ["all-archs","z80"]
