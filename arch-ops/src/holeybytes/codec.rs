@@ -1,4 +1,4 @@
-use super::Operand;
+use super::Operands;
 
 use {super::Instruction, crate::traits::InsnWrite, delegate::delegate, std::io::Write};
 
@@ -41,26 +41,38 @@ impl<W: InsnWrite> InsnWrite for HbEncoder<W> {
 
 impl<W: InsnWrite> HbEncoder<W> {
     pub fn write_instruction(&mut self, instruction: Instruction) -> std::io::Result<()> {
-        self.write_all(&[instruction.opcode() as u8])?;
-        match instruction.operand() {
-            Operand::OpsRR(_) => todo!(),
-            Operand::OpsRRR(_) => todo!(),
-            Operand::OpsRRRR(_) => todo!(),
-            Operand::OpsRRB(_) => todo!(),
-            Operand::OpsRRH(_) => todo!(),
-            Operand::OpsRRW(_) => todo!(),
-            Operand::OpsRD(_) => todo!(),
-            Operand::OpsRRD(_) => todo!(),
-            Operand::OpsRRA(_) => todo!(),
-            Operand::OpsRRAH(_) => todo!(),
-            Operand::OpsRROH(_) => todo!(),
-            Operand::OpsRRO(_) => todo!(),
-            Operand::OpsRRP(_) => todo!(),
-            Operand::OpsA(_) => todo!(),
-            Operand::OpsO(_) => todo!(),
-            Operand::OpsN(_) => todo!(),
+        macro_rules! opwrite {
+            (
+                match $match_on:expr;
+                this:      $this:expr;
+                transmute: [$($transty:ident),* $(,)?];
+                else:      {$($pat:pat => $expr:expr),* $(,)?};
+            ) => {
+                match $match_on {
+                    $(Operands::$transty(op) => $this.write_all(&op.encode())?,)*
+                    $($pat => $expr),*
+                }
+            };
         }
+
+        let (opcode, operands) = instruction.into_pair();
+        self.write_all(&[opcode as u8])?;
         
+        opwrite! {
+            match operands;
+            this: self;
+            transmute: [OpsRR, OpsRRR, OpsRRRR, OpsRRB, OpsRRH, OpsRRW, OpsRD, OpsRRD, OpsN];
+            else: {
+                Operands::OpsRRA(_) => todo!(),
+                Operands::OpsRRAH(_) => todo!(),
+                Operands::OpsRROH(_) => todo!(),
+                Operands::OpsRRO(_) => todo!(),
+                Operands::OpsRRP(_) => todo!(),
+                Operands::OpsA(_) => todo!(),
+                Operands::OpsO(_) => todo!(),
+            };
+        };
+
         Ok(())
     }
 }
