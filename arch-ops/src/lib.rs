@@ -17,5 +17,8 @@ pub mod x86;
 #[cfg(feature = "clever")]
 pub mod clever;
 
+#[cfg(feature = "holey-bytes")]
+pub mod holeybytes;
+
 #[cfg(test)]
 pub(crate) mod test;
