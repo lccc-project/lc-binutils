@@ -41,6 +41,13 @@ impl<W: InsnWrite> InsnWrite for HbEncoder<W> {
 
 impl<W: InsnWrite> HbEncoder<W> {
     pub fn write_instruction(&mut self, instruction: Instruction) -> std::io::Result<()> {
+        /// Write operands
+        /// 
+        /// # Syntax
+        /// - `match <expr>`              – match on operand
+        /// - `this: <expr>`              – `self`
+        /// - `transmute: [<type>, …]`    – types to soundly bytecast and write
+        /// - `else: { <typical match> }` – match on different types to manually write
         macro_rules! opwrite {
             (
                 match $match_on:expr;
@@ -57,7 +64,7 @@ impl<W: InsnWrite> HbEncoder<W> {
 
         let (opcode, operands) = instruction.into_pair();
         self.write_all(&[opcode as u8])?;
-        
+
         opwrite! {
             match operands;
             this: self;
