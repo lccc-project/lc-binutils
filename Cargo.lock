@@ -6,6 +6,7 @@ version = 3
 name = "arch-ops"
 version = "0.1.0"
 dependencies = [
+ "delegate",
  "lazy_static",
  "paste",
  "target-tuples",
@@ -54,6 +55,17 @@ dependencies = [
 [[package]]
 name = "dbg-info"
 version = "0.1.0"
+
+[[package]]
+name = "delegate"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ee5df75c70b95bd3aacc8e2fd098797692fb1d54121019c4de481e42f04c8a1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 1.0.103",
+]
 
 [[package]]
 name = "fake-enum"
