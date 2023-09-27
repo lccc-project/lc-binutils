@@ -10,7 +10,7 @@ license = "BSD-2-Clause-Patent"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-delegate = "0.10"
+delegate = "0.9"
 lazy_static = "1"
 target-tuples = "0.5.5"
 paste = "1"
