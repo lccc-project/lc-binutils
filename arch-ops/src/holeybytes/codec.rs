@@ -1,6 +1,14 @@
-use super::Operands;
-
-use {super::Instruction, crate::traits::InsnWrite, delegate::delegate, std::io::Write};
+use {
+    super::{Instruction, Operands},
+    crate::{
+        holeybytes::{
+            OpsA, OpsO, OpsRRA, OpsRRAH, OpsRRO, OpsRROH, OpsRRP, Relative16, Relative32,
+        },
+        traits::InsnWrite,
+    },
+    delegate::delegate,
+    std::io::Write,
+};
 
 pub struct HbEncoder<W> {
     inner: W,
@@ -42,7 +50,7 @@ impl<W: InsnWrite> InsnWrite for HbEncoder<W> {
 impl<W: InsnWrite> HbEncoder<W> {
     pub fn write_instruction(&mut self, instruction: Instruction) -> std::io::Result<()> {
         /// Write operands
-        /// 
+        ///
         /// # Syntax
         /// - `match <expr>`              – match on operand
         /// - `this: <expr>`              – `self`
@@ -56,7 +64,7 @@ impl<W: InsnWrite> HbEncoder<W> {
                 else:      {$($pat:pat => $expr:expr),* $(,)?};
             ) => {
                 match $match_on {
-                    $(Operands::$transty(op) => $this.write_all(&op.encode())?,)*
+                    $(Operands::$transty(op) => $this.write_all(&op.encode()),)*
                     $($pat => $expr),*
                 }
             };
@@ -70,15 +78,34 @@ impl<W: InsnWrite> HbEncoder<W> {
             this: self;
             transmute: [OpsRR, OpsRRR, OpsRRRR, OpsRRB, OpsRRH, OpsRRW, OpsRD, OpsRRD, OpsN];
             else: {
-                Operands::OpsRRA(_) => todo!(),
-                Operands::OpsRRAH(_) => todo!(),
-                Operands::OpsRROH(_) => todo!(),
-                Operands::OpsRRO(_) => todo!(),
-                Operands::OpsRRP(_) => todo!(),
-                Operands::OpsA(_) => todo!(),
-                Operands::OpsO(_) => todo!(),
+                Operands::OpsRRA(OpsRRA(r0, r1, addr)) => {
+                    self.write_all(&[r0.0, r1.0])?;
+                    self.write_addr(64, addr, false)
+                },
+                Operands::OpsRRAH(OpsRRAH(r0, r1, addr, i0)) => {
+                    self.write_all(&[r0.0, r1.0])?;
+                    self.write_addr(64, addr, false)?;
+                    self.write_all(&i0.to_le_bytes())
+                },
+                Operands::OpsRROH(OpsRROH(r0, r1, Relative32(addr), i0)) => {
+                    self.write_all(&[r0.0, r1.0])?;
+                    self.write_addr(32, addr, true)?;
+                    self.write_all(&i0.to_le_bytes())
+                },
+                Operands::OpsRRO(OpsRRO(r0, r1, Relative32(addr))) => {
+                    self.write_all(&[r0.0, r1.0])?;
+                    self.write_addr(32, addr, true)
+                },
+                Operands::OpsRRP(OpsRRP(r0, r1, Relative16(addr))) => {
+                    self.write_all(&[r0.0, r1.0])?;
+                    self.write_addr(16, addr, true)
+                },
+                Operands::OpsA(OpsA(addr))
+                    => self.write_addr(64, addr, false),
+                Operands::OpsO(OpsO(Relative32(addr)))
+                    => self.write_addr(32, addr, true),
             };
-        };
+        }?;
 
         Ok(())
     }
