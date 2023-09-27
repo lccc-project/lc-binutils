@@ -107,8 +107,6 @@ impl<W: InsnWrite> HbEncoder<W> {
                     self.write_addr(32, addr, true)
                 },
             };
-        }?;
-
-        Ok(())
+        }
     }
 }
