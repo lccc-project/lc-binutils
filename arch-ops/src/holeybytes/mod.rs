@@ -103,7 +103,7 @@ operands!(
 /// Define operand types
 /// - Also defines [`raw_ops`] module containing bytecode representation
 ///   of operands
-/// 
+///
 /// # Sigils
 /// - `+`: For defining type whose representation for arch-ops and
 ///   in bytecode is different
