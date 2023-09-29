@@ -39,14 +39,10 @@ impl X86RegisterClass {
     }
 
     /// Whether or not register numbers >16 can be encoded using REX2 (else use EVEX)
+    #[allow(clippy::match_like_matches_macro)] // Match is easier to extend
     pub fn use_rex2(&self) -> bool {
         match self {
-            Self::ByteRex => true,
-            Self::Word => true,
-            Self::Double => true,
-            Self::Quad => true,
-            Self::Cr => true,
-            Self::Dr => true,
+            Self::ByteRex | Self::Word | Self::Double | Self::Quad | Self::Cr | Self::Dr => true,
             _ => false,
         }
     }

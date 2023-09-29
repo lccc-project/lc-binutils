@@ -191,6 +191,7 @@ impl X86InstructionMap {
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive]
+#[allow(clippy::manual_non_exhaustive)] // See above
 pub enum X86EncodingPrefix {
     NoPrefix,
     Rex,
@@ -914,6 +915,8 @@ impl<HasRM, HasReg, HasReg3, HasMask, HasOpcode>
                     _ => return false, // 2 top bits needs REX2 or EVEX
                 }
 
+                // Match is easier to extend
+                #[allow(clippy::single_match)]
                 match self.size {
                     Some(X86RegisterClass::Zmm) => return false, // Need EVEX
                     _ => {}
@@ -1686,7 +1689,7 @@ impl<W: InsnWrite> X86Encoder<W> {
                         ),
                     ))
                 }
-                [oprs @ ..] => todo!("{:?}", oprs),
+                oprs => todo!("{:?}", oprs),
             },
             X86EncodingMode::ModRMOp2(op) => todo!("{}", op),
             X86EncodingMode::OpReg(_) => todo!("+r"),

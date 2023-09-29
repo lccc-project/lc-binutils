@@ -11,6 +11,7 @@ fn main() {
 
     let mut input_file = None::<String>;
 
+    #[allow(clippy::never_loop)] // We need to handle more options than `--version` and `--help`
     while let Some(arg) = args.next() {
         match &*arg {
             "--version" => {
