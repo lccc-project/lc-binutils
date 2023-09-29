@@ -150,10 +150,12 @@ define_operands! {
     + OpsRRA  (Register  , Register, Address             ),
     + OpsRRAH (Register  , Register, Address   , u16     ),
     + OpsRROH (Register  , Register, Relative32, u16     ),
+    + OpsRRPH (Register  , Register, Relative16, u16     ),
     + OpsRRO  (Register  , Register, Relative32          ),
     + OpsRRP  (Register  , Register, Relative16          ),
     + OpsA    (Address                                   ),
     + OpsO    (Relative32                                ),
+    + OpsP    (Relative16                                ),
     = OpsN    (                                          ),
 }
 
