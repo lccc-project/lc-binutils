@@ -268,6 +268,7 @@ impl Archive {
         }
     }
 
+    #[allow(clippy::unused_io_amount)] // FIXME: Ray wrote this code. Is this correct?
     pub fn ranlib(&mut self) -> &mut ArchiveMember {
         if self.symtab.is_none() {
             let mut symtab = ArchiveMember::new();
