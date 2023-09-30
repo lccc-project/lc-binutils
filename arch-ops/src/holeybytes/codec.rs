@@ -2,8 +2,7 @@ use {
     super::{Instruction, Operands},
     crate::{
         holeybytes::{
-            OpsA, OpsO, OpsP, OpsRRA, OpsRRAH, OpsRRO, OpsRROH, OpsRRP, OpsRRPH, Relative16,
-            Relative32,
+            OpsO, OpsP, OpsRRA, OpsRRAH, OpsRRO, OpsRROH, OpsRRP, OpsRRPH, Relative16, Relative32,
         },
         traits::InsnWrite,
     },
@@ -106,10 +105,6 @@ impl<W: InsnWrite> HbEncoder<W> {
                     self.write_all(&[r0.0, r1.0])?;
                     self.write_addr(16, addr, true)
                 },
-                Operands::OpsA(OpsA(addr)) => {
-                    self.write_addr(64, addr, false)
-                },
-
                 Operands::OpsO(OpsO(Relative32(addr))) => {
                     self.write_addr(32, addr, true)
                 },
