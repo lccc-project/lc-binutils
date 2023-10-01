@@ -139,6 +139,7 @@ pub enum RelocCode {
     W65RelaxJmp,
     CleverShort,
     CleverShortPcrel,
+    HbRelaxedRel,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

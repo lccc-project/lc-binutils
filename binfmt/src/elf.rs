@@ -581,7 +581,8 @@ pub mod consts {
             EM_CSKY = 252,          // C-SKY 32-bit processor
             EM_WC65C816 = 257,      // 65816/65c816
 
-            EM_CLEVER = 0x434C, // Clever-ISA
+            EM_CLEVER     = 0x434C, // Clever-ISA
+            EM_HOLEYBYTES = 0xAB1E, // Holey Bytes
         }
     }
 

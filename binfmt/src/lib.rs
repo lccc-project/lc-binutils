@@ -105,6 +105,8 @@ define_formats![
     elf64-x86_64,
     #[cfg(all(feature = "elf64", feature = "clever"))]
     elf64-clever,
+    #[cfg(all(feature = "elf64", feature = "holeybytes"))]
+    elf64-holeybytes,
     #[cfg(feature = "elf32")]
     elf32-genericle,
     #[cfg(feature = "elf32")]
@@ -145,6 +147,9 @@ pub fn def_vec_for(targ: &Target) -> &'static (dyn crate::fmt::Binfmt + Sync + S
             clever-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
             clever-*-cleveros => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
             clever-*-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-clever"],
+            holeybytes-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-holeybytes"],
+            holeybytes-*-*-elf => &*BINARY_FORMATS_BY_NAME["elf64-holeybytes"],
+            holeybytes-*-ableos => &*BINARY_FORMATS_BY_NAME["elf64-holeybytes"],
             * => panic!("Unknown Target")
         }
     }
