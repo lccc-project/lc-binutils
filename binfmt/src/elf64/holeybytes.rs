@@ -101,9 +101,8 @@ impl HowTo for Elf64HoleyBytesHowTo {
         use Elf64HoleyBytesHowTo::*;
         match self {
             None | Abs64 | Dynent | JumpSlot | GlobData | TpOff | DynTpOff => false,
-            Rel16 | Rel32 | RelaxRel | GotPcrel | PltPcrel | GotPcrelRelax | PltRelax | GotDynTpOff => {
-                true
-            }
+            Rel16 | Rel32 | RelaxRel | GotPcrel | PltPcrel | GotPcrelRelax | PltRelax
+            | GotDynTpOff => true,
         }
     }
 
