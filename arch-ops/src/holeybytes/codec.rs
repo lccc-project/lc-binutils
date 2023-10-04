@@ -24,7 +24,7 @@ impl<W> HbEncoder<W> {
     pub fn into_inner(self) -> W {
         self.inner
     }
-  
+
     #[inline]
     pub fn inner(&self) -> &W {
         &self.inner
