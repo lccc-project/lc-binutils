@@ -15,18 +15,22 @@ pub struct HbEncoder<W> {
 }
 
 impl<W> HbEncoder<W> {
+    #[inline]
     pub const fn new(inner: W) -> Self {
         Self { inner }
     }
 
+    #[inline]
     pub fn into_inner(self) -> W {
         self.inner
     }
 
+    #[inline]
     pub fn inner(&self) -> &W {
         &self.inner
     }
 
+    #[inline]
     pub fn inner_mut(&mut self) -> &mut W {
         &mut self.inner
     }
