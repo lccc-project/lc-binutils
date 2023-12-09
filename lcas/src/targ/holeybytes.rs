@@ -377,32 +377,32 @@ impl FromToken for (Register, Address) {
     }
 }
 
-fn from_token_rela<T>(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Address>
-where
-    T: TryFrom<i128> + Into<i64>,
-{
-    match iter.next().ok_or(Error::NotEnoughTokens)? {
-        Token::Identifier(name) => Ok(Address::Symbol { name, disp: 0 }),
-        Token::IntegerLiteral(disp) => Ok(Address::Disp(
-            T::try_from(disp as i128)
-                .map_err(|_| Error::IntTooBig)?
-                .into(),
-        )),
-        _ => Err(Error::UnexpectedToken),
-    }
+// Can't use generic for 1.56 reasons
+macro_rules! from_token_rela {
+    ($for:ty, $iter:expr $(,)?) => {
+        match $iter.next().ok_or(Error::NotEnoughTokens)? {
+            Token::Identifier(name) => Ok(Address::Symbol { name, disp: 0 }),
+            Token::IntegerLiteral(disp) => Ok(Address::Disp(
+                <$for>::try_from(disp as i128)
+                    .map_err(|_| Error::IntTooBig)?
+                    .into(),
+            )),
+            _ => Err(Error::UnexpectedToken),
+        }
+    };
 }
 
 impl FromToken for Relative16 {
     #[inline]
     fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
-        from_token_rela::<i16>(iter).map(Self)
+        from_token_rela!(i16, iter).map(Self)
     }
 }
 
 impl FromToken for Relative32 {
     #[inline]
     fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
-        from_token_rela::<i32>(iter).map(Self)
+        from_token_rela!(i32, iter).map(Self)
     }
 }
 
