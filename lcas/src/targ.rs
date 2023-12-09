@@ -39,7 +39,7 @@ macro_rules! targ_defs{
     {$(#[cfg($cfg:meta)] arch $arch:ident;)*} => {
         $(#[cfg($cfg)] mod $arch;)*
 
-        pub fn get_target_def(arch: Architecture) -> Option<&'static dyn TargetMachine>{
+        pub fn get_target_def(arch: Architecture) -> Option<&'static dyn TargetMachine> {
             match arch.canonical_name(){
                 $(stringify!($arch) => Some($arch :: get_target_def()),)*
                 _ => None,
@@ -49,6 +49,7 @@ macro_rules! targ_defs{
 }
 
 targ_defs! {
-    #[cfg(feature = "clever")] arch clever;
-    #[cfg(feature = "clever")] arch w65;
+    #[cfg(feature = "clever")]      arch clever;
+    #[cfg(feature = "w65")]         arch w65;
+    #[cfg(feature = "holey-bytes")] arch holeybytes;
 }

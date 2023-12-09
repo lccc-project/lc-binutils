@@ -288,3 +288,8 @@ pub fn int_to_bytes_be(val: u128, bytes: &mut [u8]) -> &mut [u8] {
     bytes.copy_from_slice(&val[..bytes.len()]);
     bytes
 }
+
+pub fn float_to_bytes_le(val: f64, bytes: &mut [u8]) -> &mut [u8] {
+    bytes.copy_from_slice(&val.to_le_bytes()[..bytes.len()]);
+    bytes
+}
