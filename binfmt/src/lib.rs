@@ -105,7 +105,7 @@ define_formats![
     elf64-x86_64,
     #[cfg(all(feature = "elf64", feature = "clever"))]
     elf64-clever,
-    #[cfg(all(feature = "elf64", feature = "holeybytes"))]
+    #[cfg(all(feature = "elf64", feature = "holey-bytes"))]
     elf64-holeybytes,
     #[cfg(feature = "elf32")]
     elf32-genericle,

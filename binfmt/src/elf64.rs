@@ -8,7 +8,7 @@ pub mod x86_64;
 #[cfg(feature = "clever")]
 pub mod clever;
 
-#[cfg(feature = "holeybytes")]
+#[cfg(feature = "holey-bytes")]
 pub mod holeybytes;
 
 pub mod genericle {

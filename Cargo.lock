@@ -200,9 +200,9 @@ dependencies = [
 
 [[package]]
 name = "target-tuples"
-version = "0.5.10"
+version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd836add871b78fa854fded9bfc47da0a3be0ba048c80c8a254c791ac30c8822"
+checksum = "79f244e96093a636944c070a216397df56fc85b1d4b8bb1810668d392462d588"
 
 [[package]]
 name = "toml"

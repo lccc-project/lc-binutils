@@ -37,14 +37,14 @@ impl InsnWrite for TestWriter {
 #[test]
 fn test_sanity_writer_write() {
     let mut w = TestWriter { inner: Vec::new() };
-    w.write(&[0u8]).unwrap();
+    w.write_all(&[0u8]).unwrap();
     assert_eq!(&*w.inner, &[0u8]);
 }
 
 #[test]
 fn test_sanity_writer_write_many() {
     let mut w = TestWriter { inner: Vec::new() };
-    w.write(&[0u8, 1u8, 2u8, 3u8]).unwrap();
+    w.write_all(&[0u8, 1u8, 2u8, 3u8]).unwrap();
     assert_eq!(&*w.inner, &[0u8, 1u8, 2u8, 3u8]);
 }
 

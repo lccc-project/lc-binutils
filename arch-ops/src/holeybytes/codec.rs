@@ -80,7 +80,8 @@ impl<W: InsnWrite> HbEncoder<W> {
         opwrite! {
             match operands;
             this: self;
-            transmute: [OpsRR, OpsRRR, OpsRRRR, OpsRRB, OpsRRH, OpsRRW, OpsRD, OpsRRD, OpsN];
+            transmute: [OpsRR, OpsRRR, OpsRRRR, OpsRRB, OpsRRH, OpsRRW,
+                        OpsRB, OpsRH , OpsRW  , OpsRD , OpsRRD, OpsN];
             else: {
                 Operands::OpsRRA(OpsRRA(r0, r1, addr)) => {
                     self.write_all(&[r0.0, r1.0])?;

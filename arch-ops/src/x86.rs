@@ -273,6 +273,38 @@ define_x86_registers! {
     regs [K(0), K(1), K(2), K(3), K(4), K(5), K(6), K(7)]: AvxMask;
 }
 
+macro_rules! reg_required_features{
+    {
+        $([$($regs:pat),* $(,)?]: $($feature:ident)|+;)*
+    } => {
+        impl X86Register{
+            /// Returns the list of features that are required, if any.
+            /// The returned list is disjunctive - IE. the presence of any identified feature is sufficient to enable the register
+            ///
+            /// `None` means the register is available regardless of features
+            pub fn required_feature(&self) -> Option<&[features::X86Feature]>{
+                match self{
+                    $($($regs)|* => Some(&[$(features::X86Feature::$feature),*]),)*
+                    _ => None
+                }
+            }
+        }
+    }
+}
+
+reg_required_features! {
+    [Rl(16..=31), Rw(16..=31), Rd(16..=31), R(16..=31)]: ApxF;
+    [Xmm(16..=31)]: Avx512f | Avx10_128;
+    [Ymm(16..=31)]: Avx512f | Avx10_256;
+    [Zmm(_)]: Avx512f | Avx10_512;
+    [Ymm(_)]: Avx;
+    [Xmm(_)]: Sse;
+    [K(_)]: Avx512f | Avx10;
+    [Tmm(_)]: AmxTile;
+    [Fp(_)]: X87;
+    [Mmx(_)]: Mmx;
+}
+
 impl X86Register {
     pub fn from_class(rclass: X86RegisterClass, rnum: u8) -> Option<X86Register> {
         X86REGISTERS[&rclass].get(rnum as usize).copied()
