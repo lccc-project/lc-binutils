@@ -2,6 +2,7 @@ use std::{
     any::Any,
     collections::{hash_map::Values, HashMap},
     io::{self, Read, Write},
+    ops::BitOr,
     slice::{Iter, IterMut},
 };
 
@@ -51,6 +52,14 @@ pub trait Binfmt {
         Ok(())
     }
     fn before_relocate(&self, _reloc: &mut Reloc, _symbol: &Symbol) {}
+
+    fn create_group(&self, _group: &mut SectionGroup) -> Result<(), CallbackError> {
+        Ok(())
+    }
+
+    fn has_groups(&self) -> bool {
+        false
+    }
 }
 
 impl core::fmt::Debug for dyn Binfmt {
@@ -86,6 +95,7 @@ pub struct BinaryFile<'a> {
     sections: Option<Vec<Section>>,
     symbols: Option<HashMap<String, Symbol>>,
     relocs: Option<Vec<Reloc>>,
+    groups: Option<Vec<SectionGroup>>,
     fmt: &'a dyn Binfmt,
     data: Box<dyn Any>,
     ty: FileType,
@@ -97,6 +107,7 @@ impl<'a> BinaryFile<'a> {
             sections: None,
             symbols: None,
             relocs: None,
+            groups: None,
             fmt,
             data,
             ty,
@@ -134,12 +145,35 @@ impl<'a> BinaryFile<'a> {
         Ok(num as u32)
     }
 
+    pub fn add_section_group(&mut self, mut group: SectionGroup) -> Result<u32, SectionGroup> {
+        if self.groups.is_none() {
+            if !self.fmt.has_groups() {
+                return Err(group);
+            }
+            self.groups = Some(Vec::new());
+        }
+        let groups = self.groups.as_mut().unwrap();
+        let num = groups.len();
+        if num >= (u32::max_value() as usize) {
+            panic!("Too many sections created in a binary file");
+        }
+        if self.fmt.create_group(&mut group).is_err() {
+            return Err(group);
+        }
+        groups.push(group);
+        Ok(num as u32)
+    }
+
     pub fn sections(&self) -> Sections<'_> {
         Sections(self.sections.as_ref().map(|x| x.iter()))
     }
 
     pub fn sections_mut(&mut self) -> SectionsMut<'_> {
         SectionsMut(self.sections.as_mut().map(|x| x.iter_mut()))
+    }
+
+    pub fn section_groups(&self) -> SectionGroups<'_> {
+        SectionGroups(self.groups.as_ref().map(|x| x.iter()))
     }
 
     pub fn get_section(&self, secno: u32) -> Option<&Section> {
@@ -250,6 +284,16 @@ impl<'a> BinaryFile<'a> {
     }
 }
 
+pub struct SectionGroups<'a>(Option<Iter<'a, SectionGroup>>);
+
+impl<'a> Iterator for SectionGroups<'a> {
+    type Item = &'a SectionGroup;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.as_mut().and_then(|x| x.next())
+    }
+}
+
 pub struct Sections<'a>(Option<Iter<'a, Section>>);
 
 impl<'a> Iterator for Sections<'a> {
@@ -310,6 +354,7 @@ pub enum SectionType {
     GlobalOffsetTable,
     RelocationTable,
     RelocationAddendTable,
+    Note,
     FormatSpecific(u32),
 }
 
@@ -319,7 +364,96 @@ impl Default for SectionType {
     }
 }
 
-#[derive(Clone, Debug, Hash, Default)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SectionFlag {
+    Writable,
+    Alloc,
+    Executable,
+    FormatSpecific(u32),
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct SectionFlags(u64);
+
+impl From<SectionFlag> for SectionFlags {
+    #[inline]
+    fn from(value: SectionFlag) -> Self {
+        match value {
+            SectionFlag::Writable => Self(1),
+            SectionFlag::Alloc => Self(2),
+            SectionFlag::Executable => Self(4),
+            SectionFlag::FormatSpecific(val) => {
+                assert!(val.is_power_of_two());
+                Self((val as u64) << 32)
+            }
+        }
+    }
+}
+
+impl BitOr for SectionFlags {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+}
+
+impl BitOr<SectionFlag> for SectionFlags {
+    type Output = Self;
+    #[inline]
+    fn bitor(self, rhs: SectionFlag) -> Self::Output {
+        self | Self::from(rhs)
+    }
+}
+
+impl BitOr<SectionFlags> for SectionFlag {
+    type Output = SectionFlags;
+    #[inline]
+    fn bitor(self, rhs: SectionFlags) -> Self::Output {
+        SectionFlags::from(self) | rhs
+    }
+}
+
+impl BitOr for SectionFlag {
+    type Output = SectionFlags;
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self::Output {
+        SectionFlags::from(self) | SectionFlags::from(rhs)
+    }
+}
+
+pub struct SectionFlagsIter(u64);
+
+impl Iterator for SectionFlagsIter {
+    type Item = SectionFlag;
+
+    fn next(&mut self) -> Option<SectionFlag> {
+        let pos = self.0.trailing_zeros();
+        if pos == 64 {
+            return None;
+        } else {
+            self.0 &= !(1 << pos);
+            Some(match pos {
+                0 => SectionFlag::Writable,
+                1 => SectionFlag::Alloc,
+                2 => SectionFlag::Executable,
+                val => SectionFlag::FormatSpecific(1 << (val - 32)),
+            })
+        }
+    }
+}
+
+impl IntoIterator for SectionFlags {
+    type IntoIter = SectionFlagsIter;
+    type Item = SectionFlag;
+    fn into_iter(self) -> Self::IntoIter {
+        SectionFlagsIter(self.0)
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct Section {
     pub name: String,
     pub align: usize,
@@ -329,6 +463,7 @@ pub struct Section {
     pub relocs: Vec<Reloc>,
     pub info: u64,
     pub link: u64,
+    pub flags: Option<SectionFlags>,
     #[doc(hidden)]
     pub __private: (),
 }
@@ -417,6 +552,30 @@ impl Write for Section {
     fn flush(&mut self) -> io::Result<()> {
         self.content.flush()
     }
+}
+
+#[derive(Copy, Clone, Debug, Hash)]
+#[non_exhaustive]
+pub enum GroupType {
+    Normal,
+    LinkOnce,
+    FormatSpecific(u32),
+}
+
+impl Default for GroupType {
+    fn default() -> Self {
+        GroupType::Normal
+    }
+}
+
+#[derive(Clone, Debug, Hash, Default)]
+pub struct SectionGroup {
+    pub name: String,
+    pub sections: Vec<u32>,
+    pub group_type: GroupType,
+    pub id_sym: String,
+    #[doc(hidden)]
+    pub __private: (),
 }
 
 #[cfg(test)]

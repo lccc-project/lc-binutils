@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::io::{ErrorKind, SeekFrom};
 use std::marker::PhantomData;
@@ -10,7 +11,7 @@ use arch_ops::disasm::OpcodePrinter;
 use bytemuck::{Pod, Zeroable};
 
 use crate::debug::PrintHex;
-use crate::fmt::{BinaryFile, Binfmt, FileType, Section, SectionType};
+use crate::fmt::{BinaryFile, Binfmt, FileType, Section, SectionFlag, SectionType};
 use crate::howto::HowTo;
 use crate::sym::{SymbolKind, SymbolType};
 use crate::traits::private::Sealed;
@@ -693,6 +694,7 @@ pub mod consts {
             SHT_REL = 9,
             SHT_SHLIB = 10,
             SHT_DYNSYM = 11,
+            SHT_GROUP = 17,
         }
     }
 }
@@ -1172,6 +1174,14 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
         bfile: &crate::fmt::BinaryFile,
     ) -> std::io::Result<()> {
         let mut shstrtab = (Vec::new(), HashMap::new());
+        fn strtab_cmp(haystack: &[u8], needle: &str) -> bool {
+            let len = needle.len();
+            if haystack.len() == len || haystack[len] == 0 {
+                &haystack[..len] == needle.as_bytes()
+            } else {
+                false
+            }
+        }
         fn add_to_strtab<'a>(
             strtab: &mut (Vec<u8>, HashMap<Cow<'a, str>, usize>),
             string: Cow<'a, str>,
@@ -1205,8 +1215,40 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             sh_addralign: Class::Addr::from_usize(0),
             sh_entsize: Class::Size::from_usize(0),
         });
-        for section in bfile.sections() {
-            let is_nobits = section.ty == SectionType::NoBits || section.content.is_empty();
+
+        let mut sections_in_group = HashSet::new();
+
+        for group in bfile.section_groups() {
+            for &section in &group.sections {
+                sections_in_group.insert(section);
+            }
+        }
+
+        for (idx, section) in bfile.sections().enumerate() {
+            let is_nobits = section.ty == SectionType::NoBits
+                || (section.content.is_empty() && section.ty == SectionType::ProgBits);
+            let flags = section
+                .flags
+                .map(|flags| {
+                    let mut bits = 0;
+
+                    for flag in flags {
+                        bits |= match flag {
+                            SectionFlag::Writable => 1,
+                            SectionFlag::Alloc => 2,
+                            SectionFlag::Executable => 4,
+                            SectionFlag::FormatSpecific(num) => num,
+                        };
+                    }
+                    bits
+                })
+                .unwrap_or(7);
+
+            let shf_group = if sections_in_group.contains(&(idx as u32)) {
+                0x200
+            } else {
+                0
+            };
             #[allow(clippy::needless_borrow)]
             shdrs.push(ElfSectionHeader::<Class> {
                 sh_name: Class::Word::from_usize(add_to_strtab(
@@ -1222,6 +1264,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                             consts::SHT_PROGBITS
                         }
                     }
+                    SectionType::Note => consts::SHT_NOTE,
                     SectionType::SymbolTable => consts::SHT_SYMTAB,
                     SectionType::StringTable => consts::SHT_STRTAB,
                     SectionType::Dynamic => consts::SHT_DYNAMIC,
@@ -1232,7 +1275,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                     SectionType::RelocationTable => todo!(),
                     SectionType::RelocationAddendTable => todo!(),
                 },
-                sh_flags: Class::Offset::from_usize(7),
+                sh_flags: Class::Offset::from_usize((flags | shf_group) as usize),
                 sh_addr: Class::Addr::from_usize(0),
                 sh_offset: Class::Offset::from_usize(offset),
                 sh_size: Class::Size::from_usize(section.content.len() + section.tail_size),
@@ -1247,6 +1290,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 0
             };
         }
+
         let mut new_symbol_list: Vec<_> = bfile.symbols().cloned().collect();
         new_symbol_list.sort_by_key(|s1| s1.kind());
         let mut num_reloc_sections = 0;
@@ -1308,8 +1352,36 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 Class::Half::from_usize(sym.section().map_or(0, |x| x as usize + 1)),
             ));
         }
-        let symbols_sec: Vec<u8> = Vec::from(bytemuck::cast_slice(&symbols));
+
+        let symbols_sec = bytemuck::cast_slice(&symbols);
         let symbols_sec_id = shdrs.len();
+        for group in bfile.section_groups() {
+            let sh_link = symbols_sec_id;
+            let mut sh_info = 0;
+            for (n, sym) in symbols.iter().enumerate() {
+                if strtab_cmp(&strtab.0[sym.name_idx().as_usize()..], &group.id_sym) {
+                    sh_info = n;
+                }
+            }
+            let size = group.sections.len() * 4;
+            shdrs.push(ElfSectionHeader::<Class> {
+                sh_name: Class::Word::from_usize(add_to_strtab(
+                    &mut shstrtab,
+                    (&group.name).into(),
+                )),
+                sh_type: consts::SHT_GROUP,
+                sh_flags: Class::Offset::from_usize(0),
+                sh_addr: Class::Addr::from_usize(0),
+                sh_offset: Class::Offset::from_usize(offset),
+                sh_size: Class::Size::from_usize(size),
+                sh_link: Class::Word::from_usize(sh_link),
+                sh_info: Class::Word::from_usize(sh_info),
+                sh_addralign: Class::Addr::from_usize(4),
+                sh_entsize: Class::Size::from_usize(0),
+            });
+
+            offset += size;
+        }
         shdrs.push(ElfSectionHeader::<Class> {
             sh_name: Class::Word::from_usize(add_to_strtab(&mut shstrtab, ".symtab".into())),
             sh_type: consts::SHT_SYMTAB,
@@ -1408,6 +1480,18 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
             arch_ops::traits::default_write_zeroes(&mut *file, section.tail_size)?;
         }
         file.write_all(&symbols_sec)?;
+        for group in bfile.section_groups() {
+            let mut entries = Vec::new();
+            let grp_flags = match group.group_type {
+                crate::fmt::GroupType::Normal => 0,
+                crate::fmt::GroupType::LinkOnce => 1,
+                crate::fmt::GroupType::FormatSpecific(n) => n,
+            };
+            entries.push(grp_flags);
+            entries.extend(group.sections.iter().map(|&n| n + 1));
+
+            file.write_all(bytemuck::cast_slice(&entries))?;
+        }
         file.write_all(&all_relocs)?;
         file.write_all(&strtab.0)?;
         file.write_all(&shstrtab.0)?;
