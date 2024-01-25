@@ -333,17 +333,32 @@ impl core::fmt::Display for X86Operand {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub enum X86Displacement {
+    Offset(i32),
+    Addr(Address),
+}
+
+impl core::fmt::Display for X86Displacement {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            Self::Offset(val) => val.fmt(f),
+            Self::Addr(addr) => addr.fmt(f),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum X86MemoryOperand {
     Indirect {
         reg: X86Register,
-        disp: Option<Address>,
+        disp: Option<X86Displacement>,
     },
     IndirectSib {
         scale: u8,
         index: X86Register,
         base: Option<X86Register>,
-        disp: Option<Address>,
+        disp: Option<X86Displacement>,
     },
     RelAddr(Address),
     AbsAddr(Address),
@@ -786,7 +801,7 @@ pub struct ModRMBuilder<HasRM, HasReg, HasReg3, HasMask, HasOpcode> {
     /// [0]=>b,[1]=>x,[2]=>r
     reg_top_bits: [u8; 3],
     modrm_byte: u8,
-    disp: Option<Address>,
+    disp: Option<X86Displacement>,
     size: Option<X86RegisterClass>,
     reg3: Option<u8>,
     mode: X86Mode,
@@ -994,7 +1009,7 @@ impl<HasRM, HasReg, HasReg3, HasMask> ModRMBuilder<HasRM, HasReg, HasReg3, HasMa
         }
 
         if let Some(addr) = &self.disp {
-            let size = if (self.modrm_byte & 0xC0) == 0x80 {
+            let size = if (self.modrm_byte & 0o300) == 0o100 {
                 8
             } else if self.mode == X86Mode::Real || self.mode == X86Mode::Virtual8086 {
                 16
@@ -1002,7 +1017,15 @@ impl<HasRM, HasReg, HasReg3, HasMask> ModRMBuilder<HasRM, HasReg, HasReg3, HasMa
                 32
             };
 
-            writer.write_addr(size, addr.clone(), self.rel_addr)?;
+            match addr {
+                X86Displacement::Addr(addr) => {
+                    writer.write_addr(size, addr.clone(), self.rel_addr)?
+                }
+                X86Displacement::Offset(val) => {
+                    let val = val.to_le_bytes();
+                    writer.write_all(&val[..(size >> 3)])?;
+                }
+            }
         }
 
         Ok(())
@@ -1145,15 +1168,6 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                         let class = reg.class();
                         self.addr_size = Some(class);
                         if class == X86RegisterClass::Word {
-                            let (mode, addr) = match (reg, disp) {
-                                (X86Register::Bp, None) => (0o100, Some(Address::Abs(0))),
-                                (_, None) => (0o000, None),
-                                (_, Some(Address::Abs(x))) if x < 256 => {
-                                    (0o100, Some(Address::Abs(x)))
-                                }
-                                (_, Some(addr)) => (0o200, Some(addr)),
-                            };
-
                             let rm = match reg {
                                 X86Register::Si => 0o4,
                                 X86Register::Di => 0o5,
@@ -1166,6 +1180,17 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                                     ))
                                 }
                             };
+                            let (mode, addr) = match (rm, disp) {
+                                (0o006, None) => (0o100, Some(X86Displacement::Offset(0))),
+                                (_, None) => (0o000, None),
+                                (_, Some(X86Displacement::Offset(x))) if x < 256 && x >= 0 => {
+                                    (0o100, Some(X86Displacement::Offset(x)))
+                                }
+                                (_, Some(X86Displacement::Addr(Address::Abs(x)))) if x < 256 => {
+                                    (0o100, Some(X86Displacement::Addr(Address::Abs(x))))
+                                }
+                                (_, Some(addr)) => (0o200, Some(addr)),
+                            };
 
                             self.modrm_byte = (self.modrm_byte & 0o070) | mode | rm;
                             self.disp = addr;
@@ -1174,10 +1199,13 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                             let rm = regno & 0o7;
                             self.reg_top_bits[0] = regno >> 3;
                             let (mode, addr) = match (rm, disp) {
-                                (0o005, None) => (0o100, Some(Address::Abs(0))),
+                                (0o005, None) => (0o100, Some(X86Displacement::Offset(0))),
                                 (_, None) => (0o000, None),
-                                (_, Some(Address::Abs(x))) if x < 256 => {
-                                    (0o100, Some(Address::Abs(x)))
+                                (_, Some(X86Displacement::Offset(x))) if x < 256 && x >= 0 => {
+                                    (0o100, Some(X86Displacement::Offset(x)))
+                                }
+                                (_, Some(X86Displacement::Addr(Address::Abs(x)))) if x < 256 => {
+                                    (0o100, Some(X86Displacement::Addr(Address::Abs(x))))
                                 }
                                 (_, Some(addr)) => (0o200, Some(addr)),
                             };
@@ -1207,10 +1235,15 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                             }
 
                             let (mode, disp) = match (index, base, disp) {
-                                (X86Register::Bp, None, None) => (0o100, Some(Address::Abs(0))),
+                                (X86Register::Bp, None, None) => {
+                                    (0o100, Some(X86Displacement::Offset(0)))
+                                }
                                 (_, _, None) => (0o000, None),
-                                (_, _, Some(Address::Abs(x))) if x < 256 => {
-                                    (0o100, Some(Address::Abs(x)))
+                                (_, _, Some(X86Displacement::Offset(x))) if x < 256 => {
+                                    (0o100, Some(X86Displacement::Offset(x)))
+                                }
+                                (_, _, Some(X86Displacement::Addr(Address::Abs(x)))) if x < 256 => {
+                                    (0o100, Some(X86Displacement::Addr(Address::Abs(x))))
                                 }
                                 (_, _, Some(addr)) => (0o200, Some(addr)),
                             };
@@ -1270,10 +1303,13 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                             let base = base.map(X86Register::regnum).unwrap_or(0o005) & 0o007;
 
                             let (mode, disp) = match (base, disp) {
-                                (5, None) => (0o100, Some(Address::Abs(0))),
+                                (5, None) => (0o100, Some(X86Displacement::Offset(0))),
                                 (_, None) => (0o000, None),
-                                (_, Some(Address::Abs(x))) if x < 256 => {
-                                    (0o100, Some(Address::Abs(x)))
+                                (_, Some(X86Displacement::Offset(x))) if x < 256 => {
+                                    (0o100, Some(X86Displacement::Offset(x)))
+                                }
+                                (_, Some(X86Displacement::Addr(Address::Abs(x)))) if x < 256 => {
+                                    (0o100, Some(X86Displacement::Addr(Address::Abs(x))))
                                 }
                                 (_, Some(addr)) => (0o0200, Some(addr)),
                             };
@@ -1288,7 +1324,7 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                     X86MemoryOperand::RelAddr(addr) => {
                         self.rel_addr = true;
                         self.modrm_byte = (self.modrm_byte & 0o070) | 0o005;
-                        self.disp = Some(addr);
+                        self.disp = Some(X86Displacement::Addr(addr));
                     }
                     X86MemoryOperand::AbsAddr(_) => todo!(),
                 }

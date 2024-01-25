@@ -314,51 +314,67 @@ x86_codegen_instructions! {
     }
     insn jo {
         [RelAddr(8)] => NoPrefix 0x70 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F80 @ OpcodeOnly;
     }
     insn jno{
         [RelAddr(8)] => NoPrefix 0x71 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F81 @ OpcodeOnly;
     }
     insn jb{
         [RelAddr(8)] => NoPrefix 0x72 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F82 @ OpcodeOnly;
     }
     insn jnb{
         [RelAddr(8)] => NoPrefix 0x73 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F83 @ OpcodeOnly;
     }
     insn jz {
         [RelAddr(8)] => NoPrefix 0x74 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F84 @ OpcodeOnly;
     }
     insn jnz{
         [RelAddr(8)] => NoPrefix 0x75 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F85 @ OpcodeOnly;
     }
     insn jbe{
         [RelAddr(8)] => NoPrefix 0x76 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F86 @ OpcodeOnly;
     }
     insn jnbe{
         [RelAddr(8)] => NoPrefix 0x77 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F87 @ OpcodeOnly;
     }
     insn js{
         [RelAddr(8)] => NoPrefix 0x78 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F88 @ OpcodeOnly;
     }
     insn jns{
         [RelAddr(8)] => NoPrefix 0x79 @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F89 @ OpcodeOnly;
     }
     insn jp{
         [RelAddr(8)] => NoPrefix 0x7A @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F8A @ OpcodeOnly;
     }
     insn jnp{
         [RelAddr(8)] => NoPrefix 0x7B @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F8B @ OpcodeOnly;
     }
     insn jl{
         [RelAddr(8)] => NoPrefix 0x7C @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F8C @ OpcodeOnly;
     }
     insn jnl{
         [RelAddr(8)] => NoPrefix 0x7D @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F8D @ OpcodeOnly;
     }
     insn jle{
         [RelAddr(8)] => NoPrefix 0x7E @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F8E @ OpcodeOnly;
     }
     insn jnle{
         [RelAddr(8)] => NoPrefix 0x7F @ OpcodeOnly;
+        [RelAddr(16 | 32)] => NoPrefix 0x0F8F @ OpcodeOnly;
     }
     insn test{
         [MemOrReg(Byte),Reg(Byte)] => NoPrefix | Rex | Rex2 0x84 @ ModRM(ModRMOptions::NONE);
@@ -481,5 +497,53 @@ x86_codegen_instructions! {
         [RelAddr(16)] => NoPrefix 0xE9 @ OffsetImm(16);
         [RelAddr(32)] => NoPrefix 0xE9 @ OffsetImm(32);
         [MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0xFF @ ModRMControl(4,ModRMOptions::NONE);
+    }
+    insn cmova{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F47 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovae{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F43 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovb{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F42 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovbe{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F46 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmove{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F44 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovg{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F4F @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovge{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F4D @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovl{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F4C @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovle{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F4E @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovne{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F45 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovno{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F41 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovnp{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F4B @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovo{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F40 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovp{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F4A @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovs{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F48 @ ModRM(ModRMOptions::NONE);
+    }
+    insn cmovns{
+        [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F49 @ ModRM(ModRMOptions::NONE);
     }
 }
