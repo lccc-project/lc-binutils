@@ -313,68 +313,84 @@ x86_codegen_instructions! {
         [StringAddr(Word | Double, Si | Esi | Edi)] => NoPrefix | Rex | Rex2 0x6F @ OpcodeOnly;
     }
     insn jo {
-        [RelAddr(8)] => NoPrefix 0x70 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F80 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x70 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F80 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F80 @ OffsetImm(32);
     }
     insn jno{
-        [RelAddr(8)] => NoPrefix 0x71 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F81 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x71 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F81 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F81 @ OffsetImm(32);
     }
     insn jb{
-        [RelAddr(8)] => NoPrefix 0x72 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F82 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x72 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F82 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F82 @ OffsetImm(32);
     }
     insn jnb{
-        [RelAddr(8)] => NoPrefix 0x73 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F83 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x73 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F83 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F83 @ OffsetImm(32);
     }
     insn jz {
-        [RelAddr(8)] => NoPrefix 0x74 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F84 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x74 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F84 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F84 @ OffsetImm(32);
     }
     insn jnz{
-        [RelAddr(8)] => NoPrefix 0x75 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F85 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x75 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F85 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F85 @ OffsetImm(32);
     }
     insn jbe{
-        [RelAddr(8)] => NoPrefix 0x76 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F86 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x76 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F86 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F86 @ OffsetImm(32);
     }
     insn jnbe{
-        [RelAddr(8)] => NoPrefix 0x77 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F87 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x77 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F87 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F87 @ OffsetImm(32);
     }
     insn js{
-        [RelAddr(8)] => NoPrefix 0x78 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F88 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x78 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F88 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F88 @ OffsetImm(32);
     }
     insn jns{
-        [RelAddr(8)] => NoPrefix 0x79 @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F89 @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x79 @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F89 @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F89 @ OffsetImm(32);
     }
     insn jp{
-        [RelAddr(8)] => NoPrefix 0x7A @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F8A @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x7A @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F8A @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F8A @ OffsetImm(32);
     }
     insn jnp{
-        [RelAddr(8)] => NoPrefix 0x7B @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F8B @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x7B @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F8B @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F8B @ OffsetImm(32);
     }
     insn jl{
-        [RelAddr(8)] => NoPrefix 0x7C @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F8C @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x7C @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F8C @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F8C @ OffsetImm(32);
     }
     insn jnl{
-        [RelAddr(8)] => NoPrefix 0x7D @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F8D @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x7D @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F8D @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F8D @ OffsetImm(32);
     }
     insn jle{
-        [RelAddr(8)] => NoPrefix 0x7E @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F8E @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x7E @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F8E @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F8E @ OffsetImm(32);
     }
     insn jnle{
-        [RelAddr(8)] => NoPrefix 0x7F @ OpcodeOnly;
-        [RelAddr(16 | 32)] => NoPrefix 0x0F8F @ OpcodeOnly;
+        [RelAddr(8)] => NoPrefix 0x7F @ OffsetImm(8);
+        [RelAddr(16)] => NoPrefix 0x0F8F @ OffsetImm(16);
+        [RelAddr(32)] => NoPrefix 0x0F8F @ OffsetImm(32);
     }
     insn test{
         [MemOrReg(Byte),Reg(Byte)] => NoPrefix | Rex | Rex2 0x84 @ ModRM(ModRMOptions::NONE);
