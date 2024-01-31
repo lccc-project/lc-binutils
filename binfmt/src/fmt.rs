@@ -218,13 +218,7 @@ impl<'a> BinaryFile<'a> {
             return Ok(x);
         }
         {
-            let mut sym = Symbol::new(
-                name.to_string(),
-                None,
-                None,
-                SymbolType::Null,
-                SymbolKind::Local,
-            );
+            let mut sym = Symbol::new_undef(name.to_string(), SymbolType::Null, SymbolKind::Local);
             self.fmt.create_symbol(&mut sym)?;
             symtab.insert(name.to_string(), sym);
             Ok(symtab.get_mut(name).unwrap())

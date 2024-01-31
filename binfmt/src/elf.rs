@@ -1148,13 +1148,31 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                         let value = sym.value().as_u64() as u128;
                         let section = (sym.section().as_u64() as u32).checked_sub(1);
 
-                        let sym = crate::sym::Symbol::new(
-                            name,
-                            section,
-                            section.map(|_| value),
-                            SymbolType::Object,
-                            SymbolKind::Local,
-                        );
+                        let ty = match sym.info().as_usize() & 0xf {
+                            0 => SymbolType::Null,
+                            1 => SymbolType::Object,
+                            2 => SymbolType::Function,
+                            5 => SymbolType::Common,
+                            6 => SymbolType::Tls,
+                            val => SymbolType::FormatSpecific(val as u32),
+                        };
+
+                        let bind = match sym.info().as_usize() >> 4 {
+                            0 => SymbolKind::Local,
+                            1 => SymbolKind::Global,
+                            2 => SymbolKind::Weak,
+                            val => SymbolKind::FormatSpecific(val as u32),
+                        };
+
+                        let size = sym.size().as_usize() as u64;
+
+                        let mut sym = if let Some(section) = section {
+                            crate::sym::Symbol::new(name, section, value, ty, bind)
+                        } else {
+                            crate::sym::Symbol::new_undef(name, ty, bind)
+                        };
+
+                        *sym.size_mut() = Some(size);
 
                         syms.push(sym);
                     }
@@ -1299,10 +1317,8 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                 num_reloc_sections += 1;
                 for reloc in &section.relocs {
                     if !new_symbol_list.iter().any(|x| x.name() == reloc.symbol) {
-                        new_symbol_list.push(crate::sym::Symbol::new(
+                        new_symbol_list.push(crate::sym::Symbol::new_undef(
                             reloc.symbol.clone(),
-                            None,
-                            None,
                             SymbolType::Null,
                             SymbolKind::Global,
                         ));
@@ -1328,7 +1344,7 @@ impl<Class: ElfClass + 'static, Howto: HowTo + 'static> Binfmt for ElfFormat<Cla
                     String::from(sym.name()).into(),
                 )),
                 Class::Addr::from_usize(sym.value().map_or(0, |x| x as usize)),
-                Class::Size::from_usize(0usize),
+                Class::Size::from_usize(sym.size().unwrap_or(0) as usize),
                 (match sym.kind() {
                     SymbolKind::Local => {
                         local_syms += 1;

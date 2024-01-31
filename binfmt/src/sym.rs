@@ -5,22 +5,35 @@ pub struct Symbol {
     secno: Option<u32>,
     symtype: SymbolType,
     kind: SymbolKind,
+    size: Option<u64>,
 }
 
 impl Symbol {
     pub fn new(
         name: String,
-        section: Option<u32>,
-        value: Option<u128>,
+        section: u32,
+        value: u128,
         symtype: SymbolType,
         kind: SymbolKind,
     ) -> Self {
         Self {
             name,
-            value,
-            secno: section,
+            value: Some(value),
+            secno: Some(section),
             symtype,
             kind,
+            size: None,
+        }
+    }
+
+    pub fn new_undef(name: String, symtype: SymbolType, kind: SymbolKind) -> Self {
+        Self {
+            name,
+            value: None,
+            secno: None,
+            symtype,
+            kind,
+            size: None,
         }
     }
 
@@ -58,6 +71,14 @@ impl Symbol {
 
     pub fn kind_mut(&mut self) -> &mut SymbolKind {
         &mut self.kind
+    }
+
+    pub fn size(&self) -> Option<u64> {
+        self.size
+    }
+
+    pub fn size_mut(&mut self) -> &mut Option<u64> {
+        &mut self.size
     }
 }
 
