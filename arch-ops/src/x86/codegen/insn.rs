@@ -50,7 +50,7 @@ macro_rules! x86_codegen_instructions {
                     use X86OperandMode::*;
                     use X86Register::*;
                     use X86RegisterClass::*;
-                    use X86RegisterClass::{Cr,Dr};
+                    use X86RegisterClass::{Cr,Dr, Xmm, Ymm, Zmm};
                     match self{
                         $(Self::[<$mnemonic:camel>] => {
                             $({
@@ -86,7 +86,7 @@ macro_rules! x86_codegen_instructions {
                     use X86OperandMode::*;
                     use X86Register::*;
                     use X86RegisterClass::*;
-                    use X86RegisterClass::{Cr,Dr};
+                    use X86RegisterClass::{Cr,Dr, Xmm, Ymm, Zmm};
                     match self{
                         $(Self::[<$mnemonic:camel>] => {
                             match oprs{
@@ -95,14 +95,17 @@ macro_rules! x86_codegen_instructions {
                                     $(({
                                         (oprs.get({let i = idx; idx += 1; i}).map(|opr| opr.matches_mode(|md| matches!(md,$oprs))).unwrap_or(false))
                                     })&&)* (oprs.len()==idx)
-                                } =>Some(X86Encoding{
-                                    map: X86InstructionMap::from_opcode($opcode).unwrap(),
-                                    base_opcode: ($opcode&0xFF) as u8,
-                                    mode: $encoding_mode,
-                                    allowed_modes: expand_opt!($(&[$(X86Mode::$modes),*])?),
-                                    sse_prefix: SsePrefix::from_opcode($opcode),
-                                    imm_size: expand_or_zero!($($immsize)?)
-                                }),)*
+                                } =>{
+                                    let opcode: u32 = $opcode;
+                                    Some(X86Encoding{
+                                        map: X86InstructionMap::from_opcode(opcode).unwrap(),
+                                        base_opcode: (opcode&0xFF) as u8,
+                                        mode: $encoding_mode,
+                                        allowed_modes: expand_opt!($(&[$(X86Mode::$modes),*])?),
+                                        sse_prefix: SsePrefix::from_opcode(opcode),
+                                        imm_size: expand_or_zero!($($immsize)?)
+                                    })
+                                })*
                                 _ => None
                             }
                         })*
@@ -561,5 +564,45 @@ x86_codegen_instructions! {
     }
     insn cmovns{
         [Reg(Word | Double | Quad), MemOrReg(Word | Double | Quad)] => NoPrefix | Rex | Rex2 0x0F49 @ ModRM(ModRMOptions::NONE);
+    }
+    insn movdqa{
+        [Reg(Xmm), MemOrReg(Xmm)] => NoPrefix | Rex 0x66000F6F @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm), Reg(Xmm)] => NoPrefix | Rex 0x66000F7F @ ModRM(ModRMOptions::NONE);
+    }
+    insn movdqu{
+        [Reg(Xmm), MemOrReg(Xmm)] => NoPrefix | Rex 0xF3000F6F @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm), Reg(Xmm)] => NoPrefix | Rex 0xF3000F7F @ ModRM(ModRMOptions::NONE);
+    }
+    insn vmovdqa{
+        [Reg(Xmm | Ymm), MemOrReg(Xmm | Ymm)] => Vex 0x66000F6F @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm | Ymm), Reg(Xmm | Ymm)] => Vex 0x66000F7F @ ModRM(ModRMOptions::NONE);
+    }
+    insn vmovdqu{
+        [Reg(Xmm | Ymm), MemOrReg(Xmm | Ymm)] => Vex 0xF3000F6F @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm | Ymm), Reg(Xmm | Ymm)] => Vex 0xF3000F7F @ ModRM(ModRMOptions::NONE);
+    }
+    insn vmovdqa32{
+        [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Evex 0x66000F6F @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm | Ymm | Zmm), Reg(Xmm | Ymm | Zmm)] => Evex 0x66000F7F @ ModRM(ModRMOptions::NONE);
+    }
+    insn vmovdqu32{
+        [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Evex 0xF3000F6F @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm | Ymm | Zmm), Reg(Xmm | Ymm | Zmm)] => Evex 0xF3000F7F @ ModRM(ModRMOptions::NONE);
+    }
+    insn movaps{
+        [Reg(Xmm), MemOrReg(Xmm)] => NoPrefix | Rex 0x0F28 @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm), Reg(Xmm)] => NoPrefix | Rex 0x0F29 @ ModRM(ModRMOptions::NONE);
+    }
+    insn movups{
+        [Reg(Xmm), MemOrReg(Xmm)] => NoPrefix | Rex 0x0F10 @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm), Reg(Xmm)] => NoPrefix | Rex 0x0F11 @ ModRM(ModRMOptions::NONE);
+    }
+    insn vmovaps{
+        [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F28 @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm | Ymm | Zmm), Reg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F29 @ ModRM(ModRMOptions::NONE);
+    }
+    insn vmovups{
+        [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F10 @ ModRM(ModRMOptions::NONE);
+        [MemOrReg(Xmm | Ymm | Zmm), Reg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F11 @ ModRM(ModRMOptions::NONE);
     }
 }
