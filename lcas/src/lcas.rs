@@ -432,8 +432,8 @@ fn main() {
         let sec = secnos[sec];
         let sym = Symbol::new(
             name.clone(),
-            Some(sec),
-            Some(*offset as u128),
+            sec,
+            *offset as u128,
             binfmt::sym::SymbolType::Object,
             if data.global_syms.contains(name) {
                 SymbolKind::Global
