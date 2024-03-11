@@ -605,4 +605,19 @@ x86_codegen_instructions! {
         [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F10 @ ModRM(ModRMOptions::NONE);
         [MemOrReg(Xmm | Ymm | Zmm), Reg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F11 @ ModRM(ModRMOptions::NONE);
     }
+    insn xorps{
+        [Reg(Xmm), MemOrReg(Xmm)] => NoPrefix | Rex 0x0F57 @ ModRM(ModRMOptions::NONE);
+    }
+    insn vxorps{
+        [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Vex | Evex 0x0F57 @ ModRM(ModRMOptions::NONE);
+    }
+    insn pxor{
+        [Reg(Xmm), MemOrReg(Xmm)] => NoPrefix | Rex 0x66000FEF @ ModRM(ModRMOptions::NONE);
+    }
+    insn vpxor{
+        [Reg(Xmm | Ymm), MemOrReg(Xmm | Ymm)] => Vex 0x66000FEF @ ModRM(ModRMOptions::NONE);
+    }
+    insn vpxord{
+        [Reg(Xmm | Ymm | Zmm), MemOrReg(Xmm | Ymm | Zmm)] => Evex 0x66000FEF @ ModRM(ModRMOptions::NONE);
+    }
 }
