@@ -8,10 +8,7 @@ use core::{
 };
 
 extern crate alloc;
-use alloc::{
-    string::{FromUtf16Error, FromUtf8Error, String},
-    vec::Vec,
-};
+use alloc::string::{FromUtf16Error, FromUtf8Error};
 
 pub mod raw {
     use core::num::NonZeroU32;
