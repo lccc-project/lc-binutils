@@ -2,7 +2,6 @@
 
 use core::{
     char::CharTryFromError,
-    convert::TryFrom,
     ops::{Deref, DerefMut, Index, IndexMut},
     slice::SliceIndex,
 };

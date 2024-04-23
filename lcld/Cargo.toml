@@ -2,7 +2,8 @@
 name = "lcld"
 version = "0.1.0"
 authors = ["Connor Horman <chorman64@gmail.com>", "Ray Redondo <rdrpenguin04@gmail.com>"]
-edition = "2018"
+edition = "2021"
+rust-version = "1.74"
 license = "BSD-2-Clause-Patent"
 build = "build/main.rs"
 

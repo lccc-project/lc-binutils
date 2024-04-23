@@ -1,5 +1,4 @@
 use std::{
-    convert::TryFrom,
     io::{ErrorKind, Read, Write},
     ops::{Range, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive},
 };
@@ -1058,7 +1057,7 @@ macro_rules! nop_instructions{
 nop_instructions!(NOP0: Nop10, NOP1: Nop11, NOP2: Nop12, NOP3: Nop13);
 
 macro_rules! print_h_field{
-    [$(($enum:ident {$($h:pat,)* $(, ..)?} => |$fmt:pat| $e:expr)),* $(,)?] => {
+    [$(($enum:ident {$($h:pat,)* $(, ..)?} => |$fmt:pat_param| $e:expr)),* $(,)?] => {
         impl core::fmt::Display for CleverOpcode{
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result{
                 f.write_str(self.name())?;
@@ -1533,7 +1532,7 @@ impl CleverInstruction {
 
 impl core::fmt::Display for CleverInstruction {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.opcode().fmt(f)?;
+        write!(f, "{:?}", self.opcode())?;
 
         match self.opcode().operands() {
             CleverOperandKind::Size => {

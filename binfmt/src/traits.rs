@@ -2,14 +2,10 @@ use bytemuck::Pod;
 
 use crate::traits::private::Sealed;
 use core::{
-    convert::TryInto,
     fmt::{Debug, LowerHex},
     ops::*,
 };
-use std::{
-    convert::TryFrom,
-    io::{Read, Seek},
-};
+use std::io::{Read, Seek};
 
 #[doc(hidden)]
 pub(crate) mod private {

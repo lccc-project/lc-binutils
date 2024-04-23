@@ -1,7 +1,5 @@
 use crate::howto::{HowTo, HowToError};
 
-use std::convert::TryFrom;
-
 use super::consts;
 
 #[non_exhaustive]

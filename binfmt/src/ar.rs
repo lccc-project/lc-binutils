@@ -1,5 +1,4 @@
 use std::{
-    convert::TryFrom,
     error::Error,
     ffi::{CString, OsStr, OsString},
     fmt::Display,
