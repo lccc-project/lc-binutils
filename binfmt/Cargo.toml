@@ -16,6 +16,7 @@ lazy_static = "1.4.0"
 target-tuples = "0.5.9"
 fake-enum = "0.1.4"
 arch-ops = {path="../arch-ops", version = "0.1.0"}
+bitflags = {version="2.5.0", features=["bytemuck"]}
 
 [lib]
 name = "binfmt"
@@ -33,8 +34,9 @@ xir = []
 ar = []
 xo65 = []
 o65 = []
-default-formats = ["coff","elf32","elf64","macho","pe","llir","xir","ar"]
-all-formats = ["default-formats","aout","xo65","o65"]
+default-formats = ["coff","elf32","elf64","macho","pe","ar"]
+lto-formats = ["llir","xir"]
+all-formats = ["default-formats", "lto-formats","aout","xo65","o65"]
 w65 = []
 x86 = []
 arm = []

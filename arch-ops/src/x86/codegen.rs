@@ -1183,7 +1183,7 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                             let (mode, addr) = match (rm, disp) {
                                 (0o006, None) => (0o100, Some(X86Displacement::Offset(0))),
                                 (_, None) => (0o000, None),
-                                (_, Some(X86Displacement::Offset(x))) if x < 256 && x >= 0 => {
+                                (_, Some(X86Displacement::Offset(x))) if (0..256).contains(&x) => {
                                     (0o100, Some(X86Displacement::Offset(x)))
                                 }
                                 (_, Some(X86Displacement::Addr(Address::Abs(x)))) if x < 256 => {
@@ -1201,7 +1201,7 @@ impl<HasReg, HasReg3, HasMask, HasOpcode> ModRMBuilder<NoRM, HasReg, HasReg3, Ha
                             let (mode, addr) = match (rm, disp) {
                                 (0o005, None) => (0o100, Some(X86Displacement::Offset(0))),
                                 (_, None) => (0o000, None),
-                                (_, Some(X86Displacement::Offset(x))) if x < 256 && x >= 0 => {
+                                (_, Some(X86Displacement::Offset(x))) if (0..256).contains(&x) => {
                                     (0o100, Some(X86Displacement::Offset(x)))
                                 }
                                 (_, Some(X86Displacement::Addr(Address::Abs(x)))) if x < 256 => {
