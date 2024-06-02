@@ -61,7 +61,7 @@ macro_rules! opcodes {
                     const INST_HIGH: u8 = 0 $(+ ignore_const_one!($mnemonic))*;
                     if value < INST_HIGH {
                         #[allow(unsafe_code)]
-                        Ok(unsafe { std::mem::transmute(value) })
+                        Ok(unsafe { std::mem::transmute::<u8, $crate::holeybytes::Opcode>(value) })
                     } else {
                         Err(())
                     }
