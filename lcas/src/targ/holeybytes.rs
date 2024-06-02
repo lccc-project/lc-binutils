@@ -9,8 +9,7 @@ use {
     arch_ops::holeybytes::{
         self, Address, Instruction, Opcode, Operands, OpsType, Register, Relative16, Relative32,
     },
-    std::convert::TryInto,
-    std::{convert::TryFrom, fmt::Display, iter::Peekable, str::FromStr},
+    std::{fmt::Display, iter::Peekable, str::FromStr},
 };
 
 #[derive(Default, Clone, Hash, PartialEq, Eq)]
@@ -410,7 +409,6 @@ macro_rules! from_token_imms {
     ($($ty:ident),* $(,)?) => {
         $(impl FromToken for $ty {
             fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
-                use std::convert::TryFrom;
                 if let Token::IntegerLiteral(lit) = iter.next().ok_or(Error::NotEnoughTokens)?  {
                     Ok($ty::try_from(lit).map_err(|_| Error::IntTooBig)?)
                 } else {

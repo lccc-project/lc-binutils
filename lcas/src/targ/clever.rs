@@ -1,4 +1,4 @@
-use std::{convert::TryFrom, str::FromStr};
+use std::str::FromStr;
 
 use crate::{
     as_state::{int_to_bytes_le, PeekToken},
@@ -140,7 +140,7 @@ impl TargetMachine for CleverTargetMachine {
         todo!("float_to_bytes")
     }
 
-    fn long_width(&self) -> usize{
+    fn long_width(&self) -> usize {
         8
     }
 
@@ -339,7 +339,7 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
                             Some(CleverOperand::Indirect {
                                 size: size.unwrap_or(64),
                                 base: reg,
-                                scale: (1<<scale) as u8,
+                                scale: (1 << scale) as u8,
                                 index: CleverIndex::Abs(imm as i16),
                             })
                         }
@@ -469,14 +469,14 @@ fn parse_insn(
     opc: &str,
     state: &mut crate::as_state::AsState,
 ) -> Option<CleverInstruction> {
-    if opc=="nop"{
+    if opc == "nop" {
         let mut oprs = Vec::new();
-        if let Some(Token::LineTerminator) | None = state.iter().peek(){
-        }else{
-            for _ in 0..3{
+        if let Some(Token::LineTerminator) | None = state.iter().peek() {
+        } else {
+            for _ in 0..3 {
                 oprs.push(parse_operand(state, false)?);
-                match state.iter().peek(){
-                    Some(Token::Sigil(s)) if s=="," => continue,
+                match state.iter().peek() {
+                    Some(Token::Sigil(s)) if s == "," => continue,
                     _ => break,
                 }
             }
@@ -485,12 +485,18 @@ fn parse_insn(
         let opc = CleverOpcode::from_opcode(opc).unwrap();
 
         return Some(CleverInstruction::new(opc, oprs));
-    }else if opc=="ifjmp"{
+    } else if opc == "ifjmp" {
         let opc = 0x7c8f;
-        return Some(CleverInstruction::new(CleverOpcode::from_opcode(opc).unwrap(), vec![]));
-    }else if opc=="fret"{
+        return Some(CleverInstruction::new(
+            CleverOpcode::from_opcode(opc).unwrap(),
+            vec![],
+        ));
+    } else if opc == "fret" {
         let opc = 0x7c8e;
-        return Some(CleverInstruction::new(CleverOpcode::from_opcode(opc).unwrap(), vec![]));
+        return Some(CleverInstruction::new(
+            CleverOpcode::from_opcode(opc).unwrap(),
+            vec![],
+        ));
     }
     let opc = parse_mnemonic(opc)?;
     match opc.operands() {
@@ -568,16 +574,14 @@ fn parse_insn(
             ))
         }
         arch_ops::clever::CleverOperandKind::Insn => {
-            if prefix.is_some(){
-                return None
+            if prefix.is_some() {
+                return None;
             }
-             match state.iter().next()?{
-                Token::Identifier(id) => {
-                    parse_insn(Some(opc),&id,state)
-                }
-                tok => panic!("Unexpected token, excepted an instruction, got {:?}",tok)
+            match state.iter().next()? {
+                Token::Identifier(id) => parse_insn(Some(opc), &id, state),
+                tok => panic!("Unexpected token, excepted an instruction, got {:?}", tok),
             }
-        },
+        }
         CleverOperandKind::HRegister => {
             let reg = match state.iter().next()? {
                 Token::Identifier(id) => id
@@ -641,7 +645,7 @@ macro_rules! clever_mnemonics{
     }
 }
 
-fn parse_cc(opc: &mut u16, mnemonic: &str) -> Option<()>{
+fn parse_cc(opc: &mut u16, mnemonic: &str) -> Option<()> {
     match mnemonic {
         "p" | "po" => (),
         "c" | "b" => *opc |= 0x1,
@@ -747,35 +751,34 @@ fn parse_uf(opc: &mut u16, mnemonic: &str) -> Option<()> {
     }
 }
 
-fn parse_size_suffix(opc: &mut u16, mnemonic: &str) -> Option<()>{
+fn parse_size_suffix(opc: &mut u16, mnemonic: &str) -> Option<()> {
     if mnemonic.starts_with('.') {
         let suffix = &mnemonic[1..];
-        match suffix{
+        match suffix {
             "8" | "byte" => (),
             "16" | "half" => *opc |= 0x01,
             "32" | "single" => *opc |= 0x02,
             "64" | "double" => *opc |= 0x03,
-            _ => None?
+            _ => None?,
         }
         Some(())
-    }else{
+    } else {
         None
     }
 }
 
-fn parse_callsm(opc: &mut u16, mnemonic: &str) -> Option<()>{
+fn parse_callsm(opc: &mut u16, mnemonic: &str) -> Option<()> {
     if mnemonic.starts_with('.') {
         let suffix = &mnemonic[1..];
-        if suffix=="v"{
+        if suffix == "v" {
             *opc |= 0x01;
-        }else{
+        } else {
             None?
         }
         Some(())
-    }else if mnemonic.is_empty() {
+    } else if mnemonic.is_empty() {
         Some(())
-    }
-    else{
+    } else {
         None
     }
 }
@@ -844,7 +847,7 @@ clever_mnemonics! {
     ["fcmp",0x119,parse_none],
     ["exp",0x120,parse_l00f],
     ["ln",0x121,parse_l00f],
-    
+
     ["fraiseexcept",0x130,parse_none],
     ["ftriggerexcept",0x131,parse_none],
 
@@ -873,7 +876,7 @@ clever_mnemonics! {
     ["jmpsm",0x7cb,parse_none],
     ["callsm",0x7cc,parse_callsm],
     ["retrsm",0x7cd,parse_none],
-    
+
     ["hlt", 0x801, parse_none],
     ["in", 0x806, parse_none],
     ["out", 0x807, parse_none],
@@ -881,7 +884,7 @@ clever_mnemonics! {
     ["rstregf",0x809,parse_none],
     ["vmcreate",0xe00,parse_none],
     ["vmdestroy",0xe01,parse_none],
-    
+
     ["scret",0xfc6,parse_none],
     ["reti",0xfc7,parse_none],
     ["hcall",0xfcb,parse_none],

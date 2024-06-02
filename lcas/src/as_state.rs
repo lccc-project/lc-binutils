@@ -1,6 +1,5 @@
 use std::{
     any::Any,
-    convert::TryInto,
     iter::Peekable,
     ops::{Deref, DerefMut},
 };
