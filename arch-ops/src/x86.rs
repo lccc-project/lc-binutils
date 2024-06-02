@@ -1,4 +1,17 @@
 use target_tuples::Target;
+
+#[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
+pub enum X86Gpr {
+    Ax,
+    Cx,
+    Dx,
+    Bx,
+    Sp,
+    Bp,
+    Si,
+    Di,
+}
+
 #[derive(Debug, Hash, PartialEq, Eq, Copy, Clone)]
 #[non_exhaustive]
 pub enum X86RegisterClass {
@@ -55,6 +68,19 @@ impl X86RegisterClass {
             4 => Some(X86RegisterClass::Double),
             8 => Some(X86RegisterClass::Quad),
             _ => None,
+        }
+    }
+
+    pub fn as_gpr(self, gpr_no: X86Gpr) -> X86Register {
+        let regno = gpr_no as u8;
+        match self {
+            Self::Byte if regno < 4 => {
+                X86Register::from_class(self, regno).expect("We have a valid GPR Number")
+            }
+            Self::ByteRex | Self::Word | Self::Double | Self::Quad => {
+                X86Register::from_class(self, regno).expect("We have a valid GPR Number")
+            }
+            cl => panic!("Cannot produce a GPR for {:?}", cl),
         }
     }
 }
