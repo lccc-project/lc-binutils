@@ -1,3 +1,5 @@
+#![allow(dead_code)] // fixme later
+
 #[repr(C)]
 #[derive(Zeroable, Pod, Clone, Copy)]
 pub struct O65FixedHeader {
