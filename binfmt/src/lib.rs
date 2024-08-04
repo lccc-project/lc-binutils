@@ -1,5 +1,9 @@
 #![deny(warnings)]
-#![allow(clippy::wrong_self_convention, clippy::extra_unused_type_parameters)]
+#![allow(
+    clippy::wrong_self_convention,
+    clippy::extra_unused_type_parameters,
+    dead_code
+)] // dead_code got very aggressive. We need to fix later
 
 pub mod traits;
 
