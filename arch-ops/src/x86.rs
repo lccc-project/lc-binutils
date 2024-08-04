@@ -208,6 +208,22 @@ pub enum X86Register {
     UndefSeg,
 }
 
+impl X86Register {
+    pub const fn gpr(self) -> Option<X86Gpr> {
+        match self {
+            Self::Al | Self::Ah | Self::Ax | Self::Eax | Self::Rax => Some(X86Gpr::Ax),
+            Self::Cl | Self::Ch | Self::Cx | Self::Ecx | Self::Rcx => Some(X86Gpr::Cx),
+            Self::Dl | Self::Dh | Self::Dx | Self::Edx | Self::Rdx => Some(X86Gpr::Dx),
+            Self::Bl | Self::Bh | Self::Bx | Self::Ebx | Self::Rbx => Some(X86Gpr::Bx),
+            Self::Spl | Self::Sp | Self::Esp | Self::Rsp => Some(X86Gpr::Sp),
+            Self::Bpl | Self::Bp | Self::Ebp | Self::Rbp => Some(X86Gpr::Bp),
+            Self::Sil | Self::Si | Self::Esi | Self::Rsi => Some(X86Gpr::Si),
+            Self::Dil | Self::Di | Self::Edi | Self::Rdi => Some(X86Gpr::Di),
+            _ => None,
+        }
+    }
+}
+
 use std::{collections::HashMap, fmt::Display};
 
 macro_rules! define_x86_registers{
