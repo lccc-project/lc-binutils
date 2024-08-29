@@ -115,7 +115,20 @@ impl HowTo for Elf64HoleyBytesHowTo {
         unimplemented!("Will be removed soon™?")
     }
 
-    fn apply(&self, _addr: u128, _at_addr: u128, _region: &mut [u8]) -> Result<bool, HowToError> {
+    fn apply<'a>(
+        &self,
+        _addr: u128,
+        _at_addr: u128,
+        _region: &'a mut [u8],
+    ) -> Result<&'a mut [u8], HowToError> {
+        todo!()
+    }
+
+    fn valid_in(
+        &self,
+        _output_ty: crate::howto::RelocOutput,
+        _sym_vis: &crate::sym::Symbol,
+    ) -> bool {
         todo!()
     }
 }

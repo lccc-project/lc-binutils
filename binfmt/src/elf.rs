@@ -13,9 +13,76 @@ use bytemuck::{Pod, Zeroable};
 use crate::debug::PrintHex;
 use crate::fmt::{BinaryFile, Binfmt, FileType, Section, SectionFlag, SectionType};
 use crate::howto::HowTo;
-use crate::sym::{SymbolKind, SymbolType};
+use crate::howto::RelocOutput;
+use crate::sym::{self, SymbolKind, SymbolType};
 use crate::traits::private::Sealed;
 use crate::traits::{Numeric, ReadSeek};
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PltType {
+    Lazy,
+    NonLazy,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub struct PltEntryReloc<H> {
+    pub offset: usize,
+    pub howto: H,
+    pub addend: usize,
+}
+
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub struct PltEntryDesc<'a, H> {
+    pub bytes: &'a [u8],
+    /// The target of the relocation for the jump slot
+    pub rel_dynent: Option<PltEntryReloc<H>>,
+    /// The target of the relocation for the initial PLT Entry
+    pub rel_plt_init: Option<PltEntryReloc<H>>,
+    /// The target of the relocation for the Global Offset Table (The entire GOT/_GLOBAL_OFFSET_TABLE_ symbol)
+    pub rel_got: Option<PltEntryReloc<H>>,
+    /// The target of the relocation for the GOT Entry for the current symbol
+    pub rel_got_entry: Option<PltEntryReloc<H>>,
+    #[doc(hidden)]
+    pub __non_exhaustive: (),
+}
+
+impl<'a, H> PltEntryDesc<'a, H> {
+    pub const fn new() -> Self {
+        Self {
+            bytes: &[],
+            rel_dynent: None,
+            rel_got: None,
+            rel_plt_init: None,
+            rel_got_entry: None,
+            __non_exhaustive: (),
+        }
+    }
+}
+
+impl<'a, H> Default for PltEntryDesc<'a, H> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub trait DynBuilder {
+    type HowTo: HowTo;
+
+    /// Checks whether or not
+    fn supports_dyn(&self) -> bool;
+
+    /// Checks whether or not the current format supports the specified plt type.
+    ///
+    /// Returns `Ok` if the `ty` is supported, and returns `Err` of the type to use instead otherwise
+    fn supports_plt_type(&self, ty: PltType) -> Result<(), PltType>;
+
+    /// The Dynamic Relocation type to use for a Jump Slot
+    fn jump_slot_howto(&self) -> Self::HowTo;
+
+    /// The Dynamic Relocation type to use for global data
+    fn global_data_howto(&self) -> Self::HowTo;
+}
 
 pub type ElfByte<E> = <E as ElfClass>::Byte;
 pub type ElfHalf<E> = <E as ElfClass>::Half;
@@ -1592,7 +1659,16 @@ impl HowTo for ElfHowToUnknown {
         None
     }
 
-    fn apply(&self, _: u128, _: u128, _: &mut [u8]) -> Result<bool, crate::howto::HowToError> {
-        Ok(false)
+    fn apply<'a>(
+        &self,
+        _: u128,
+        _: u128,
+        region: &'a mut [u8],
+    ) -> Result<&'a mut [u8], crate::howto::HowToError> {
+        Ok(region)
+    }
+
+    fn valid_in(&self, _: RelocOutput, _: &sym::Symbol) -> bool {
+        false
     }
 }

@@ -197,34 +197,34 @@ impl HowTo for Elf32W65HowTo {
         None
     }
 
-    fn apply(
+    fn apply<'a>(
         &self,
         addr: u128,
         at_addr: u128,
-        region: &mut [u8],
-    ) -> Result<bool, crate::howto::HowToError> {
+        region: &'a mut [u8],
+    ) -> Result<&'a mut [u8], crate::howto::HowToError> {
         match self {
-            Elf32W65HowTo::None => Ok(false),
+            Elf32W65HowTo::None => Ok(region),
             Elf32W65HowTo::Abs24 => {
                 if addr > 16777216 {
                     Err(HowToError::UnsignedOverflow)
                 } else {
                     let bytes = addr.to_le_bytes();
                     region.copy_from_slice(&bytes[..3]);
-                    Ok(true)
+                    Ok(region)
                 }
             }
             Elf32W65HowTo::Abs16 => {
                 let bytes = addr.to_le_bytes();
                 region.copy_from_slice(&bytes[..2]);
-                Ok(true)
+                Ok(region)
             }
             Elf32W65HowTo::Rel8 => {
                 let val = (addr as i128) - (at_addr as i128);
                 if let Ok(x) = i8::try_from(val) {
                     let bytes = x.to_le_bytes();
                     region.copy_from_slice(&bytes);
-                    Ok(true)
+                    Ok(region)
                 } else {
                     Err(HowToError::SignedOverflow)
                 }
@@ -234,7 +234,7 @@ impl HowTo for Elf32W65HowTo {
                 if let Ok(x) = i16::try_from(val) {
                     let bytes = x.to_le_bytes();
                     region.copy_from_slice(&bytes);
-                    Ok(true)
+                    Ok(region)
                 } else {
                     Err(HowToError::SignedOverflow)
                 }
@@ -242,17 +242,17 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::Bank => {
                 let bytes = addr.to_le_bytes();
                 region.copy_from_slice(&bytes[3..4]);
-                Ok(true)
+                Ok(region)
             }
             Elf32W65HowTo::Abs8 => {
                 let bytes = addr.to_le_bytes();
                 region.copy_from_slice(&bytes[..1]);
-                Ok(true)
+                Ok(region)
             }
             Elf32W65HowTo::Direct => {
                 let bytes = (addr & !0xff).to_le_bytes();
                 region.copy_from_slice(&bytes[..2]);
-                Ok(true)
+                Ok(region)
             }
             Elf32W65HowTo::RelaxJsl => unimplemented!(),
             Elf32W65HowTo::RelaxJml => unimplemented!(),
@@ -261,6 +261,14 @@ impl HowTo for Elf32W65HowTo {
             Elf32W65HowTo::RelaxAbs => unimplemented!(),
             Elf32W65HowTo::RelaxJmp => unimplemented!(),
         }
+    }
+
+    fn valid_in(
+        &self,
+        _output_ty: crate::howto::RelocOutput,
+        _sym_vis: &crate::sym::Symbol,
+    ) -> bool {
+        todo!()
     }
 }
 
