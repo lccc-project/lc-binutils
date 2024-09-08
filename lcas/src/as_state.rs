@@ -6,34 +6,37 @@ use std::{
 
 use arch_ops::traits::InsnWrite;
 
-use crate::{expr::Expression, lex::Token, targ::TargetMachine};
+use crate::{expr::Expression, lex::Token, span::Spanned, targ::TargetMachine};
 
 pub trait PeekToken: Iterator {
     fn peek(&mut self) -> Option<&Self::Item>;
 
-    fn next_ignore_newline(&mut self) -> Option<Token>
+    fn next_ignore_newline(&mut self) -> Option<Spanned<Token>>
     where
-        Self: Iterator<Item = Token>,
+        Self: Iterator<Item = Spanned<Token>>,
     {
         loop {
             match self.next()? {
-                Token::LineTerminator => continue,
+                tok if matches!(tok.body(), Token::LineTerminator) => {
+                    self.next();
+                    continue;
+                }
                 tok => break Some(tok),
             }
         }
     }
 
-    fn peek_ignore_newline(&mut self) -> Option<&Token>
+    fn peek_ignore_newline(&mut self) -> Option<&Spanned<Token>>
     where
-        Self: Iterator<Item = Token>,
+        Self: Iterator<Item = Spanned<Token>>,
     {
         loop {
             match self.peek()? {
-                Token::LineTerminator => {
+                tok if matches!(tok.body(), Token::LineTerminator) => {
                     self.next();
                     continue;
                 }
-                tok => break Some(unsafe { &*(tok as *const Token) }), // Hecking NLL
+                tok => break Some(unsafe { &*(tok as *const _) }), // Hecking NLL
             }
         }
     }
@@ -62,7 +65,7 @@ impl<'a> Assembler<'a> {
         output: Box<dyn InsnWrite + 'a>,
         as_data: Box<dyn Any>,
         as_callbacks: &'a dyn AssemblerCallbacks,
-        tokens: &'a mut (dyn Iterator<Item = Token> + 'a),
+        tokens: &'a mut (dyn Iterator<Item = Spanned<Token>> + 'a),
     ) -> Assembler<'a> {
         Assembler {
             state: AsState {
@@ -93,8 +96,8 @@ impl<'a> Assembler<'a> {
 
         loop {
             let maybe_mnemonic = self.state.iter.next_ignore_newline()?;
-            match maybe_mnemonic {
-                Token::Identifier(id) => match self.state.iter.peek()? {
+            match maybe_mnemonic.into_inner() {
+                Token::Identifier(id) => match self.state.iter.peek()?.body() {
                     Token::Sigil(x) if x == ":" => {
                         self.state.iter.next();
                         self.as_callbacks.create_symbol_now(self, &id)
@@ -114,7 +117,7 @@ impl<'a> Assembler<'a> {
             } else {
                 match &*mnemonic {
                     ".asciz" => {
-                        let mut buf = match self.state.iter.next_ignore_newline()? {
+                        let mut buf = match self.state.iter.next_ignore_newline()?.body() {
                             Token::StringLiteral(x) => x.bytes().collect::<Vec<_>>(),
                             tok => panic!("Unexpected token {:?}. Expected a string literal", tok),
                         };
@@ -122,7 +125,7 @@ impl<'a> Assembler<'a> {
                         Some(self.state.output.write_all(&buf))
                     }
                     ".ascii" => {
-                        let buf = match self.state.iter.next_ignore_newline()? {
+                        let buf = match self.state.iter.next_ignore_newline()?.body() {
                             Token::StringLiteral(x) => x.bytes().collect::<Vec<_>>(),
                             tok => panic!("Unexpected token {:?}. Expected a string literal", tok),
                         };
@@ -160,7 +163,7 @@ impl<'a> Assembler<'a> {
                                 expr => todo!("{:?}", expr),
                             }
 
-                            match self.iter().peek() {
+                            match self.iter().peek().map(Spanned::body) {
                                 Some(Token::Sigil(s)) if s == "," => {
                                     self.iter().next();
                                 }
@@ -199,7 +202,7 @@ impl<'a> Assembler<'a> {
                                 expr => todo!("{:?}", expr),
                             }
 
-                            match self.iter().peek() {
+                            match self.iter().peek().map(Spanned::body) {
                                 Some(Token::Sigil(s)) if s == "," => {
                                     self.iter().next();
                                 }
@@ -247,7 +250,7 @@ pub struct AsState<'a> {
     mach: &'a dyn TargetMachine,
     output: Box<dyn InsnWrite + 'a>,
     mach_data: Box<dyn Any>,
-    iter: Peekable<&'a mut (dyn Iterator<Item = Token> + 'a)>,
+    iter: Peekable<&'a mut (dyn Iterator<Item = Spanned<Token>> + 'a)>,
 }
 
 impl<'a> AsState<'a> {
@@ -267,7 +270,7 @@ impl<'a> AsState<'a> {
         &*self.mach_data
     }
 
-    pub fn iter(&mut self) -> &mut Peekable<&'a mut (dyn Iterator<Item = Token> + 'a)> {
+    pub fn iter(&mut self) -> &mut Peekable<&'a mut (dyn Iterator<Item = Spanned<Token>> + 'a)> {
         &mut self.iter
     }
 

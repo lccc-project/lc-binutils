@@ -1,5 +1,7 @@
 #![allow(dead_code)] // fixme later
 
+use bytemuck::{Pod, Zeroable};
+
 #[repr(C)]
 #[derive(Zeroable, Pod, Clone, Copy)]
 pub struct O65FixedHeader {

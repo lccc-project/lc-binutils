@@ -1,6 +1,6 @@
 use std::iter::Peekable;
 
-use crate::lex::Token;
+use crate::{lex::Token, span::Spanned};
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum BinaryOp {
@@ -39,7 +39,7 @@ pub enum Expression {
     Group(char, Box<Expression>),
 }
 
-pub fn parse_expression<I: Iterator<Item = Token>>(it: &mut Peekable<I>) -> Expression {
+pub fn parse_expression<I: Iterator<Item = Spanned<Token>>>(it: &mut Peekable<I>) -> Expression {
     parse_binary_expr(it, 0)
 }
 
@@ -67,13 +67,13 @@ fn binary_op(st: &str) -> Option<(BinaryOp, u32)> {
     }
 }
 
-pub fn parse_binary_expr<I: Iterator<Item = Token>>(
+pub fn parse_binary_expr<I: Iterator<Item = Spanned<Token>>>(
     it: &mut Peekable<I>,
     precedence: u32,
 ) -> Expression {
     let mut lhs = parse_unary_expr(it);
     loop {
-        let tok = if let Some(Token::Sigil(sig)) = it.peek() {
+        let tok = if let Some(Token::Sigil(sig)) = it.peek().map(Spanned::body) {
             sig
         } else {
             break;
@@ -92,8 +92,8 @@ pub fn parse_binary_expr<I: Iterator<Item = Token>>(
     }
     lhs
 }
-pub fn parse_unary_expr<I: Iterator<Item = Token>>(it: &mut Peekable<I>) -> Expression {
-    match it.peek() {
+pub fn parse_unary_expr<I: Iterator<Item = Spanned<Token>>>(it: &mut Peekable<I>) -> Expression {
+    match it.peek().map(Spanned::body) {
         Some(Token::Sigil(x)) if x == "-" => {
             it.next();
             Expression::Unary(UnaryOp::Neg, Box::new(parse_unary_expr(it)))
@@ -106,8 +106,8 @@ pub fn parse_unary_expr<I: Iterator<Item = Token>>(it: &mut Peekable<I>) -> Expr
     }
 }
 
-pub fn parse_simple_expr<I: Iterator<Item = Token>>(it: &mut Peekable<I>) -> Expression {
-    match it.next().unwrap() {
+pub fn parse_simple_expr<I: Iterator<Item = Spanned<Token>>>(it: &mut Peekable<I>) -> Expression {
+    match it.next().unwrap().into_inner() {
         Token::Identifier(id) => Expression::Symbol(id),
         Token::IntegerLiteral(n) => Expression::Integer(n),
         Token::Group(c, inner) => {

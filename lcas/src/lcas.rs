@@ -7,6 +7,7 @@ use lcas_core::{
     as_state::{Assembler, AssemblerCallbacks},
     expr::Expression,
     lex::Token,
+    sym::Symbol as LCasSymbol,
 };
 use std::{
     cell::RefCell,
@@ -96,7 +97,7 @@ impl AssemblerCallbacks for Callbacks {
 
                 Ok(())
             }
-            ".section" => match asm.iter().next().unwrap() {
+            ".section" => match asm.iter().next().unwrap().into_inner() {
                 Token::Identifier(tok) => {
                     let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
                     let sect = if let Some(sect) = data.sections.get(&tok) {
@@ -132,7 +133,7 @@ impl AssemblerCallbacks for Callbacks {
             },
             ".global" | ".globl" => {
                 loop {
-                    match asm.iter().next().unwrap() {
+                    match asm.iter().next().unwrap().into_inner() {
                         Token::Identifier(id) => {
                             let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
                             data.global_syms.insert(id);
@@ -149,7 +150,7 @@ impl AssemblerCallbacks for Callbacks {
             }
             ".weak" => {
                 loop {
-                    match asm.iter().next().unwrap() {
+                    match asm.iter().next().unwrap().into_inner() {
                         Token::Identifier(id) => {
                             let data = asm.as_data_mut().downcast_mut::<Data>().unwrap();
                             data.weak_syms.insert(id);
@@ -314,8 +315,6 @@ fn main() {
 
             x => {
                 input_files.push(x.to_string());
-                input_files.extend(args);
-                break;
             }
         }
     }
@@ -349,6 +348,8 @@ fn main() {
         std::process::exit(1)
     });
 
+    let file = LCasSymbol::intern(input_files.first().unwrap());
+
     let mut input = utf::decode_utf8(
         input_files
             .into_iter()
@@ -371,7 +372,7 @@ fn main() {
     .map(|e| e.unwrap())
     .peekable();
 
-    let mut lex = lcas_core::lex::Lexer::new(targ_def, &mut input);
+    let mut lex = lcas_core::lex::Lexer::new(targ_def, &mut input, file);
 
     let text = Section {
         name: ".text".to_string(),

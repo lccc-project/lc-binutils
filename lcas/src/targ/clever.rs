@@ -4,6 +4,7 @@ use crate::{
     as_state::{int_to_bytes_le, PeekToken},
     expr::{BinaryOp, Expression},
     lex::Token,
+    span::Spanned,
 };
 
 use arch_ops::{
@@ -194,7 +195,7 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
 
     let iter = state.iter();
 
-    match iter.peek()? {
+    match iter.peek()?.body() {
         Token::Identifier(id) => match &**id {
             "byte" => {
                 iter.next();
@@ -227,14 +228,14 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
 
     let mut isrel = None::<bool>;
 
-    match iter.peek()? {
-        Token::Group('[', _) => match iter.next().unwrap() {
+    match iter.peek()?.body() {
+        Token::Group('[', _) => match iter.next().unwrap().into_inner() {
             Token::Group('[', group) => {
                 let mut inner_size = None::<u16>;
 
                 let mut iter = group.into_iter().peekable();
 
-                match iter.peek()? {
+                match iter.peek()?.body() {
                     Token::Identifier(id) => match &**id {
                         "byte" => {
                             iter.next();
@@ -257,7 +258,7 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
                     _ => {}
                 }
 
-                match iter.peek()? {
+                match iter.peek()?.body() {
                     Token::Identifier(id) => match &**id {
                         "abs" => {
                             iter.next();
@@ -366,7 +367,7 @@ fn parse_operand(state: &mut crate::as_state::AsState, isaddr: bool) -> Option<C
             _ => unreachable!(),
         },
         _ => {
-            match iter.peek()? {
+            match iter.peek()?.body() {
                 Token::Identifier(id) => match &**id {
                     "abs" => {
                         iter.next();
@@ -471,11 +472,11 @@ fn parse_insn(
 ) -> Option<CleverInstruction> {
     if opc == "nop" {
         let mut oprs = Vec::new();
-        if let Some(Token::LineTerminator) | None = state.iter().peek() {
+        if let Some(Token::LineTerminator) | None = state.iter().peek().map(Spanned::body) {
         } else {
             for _ in 0..3 {
                 oprs.push(parse_operand(state, false)?);
-                match state.iter().peek() {
+                match state.iter().peek().map(Spanned::body) {
                     Some(Token::Sigil(s)) if s == "," => continue,
                     _ => break,
                 }
@@ -504,7 +505,7 @@ fn parse_insn(
             let operands = (0..n)
                 .map(|n| {
                     if n != 0 {
-                        match state.iter().next()? {
+                        match state.iter().next()?.into_inner() {
                             Token::Sigil(s) if s == "," => {}
                             _ => None?,
                         }
@@ -542,7 +543,7 @@ fn parse_insn(
             Some(CleverInstruction::new(opc, vec![op]))
         }
         arch_ops::clever::CleverOperandKind::Size => {
-            let size = match state.iter().next()? {
+            let size = match state.iter().next()?.into_inner() {
                 Token::Identifier(id) => match &*id {
                     "byte" => {
                         state.iter().next();
@@ -577,13 +578,13 @@ fn parse_insn(
             if prefix.is_some() {
                 return None;
             }
-            match state.iter().next()? {
+            match state.iter().next()?.into_inner() {
                 Token::Identifier(id) => parse_insn(Some(opc), &id, state),
                 tok => panic!("Unexpected token, excepted an instruction, got {:?}", tok),
             }
         }
         CleverOperandKind::HRegister => {
-            let reg = match state.iter().next()? {
+            let reg = match state.iter().next()?.into_inner() {
                 Token::Identifier(id) => id
                     .parse::<CleverRegister>()
                     .expect("Expected a register name"),
@@ -601,7 +602,7 @@ fn parse_insn(
             ))
         }
         CleverOperandKind::HImmediate => {
-            let imm = match state.iter().next()? {
+            let imm = match state.iter().next()?.into_inner() {
                 Token::IntegerLiteral(lit) => lit,
                 tok => panic!("Unexpected Token, expected an integer, got {:?}", tok),
             };

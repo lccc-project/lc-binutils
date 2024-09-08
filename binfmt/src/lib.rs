@@ -48,9 +48,6 @@ pub mod o65;
 
 pub mod binary;
 
-#[macro_use]
-extern crate bytemuck;
-
 extern crate lazy_static;
 
 macro_rules! collect_dashed_idents{

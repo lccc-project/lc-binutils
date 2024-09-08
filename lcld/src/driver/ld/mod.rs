@@ -140,6 +140,8 @@ pub fn main() -> Result<(), IOError> {
 
     let mut add_search_dirs = Vec::new();
 
+    let mut default_script = None::<PathBuf>;
+
     if let Some((left, _)) = prg_name.rsplit_once('-') {
         if let Ok(targ) = left.parse() {
             default_targ = targ;
@@ -231,6 +233,12 @@ pub fn main() -> Result<(), IOError> {
             }
             "--flavour" | "-flavour" | "--flavor" | "-flavor" => {
                 args.next(); // consume the argument to flavour, but we're committed on the unix driver now
+            }
+            "-T" => {
+                default_script = Some(PathBuf::from(args.next().unwrap_or_else(|| {
+                    eprintln!("{}: Expected a file name after -T", prg_name);
+                    std::process::exit(1)
+                })));
             }
             x if x.starts_with('-') => todo!("opts"),
             _ => {

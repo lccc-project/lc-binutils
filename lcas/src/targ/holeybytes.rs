@@ -1,10 +1,10 @@
 use {
     super::TargetMachine,
-    crate::expr::{parse_simple_expr, BinaryOp},
     crate::{
         as_state::{float_to_bytes_le, int_to_bytes_le, AsState},
-        expr::Expression,
+        expr::{parse_simple_expr, BinaryOp, Expression},
         lex::Token,
+        span::Spanned,
     },
     arch_ops::holeybytes::{
         self, Address, Instruction, Opcode, Operands, OpsType, Register, Relative16, Relative32,
@@ -102,7 +102,7 @@ pub fn get_target_def() -> &'static HbTargetMachine {
 
 pub fn extract_ops(
     opsty: OpsType,
-    iter: &mut Peekable<impl Iterator<Item = Token>>,
+    iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>,
 ) -> Result<Operands> {
     mod addressing {
         use super::*;
@@ -160,7 +160,7 @@ pub fn extract_ops(
 
                             counter += 1;
                             if counter < OPSN
-                                && !matches!(iter.next().ok_or(Error::NotEnoughTokens)?, Token::Sigil(s) if s == ",")
+                                && !matches!(iter.next().ok_or(Error::NotEnoughTokens)?.into_inner(), Token::Sigil(s) if s == ",")
                                 { return Err(Error::TooManyOps); }
 
                             item
@@ -228,7 +228,9 @@ pub fn extract_ops(
     )
 }
 
-fn address(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<(Register, Address)> {
+fn address(
+    iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>,
+) -> Result<(Register, Address)> {
     match parse_simple_expr(iter) {
         Expression::Symbol(name) => Ok((Register(0), Address::Symbol { name, disp: 0 })),
         Expression::Integer(abs) => Ok((Register(0), Address::Abs(abs))),
@@ -340,12 +342,12 @@ fn gsqb_address(expr: Expression) -> Result<GsQbResultOk> {
 }
 
 trait FromToken: Sized {
-    fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self>;
+    fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self>;
 }
 
 impl FromToken for Register {
-    fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
-        if let Token::Identifier(lit) = iter.next().ok_or(Error::NotEnoughTokens)? {
+    fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self> {
+        if let Token::Identifier(lit) = iter.next().ok_or(Error::NotEnoughTokens)?.into_inner() {
             Ok(Self(
                 lit.strip_prefix('r')
                     .ok_or(Error::ExpectedRegister)?
@@ -359,7 +361,7 @@ impl FromToken for Register {
 }
 
 impl FromToken for Address {
-    fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
+    fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self> {
         let (reg, addr) = address(iter)?;
         if reg.0 != 0 {
             return Err(Error::UnexpectedAddressTy);
@@ -371,7 +373,7 @@ impl FromToken for Address {
 
 impl FromToken for (Register, Address) {
     #[inline(always)]
-    fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
+    fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self> {
         address(iter)
     }
 }
@@ -379,7 +381,7 @@ impl FromToken for (Register, Address) {
 // Can't use generic for 1.56 reasons
 macro_rules! from_token_rela {
     ($for:ty, $iter:expr $(,)?) => {
-        match $iter.next().ok_or(Error::NotEnoughTokens)? {
+        match $iter.next().ok_or(Error::NotEnoughTokens)?.into_inner() {
             Token::Identifier(name) => Ok(Address::Symbol { name, disp: 0 }),
             Token::IntegerLiteral(disp) => Ok(Address::Disp(
                 <$for>::try_from(disp as i128)
@@ -393,14 +395,14 @@ macro_rules! from_token_rela {
 
 impl FromToken for Relative16 {
     #[inline]
-    fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
+    fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self> {
         from_token_rela!(i16, iter).map(Self)
     }
 }
 
 impl FromToken for Relative32 {
     #[inline]
-    fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
+    fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self> {
         from_token_rela!(i32, iter).map(Self)
     }
 }
@@ -408,8 +410,8 @@ impl FromToken for Relative32 {
 macro_rules! from_token_imms {
     ($($ty:ident),* $(,)?) => {
         $(impl FromToken for $ty {
-            fn from_token(iter: &mut Peekable<impl Iterator<Item = Token>>) -> Result<Self> {
-                if let Token::IntegerLiteral(lit) = iter.next().ok_or(Error::NotEnoughTokens)?  {
+            fn from_token(iter: &mut Peekable<impl Iterator<Item = Spanned<Token>>>) -> Result<Self> {
+                if let Token::IntegerLiteral(lit) = iter.next().ok_or(Error::NotEnoughTokens)?.into_inner()  {
                     Ok($ty::try_from(lit).map_err(|_| Error::IntTooBig)?)
                 } else {
                     Err(Error::UnexpectedToken)
