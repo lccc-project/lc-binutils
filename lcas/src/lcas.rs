@@ -124,6 +124,8 @@ impl AssemblerCallbacks for Callbacks {
 
                     asm.set_output(Box::new(SharedSection(sect)));
 
+                    dbg!(asm.iter().peek());
+
                     Ok(())
                 }
                 tok => panic!(

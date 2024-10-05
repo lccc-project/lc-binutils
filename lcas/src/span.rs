@@ -30,11 +30,11 @@ impl Pos {
         self.0 >> 20
     }
 
-    pub const fn next_col(mut self, n: u32) -> Self {
+    pub const fn next_col(self, n: u32) -> Self {
         Self::new(self.row(), self.col() + n)
     }
 
-    pub const fn next_row(mut self, n: u32) -> Self {
+    pub const fn next_row(self, n: u32) -> Self {
         Self::new(self.row() + n, 0)
     }
 }

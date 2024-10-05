@@ -16,9 +16,8 @@ pub trait PeekToken: Iterator {
         Self: Iterator<Item = Spanned<Token>>,
     {
         loop {
-            match self.next()? {
+            match dbg!(self.next()?) {
                 tok if matches!(tok.body(), Token::LineTerminator) => {
-                    self.next();
                     continue;
                 }
                 tok => break Some(tok),
@@ -96,8 +95,9 @@ impl<'a> Assembler<'a> {
 
         loop {
             let maybe_mnemonic = self.state.iter.next_ignore_newline()?;
-            match maybe_mnemonic.into_inner() {
-                Token::Identifier(id) => match self.state.iter.peek()?.body() {
+
+            match dbg!(maybe_mnemonic).into_inner() {
+                Token::Identifier(id) => match dbg!(self.state.iter.peek())?.body() {
                     Token::Sigil(x) if x == ":" => {
                         self.state.iter.next();
                         self.as_callbacks.create_symbol_now(self, &id)

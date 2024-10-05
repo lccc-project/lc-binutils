@@ -1,7 +1,5 @@
 use std::any::Any;
 
-use arch_ops::traits::InsnWrite;
-
 use crate::as_state::AsState;
 
 use target_tuples::Architecture;
